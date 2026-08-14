@@ -1,0 +1,30 @@
+{
+  "name": "@findit/domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
+    "./routing": "./src/routing.ts",
+    "./category-routing": "./src/category-routing.ts",
+    "./store-hours": "./src/store-hours.ts",
+    "./request-lifecycle": "./src/request-lifecycle.ts",
+    "./validations": "./src/validations.ts",
+    "./home-path": "./src/home-path.ts",
+    "./store-role": "./src/store-role.ts",
+    "./product-utils": "./src/product-utils.ts",
+    "./analytics": "./src/analytics.ts",
+    "./deep-links": "./src/deep-links.ts"
+  },
+  "dependencies": {
+    "@findit/types": "*",
+    "zod": "^4.4.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}

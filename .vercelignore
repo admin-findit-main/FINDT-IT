@@ -1,0 +1,20 @@
+# Files excluded from the Vercel upload. Only the Next.js web app at the repo
+# root is deployed; the Expo apps ship through EAS, not Vercel.
+#
+# Dropping apps/ is what keeps the deployment lean: with it, `npm ci` resolves
+# the whole workspace and installs ~1.0 GB of Expo and React Native packages
+# that the web build never imports. Without it the install is ~570 MB and the
+# workspace packages in packages/* still link correctly.
+#
+# If you ever move the Next.js app into apps/web, delete this line first.
+apps/
+
+# Backend source. Migrations and Edge Functions deploy with the Supabase CLI.
+supabase/
+
+# Local-only seed and env-check tooling; nothing in src/ imports it.
+scripts/
+
+# Agent tooling notes.
+.agents/
+.cursor/

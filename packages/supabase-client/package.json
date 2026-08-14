@@ -1,0 +1,30 @@
+{
+  "name": "@findit/supabase-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./mobile": "./src/mobile.ts",
+    "./edge": "./src/edge.ts",
+    "./push": "./src/push.ts"
+  },
+  "dependencies": {
+    "@findit/domain": "*",
+    "@findit/types": "*",
+    "@supabase/supabase-js": "^2.112.2"
+  },
+  "peerDependencies": {
+    "expo-secure-store": "*",
+    "@react-native-async-storage/async-storage": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo-secure-store": { "optional": true },
+    "@react-native-async-storage/async-storage": { "optional": true }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

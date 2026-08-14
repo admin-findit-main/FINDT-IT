@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@findit/types": ["./packages/types/src/index.ts"],
+      "@findit/domain": ["./packages/domain/src/index.ts"],
+      "@findit/domain/*": ["./packages/domain/src/*"],
+      "@findit/supabase-client": ["./packages/supabase-client/src/index.ts"],
+      "@findit/supabase-client/*": ["./packages/supabase-client/src/*"],
+      "@findit/theme": ["./packages/theme/src/index.ts"],
+      "@findit/theme/tokens": ["./packages/theme/src/tokens.ts"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "scripts/**/*.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules", "apps", "packages", "supabase/functions"]
+}

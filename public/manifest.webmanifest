@@ -1,0 +1,24 @@
+{
+  "name": "FINDIT",
+  "short_name": "FINDIT",
+  "description": "Ask nearby stores if they have what you're looking for.",
+  "start_url": "/home",
+  "display": "standalone",
+  "background_color": "#f7f7f5",
+  "theme_color": "#111111",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
