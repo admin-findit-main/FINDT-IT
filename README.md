@@ -182,3 +182,4 @@ FINDIT does not depend on perfect inventory systems. Employees answer quickly:
 
 Demand data is collected naturally from customer behavior. Primary metric: **time to first useful response**.
 # FINDIT-
+# FINDIT-
