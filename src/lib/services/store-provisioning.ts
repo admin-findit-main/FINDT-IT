@@ -94,6 +94,7 @@ export async function provisionStoreFromApplication(applicationId: string, revie
       subscription_status: "active",
       trial_ends_at: trialEnds,
       service_radius_miles: 10,
+      age_restricted: Boolean(application.requires_customer_id),
     })
     .select("*")
     .single();
@@ -258,6 +259,24 @@ export async function computeStoreMetricsFromSupabase(storeId: string): Promise<
   month.setDate(1);
   month.setHours(0, 0, 0, 0);
 
+  const yStart = new Date(start);
+  yStart.setDate(yStart.getDate() - 1);
+
+  const { data: yesterdayTargets } = await supabase
+    .from("request_targets")
+    .select("request_id")
+    .eq("store_id", storeId)
+    .gte("created_at", yStart.toISOString())
+    .lt("created_at", start.toISOString());
+  const yesterdayIds = (yesterdayTargets || []).map((t) => t.request_id);
+  const { data: yesterdayResponses } = yesterdayIds.length
+    ? await supabase
+        .from("store_responses")
+        .select("request_id")
+        .eq("store_id", storeId)
+        .in("request_id", yesterdayIds)
+    : { data: [] as { request_id: string }[] };
+
   const { data: todayTargets } = await supabase
     .from("request_targets")
     .select("request_id, created_at")
@@ -326,6 +345,8 @@ export async function computeStoreMetricsFromSupabase(storeId: string): Promise<
   return {
     requests_today: todayTargets?.length || 0,
     answered_today: todayResponses?.length || 0,
+    requests_yesterday: yesterdayTargets?.length || 0,
+    answered_yesterday: yesterdayResponses?.length || 0,
     waiting_today: (todayTargets?.length || 0) - (todayResponses?.length || 0),
     in_stock_today: (todayResponses || []).filter((r) => r.response_type === "in_stock").length,
     total_received: totalReceived || 0,

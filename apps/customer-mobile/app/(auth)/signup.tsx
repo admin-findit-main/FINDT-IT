@@ -1,106 +1,240 @@
-import { Link, useRouter } from "expo-router";
-import { useState } from "react";
-import { ScrollView, StyleSheet, Text } from "react-native";
-import { spacing, theme, typography } from "@findit/theme";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
 import {
-  GlassBackdrop,
+  OTP_RESEND_SECONDS,
+  formatUsNationalInput,
+  maskPhoneE164,
+} from "@findit/domain";
+import { spacing, typography } from "@findit/theme";
+import {
   GlassButton,
   GlassCard,
   GlassInput,
   GlassNotice,
+  useAppTheme,
 } from "@findit/theme/native";
+import { AuthFooter, AuthHeader } from "@/components/auth-chrome";
+import { Screen } from "@/components/screen";
 import { useAuth } from "@/lib/auth";
 
 export default function SignupScreen() {
-  const { signUp } = useAuth();
-  const router = useRouter();
+  const theme = useAppTheme();
+  const { sendPhoneOtp, verifyPhoneOtp, signUp } = useAuth();
+  const [mode, setMode] = useState<"phone" | "email">("email");
+  const [phoneDisplay, setPhoneDisplay] = useState("");
+  const [phoneE164, setPhoneE164] = useState("");
+  const [masked, setMasked] = useState("");
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<"phone" | "otp">("phone");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [seconds, setSeconds] = useState(0);
 
-  const onSubmit = async () => {
+  useEffect(() => {
+    if (seconds <= 0) return;
+    const id = setInterval(() => setSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(id);
+  }, [seconds]);
+
+  const sendCode = async (value: string) => {
     setBusy(true);
     setError(null);
+    const res = await sendPhoneOtp({ phone: value, createIfMissing: true });
+    setBusy(false);
+    if (res.error) {
+      setError(res.error);
+      return;
+    }
+    setPhoneE164(res.phone || value);
+    setMasked(res.masked || maskPhoneE164(res.phone || value));
+    setSeconds(OTP_RESEND_SECONDS);
+    setCode("");
+    setStep("otp");
+  };
+
+  const onOtp = async () => {
+    setBusy(true);
+    setError(null);
+    const res = await verifyPhoneOtp({
+      phone: phoneE164 || phoneDisplay,
+      token: code,
+    });
+    if (res.error) setError(res.error);
+    setBusy(false);
+  };
+
+  const onEmail = async () => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
     const res = await signUp({
       email: email.trim(),
       password,
       firstName: firstName.trim() || "Friend",
     });
     if (res.error) setError(res.error);
-    else router.replace("/(auth)/login");
+    else if (res.needsEmailConfirm) {
+      setNotice(
+        "Check your inbox, tap the link once, then sign in with this password."
+      );
+    }
     setBusy(false);
   };
 
   return (
-    <GlassBackdrop>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.brand}>Join FINDIT</Text>
-        <Text style={styles.sub}>Customer accounts only in this app.</Text>
+    <Screen variant="auth">
+      <AuthHeader
+        title="Create account"
+        subtitle="Customer accounts only in this app."
+      />
 
-        <GlassCard level="subtle">
-          <GlassInput
-            placeholder="First name"
-            value={firstName}
-            onChangeText={setFirstName}
-          />
-          <GlassInput
-            autoCapitalize="none"
-            keyboardType="email-address"
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <GlassInput
-            secureTextEntry
-            placeholder="Password (8+ characters)"
-            value={password}
-            onChangeText={setPassword}
-            containerStyle={styles.lastField}
-          />
-          {error ? <GlassNotice>{error}</GlassNotice> : null}
-          <GlassButton
-            title="Create account"
-            size="lg"
-            loading={busy}
-            disabled={busy}
-            onPress={onSubmit}
-          />
-        </GlassCard>
+      <GlassCard>
+        {mode === "phone" && step === "phone" ? (
+          <>
+            <GlassInput
+              inset
+              last
+              keyboardType="phone-pad"
+              placeholder="Phone number"
+              textContentType="telephoneNumber"
+              autoComplete="tel"
+              value={phoneDisplay}
+              onChangeText={(raw) => {
+                if (raw.trim().startsWith("+") && raw.replace(/\D/g, "").length > 11) {
+                  setPhoneDisplay(raw);
+                  return;
+                }
+                setPhoneDisplay(formatUsNationalInput(raw));
+              }}
+            />
+            {error ? <GlassNotice>{error}</GlassNotice> : null}
+            <GlassButton
+              title={busy ? "Sending…" : "Text me a code"}
+              size="lg"
+              loading={busy}
+              disabled={busy}
+              onPress={() => sendCode(phoneDisplay)}
+              style={styles.cta}
+            />
+          </>
+        ) : null}
+        {mode === "phone" && step === "otp" ? (
+          <>
+            <Text style={[styles.hint, { color: theme.inkMuted }]}>Code sent to {masked}</Text>
+            <GlassInput
+              inset
+              last
+              keyboardType="number-pad"
+              placeholder="6-digit code"
+              textContentType="oneTimeCode"
+              autoComplete="one-time-code"
+              value={code}
+              maxLength={6}
+              onChangeText={(v) => setCode(v.replace(/\D/g, "").slice(0, 6))}
+            />
+            {error ? <GlassNotice>{error}</GlassNotice> : null}
+            <GlassButton
+              title={busy ? "Checking…" : "Continue"}
+              size="lg"
+              loading={busy}
+              disabled={busy || code.length !== 6}
+              onPress={onOtp}
+              style={styles.cta}
+            />
+            <Pressable
+              onPress={() => {
+                setStep("phone");
+                setCode("");
+                setError(null);
+              }}
+              style={styles.altPress}
+            >
+              <Text style={[styles.alt, { color: theme.inkMuted }]}>Use a different number</Text>
+            </Pressable>
+            <Pressable
+              disabled={busy || seconds > 0}
+              onPress={() => sendCode(phoneE164 || phoneDisplay)}
+              style={styles.altPress}
+            >
+              <Text style={[styles.alt, { color: theme.inkMuted }]}>
+                {seconds > 0 ? `Resend in ${seconds}s` : "Resend code"}
+              </Text>
+            </Pressable>
+          </>
+        ) : null}
+        {mode === "email" ? (
+          <>
+            <GlassInput
+              inset
+              placeholder="First name"
+              autoComplete="given-name"
+              textContentType="givenName"
+              value={firstName}
+              onChangeText={setFirstName}
+            />
+            <GlassInput
+              inset
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <GlassInput
+              inset
+              last
+              secureTextEntry
+              textContentType="newPassword"
+              autoComplete="password-new"
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+            />
+            {error ? <GlassNotice>{error}</GlassNotice> : null}
+            {notice ? <GlassNotice tone="muted">{notice}</GlassNotice> : null}
+            <GlassButton
+              title="Create account"
+              size="lg"
+              loading={busy}
+              disabled={busy}
+              onPress={onEmail}
+              style={styles.cta}
+            />
+          </>
+        ) : null}
+      </GlassCard>
 
-        <Link href="/(auth)/login" style={styles.link}>
-          Already have an account?
-        </Link>
-      </ScrollView>
-    </GlassBackdrop>
+      <AuthFooter
+        secondaryLabel={mode === "phone" ? "Use email" : "Use phone"}
+        onSecondary={() => {
+          setMode(mode === "phone" ? "email" : "phone");
+          setError(null);
+          setNotice(null);
+          setStep("phone");
+        }}
+        linkHref="/(auth)/login"
+        linkLabel="Already have an account?"
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, justifyContent: "center", padding: spacing.xl },
-  brand: {
-    fontSize: typography.size.title1,
-    fontWeight: typography.weight.heavy,
-    color: theme.ink,
-    letterSpacing: typography.tracking.hero,
+  hint: {
+    fontSize: typography.size.footnote,
+    marginBottom: spacing.sm,
   },
-  sub: {
-    color: theme.inkMuted,
-    fontSize: typography.size.body,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  lastField: { marginBottom: spacing.lg },
-  link: {
-    color: theme.accentInk,
-    fontSize: typography.size.body,
-    fontWeight: typography.weight.semibold,
-    marginTop: spacing.xl,
-    paddingVertical: spacing.md,
+  cta: { marginTop: spacing.lg },
+  altPress: { minHeight: 44, justifyContent: "center", marginTop: spacing.md },
+  alt: {
+    fontSize: typography.size.footnote,
     textAlign: "center",
   },
 });

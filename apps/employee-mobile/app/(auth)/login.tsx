@@ -1,13 +1,8 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from "react-native";
 import { spacing, theme, typography } from "@findit/theme";
-import {
-  GlassBackdrop,
-  GlassButton,
-  GlassCard,
-  GlassInput,
-  GlassNotice,
-} from "@findit/theme/native";
+import { GlassBackdrop, GlassButton, GlassCard, GlassInput, GlassNotice } from "@findit/theme/native";
+import { BrandBusiness } from "@/components/brand";
 import { useAuth } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
 
@@ -45,8 +40,8 @@ export default function LoginScreen() {
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.brand}>FINDIT Employee</Text>
-          <Text style={styles.sub}>Floor terminal — respond fast.</Text>
+          <BrandBusiness style={styles.brandImg} />
+          <Text style={styles.sub}>Sign in to answer nearby asks.</Text>
 
           <GlassCard level="strong" style={styles.card}>
             {!isSupabaseConfigured() && (
@@ -94,11 +89,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.xl,
   },
-  brand: {
-    color: theme.ink,
-    fontSize: typography.size.hero,
-    fontWeight: typography.weight.heavy,
-    letterSpacing: typography.tracking.hero,
+  brandImg: {
+    height: 32,
+    width: 194,
+    marginBottom: spacing.sm,
   },
   sub: {
     color: theme.inkMuted,

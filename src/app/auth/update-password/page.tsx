@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
+import { BrandHomeLink } from "@/components/brand/logo";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -45,13 +45,7 @@ export default function UpdatePasswordPage() {
   return (
     <div className="app-canvas min-h-screen">
       <div className="mx-auto flex min-h-screen max-w-md flex-col px-6 py-10">
-        <Link
-          href="/"
-          className="mb-10 flex items-center gap-1.5 self-start text-2xl font-bold tracking-tight text-ink"
-        >
-          FINDIT
-          <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />
-        </Link>
+        <BrandHomeLink href="/" className="mb-10 self-start" />
         <Card level="strong" sheen className="p-6 sm:p-8">
           <h1 className="text-2xl font-bold tracking-tight text-ink">
             Choose a new password

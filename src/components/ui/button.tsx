@@ -4,12 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * Buttons in the clear-glass system.
- *
- * `default` is brand red and marks the single primary action on a screen;
- * everything else is glass, hairline or tinted so red keeps its meaning.
- * Styling lives here rather than at call sites — see `ui/glass.tsx` for the
- * surfaces these share.
+ * Buttons. `default` is brand red — the single primary action on a screen.
  */
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold glass-press transition-[background-color,box-shadow,color,transform] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-ring disabled:pointer-events-none disabled:opacity-50",
@@ -19,10 +14,10 @@ const buttonVariants = cva(
         default:
           "bg-accent text-ink-inverse shadow-accent hover:bg-accent-hover",
         accent: "bg-accent text-ink-inverse shadow-accent hover:bg-accent-hover",
-        ink: "bg-ink text-ink-inverse hover:bg-[var(--fd-ink-700)]",
+        ink: "bg-[var(--fd-black)] text-ink-inverse hover:bg-[var(--fd-ink-700)]",
         secondary: "glass text-ink hover:bg-glass-3",
         outline:
-          "border border-hairline-strong bg-glass-1 text-ink backdrop-blur-sm hover:bg-glass-2",
+          "border border-hairline-strong bg-white text-ink hover:bg-[var(--solid-3)]",
         ghost: "text-ink-muted hover:bg-glass-2 hover:text-ink",
         success: "bg-stock text-ink-inverse hover:brightness-95",
         warning: "bg-order text-ink-inverse hover:brightness-95",

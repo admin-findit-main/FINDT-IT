@@ -1,59 +1,234 @@
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
-import { ScrollView, StyleSheet, Text } from "react-native";
-import { displayName } from "@findit/domain";
-import { spacing, theme, typography } from "@findit/theme";
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
-  GlassBackdrop,
+  accountContactLabel,
+  displayName,
+  shortPlaceFromProfile,
+  type ShortPlace,
+} from "@findit/domain";
+import { spacing, typography } from "@findit/theme";
+import {
   GlassButton,
   GlassCard,
+  GlassInput,
   GlassNotice,
   ScreenTitle,
+  useAppTheme,
 } from "@findit/theme/native";
+import { AppChrome } from "@/components/app-menu";
+import { PlaceFields } from "@/components/place-fields";
+import { SettingsChoice, SettingsSection, SettingsToggle } from "@/components/settings-row";
+import { useAppearance } from "@/lib/appearance";
+import { updateMyProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export default function ProfileScreen() {
-  const { profile, signOut } = useAuth();
-  const tabBarHeight = useBottomTabBarHeight();
+  const theme = useAppTheme();
+  const { profile, signOut, refreshProfile } = useAuth();
+  const { scheme, setScheme } = useAppearance();
+  const [firstName, setFirstName] = useState(profile?.first_name || "");
+  const [place, setPlace] = useState<ShortPlace>(() => shortPlaceFromProfile(profile));
+  const [notifyInStock, setNotifyInStock] = useState(profile?.notify_in_stock ?? true);
+  const [notifyCanOrder, setNotifyCanOrder] = useState(profile?.notify_can_order ?? true);
+  const [notifyExpired, setNotifyExpired] = useState(profile?.notify_request_expired ?? true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setFirstName(profile?.first_name || "");
+    setPlace(shortPlaceFromProfile(profile));
+    setNotifyInStock(profile?.notify_in_stock ?? true);
+    setNotifyCanOrder(profile?.notify_can_order ?? true);
+    setNotifyExpired(profile?.notify_request_expired ?? true);
+  }, [
+    profile?.first_name,
+    profile?.default_city,
+    profile?.default_state,
+    profile?.default_postal_code,
+    profile?.notify_in_stock,
+    profile?.notify_can_order,
+    profile?.notify_request_expired,
+  ]);
 
   return (
-    <GlassBackdrop>
+    <AppChrome title="Profile">
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: tabBarHeight + spacing.xxl },
-        ]}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
+        alwaysBounceVertical
       >
-        <ScreenTitle title={displayName(profile || {})} />
+        <ScreenTitle
+          title={displayName(profile || {})}
+          subtitle={accountContactLabel(profile || {})}
+        />
 
-        <GlassCard style={styles.card}>
-          <Text style={styles.meta}>{profile?.email}</Text>
-          <Text style={styles.meta}>
-            Plan: {profile?.subscription_plan === "plus" ? "FINDIT+" : "FREE"} · Beta
-          </Text>
+        <SettingsSection title="You" />
+        <GlassCard>
+          <GlassInput
+            label="Name"
+            value={firstName}
+            onChangeText={(value) => {
+              setFirstName(value);
+              setSaved(false);
+            }}
+            autoCapitalize="words"
+            placeholder="First name"
+            containerStyle={{ marginBottom: 0 }}
+          />
+        </GlassCard>
+        <GlassCard padded={false} style={styles.contactCard}>
+          <View style={styles.contactRow}>
+            <Text style={[styles.contactLabel, { color: theme.inkMuted }]}>
+              {profile?.email ? "Email" : "Phone"}
+            </Text>
+            <Text style={[styles.contactValue, { color: theme.ink }]} numberOfLines={1}>
+              {accountContactLabel(profile || {})}
+            </Text>
+          </View>
         </GlassCard>
 
-        <GlassNotice tone="muted">
-          Owners and employees use the web app or FINDIT Employee for store tools.
-        </GlassNotice>
+        <SettingsSection title="Place" />
+        <GlassCard>
+          <PlaceFields
+            value={place}
+            onChange={(next) => {
+              setPlace(next);
+              setSaved(false);
+              setError(null);
+            }}
+          />
+        </GlassCard>
 
+        <SettingsSection title="Alerts" />
+        <GlassCard padded={false}>
+          <SettingsToggle
+            label="In Stock replies"
+            value={notifyInStock}
+            onChange={(next) => {
+              setNotifyInStock(next);
+              setSaved(false);
+            }}
+          />
+          <SettingsToggle
+            label="Can Order replies"
+            value={notifyCanOrder}
+            onChange={(next) => {
+              setNotifyCanOrder(next);
+              setSaved(false);
+            }}
+          />
+          <SettingsToggle
+            label="Request expiration"
+            value={notifyExpired}
+            onChange={(next) => {
+              setNotifyExpired(next);
+              setSaved(false);
+            }}
+            last
+          />
+        </GlassCard>
+
+        {error ? <GlassNotice>{error}</GlassNotice> : null}
+        {saved ? (
+          <Text style={[styles.hint, { color: theme.inkMuted }]}>Saved.</Text>
+        ) : null}
         <GlassButton
-          title="Sign out"
-          variant="ghost"
-          onPress={signOut}
-          style={styles.signOut}
+          title="Save"
+          loading={saving}
+          disabled={saving}
+          onPress={async () => {
+            setSaving(true);
+            setError(null);
+            setSaved(false);
+            const result = await updateMyProfile({
+              firstName,
+              city: place.city,
+              state: place.state,
+              postalCode: place.postalCode,
+              notifyInStock,
+              notifyCanOrder,
+              notifyRequestExpired: notifyExpired,
+            });
+            setSaving(false);
+            if (result.error) {
+              setError(result.error);
+              return;
+            }
+            await refreshProfile();
+            setSaved(true);
+          }}
+          style={styles.save}
         />
+
+        <SettingsSection title="Appearance" />
+        <GlassCard padded={false}>
+          <View style={styles.choicePad}>
+            <SettingsChoice
+              options={[
+                { id: "light", label: "Light" },
+                { id: "dark", label: "Dark" },
+              ]}
+              value={scheme}
+              onChange={(id) => setScheme(id === "light" ? "light" : "dark")}
+            />
+          </View>
+        </GlassCard>
+
+        <SettingsSection title="Account" />
+        <GlassCard padded={false}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={signOut}
+            style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.45 }]}
+          >
+            <Text style={[styles.signOutText, { color: theme.accentInk }]}>Sign out</Text>
+          </Pressable>
+        </GlassCard>
       </ScrollView>
-    </GlassBackdrop>
+    </AppChrome>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.xl },
-  card: { marginBottom: spacing.md },
-  meta: {
-    color: theme.inkMuted,
-    fontSize: typography.size.body,
-    marginTop: spacing.xs,
+  body: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xxl,
   },
-  signOut: { marginTop: spacing.lg },
+  contactCard: { marginTop: spacing.sm },
+  contactRow: {
+    minHeight: 48,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    gap: 2,
+    justifyContent: "center",
+  },
+  contactLabel: {
+    fontSize: typography.size.caption,
+    fontWeight: typography.weight.semibold,
+  },
+  contactValue: {
+    fontSize: typography.size.footnote,
+    fontWeight: typography.weight.medium,
+  },
+  hint: {
+    fontSize: typography.size.caption,
+    lineHeight: 16,
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  choicePad: { paddingVertical: spacing.xs },
+  save: { marginTop: spacing.lg },
+  signOut: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
+  },
+  signOutText: {
+    fontSize: typography.size.body,
+    fontWeight: typography.weight.semibold,
+  },
 });

@@ -56,7 +56,7 @@ export function mapsDirectionsUrl(store: {
 export function displayName(profile: {
   first_name?: string | null;
   display_name?: string | null;
-  email?: string;
+  email?: string | null;
 }): string {
   if (profile.first_name?.trim()) return profile.first_name.trim();
   if (profile.display_name?.trim()) return profile.display_name.trim();

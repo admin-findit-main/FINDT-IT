@@ -14,7 +14,7 @@ export const DialogClose = DialogPrimitive.Close;
  * the sheet above read as a pane of glass sitting over the page.
  */
 const overlayClass =
-  "fixed inset-0 z-50 bg-[rgba(11,11,12,0.32)] backdrop-blur-md data-[state=open]:animate-in data-[state=open]:fade-in-0";
+  "fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0";
 
 const closeButtonClass =
   "absolute right-4 top-4 rounded-full border border-hairline-strong bg-glass-2 p-2 text-ink-muted transition-colors hover:bg-glass-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-ring";
@@ -29,7 +29,7 @@ export function DialogContent({
       <DialogPrimitive.Overlay className={overlayClass} />
       <DialogPrimitive.Content
         className={cn(
-          "glass-strong glass-sheen fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-glass-2xl p-6 focus:outline-none",
+          "glass-strong fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-glass-2xl p-6 focus:outline-none",
           className
         )}
         {...props}
@@ -93,7 +93,7 @@ export function GlassSheet({
         <DialogPrimitive.Overlay className={overlayClass} />
         <DialogPrimitive.Content
           className={cn(
-            "glass-strong glass-sheen fixed inset-x-0 bottom-0 z-50 max-h-[92vh] overflow-y-auto rounded-t-glass-2xl px-6 pb-6 pt-3 focus:outline-none",
+            "glass-strong fixed inset-x-0 bottom-0 z-50 max-h-[92vh] overflow-y-auto rounded-t-glass-2xl px-6 pb-6 pt-3 focus:outline-none",
             "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-glass-2xl sm:pt-6",
             className
           )}

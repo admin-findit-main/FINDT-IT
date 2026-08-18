@@ -6,9 +6,15 @@ import {
   jsonResponse,
   normalizeProductName,
   PRODUCT_CATEGORIES,
+  isAgeRestrictedFind,
+  AGE_RESTRICTED_ID_REQUIRED,
   responseTimeSeconds,
   selectEligibleStores,
   STORE_PLANS_FREE_MONTHLY,
+  FREE_MONTHLY_REQUEST_LIMIT,
+  FREE_MAX_RADIUS_MILES,
+  PLUS_MONTHLY_REQUEST_LIMIT,
+  PLUS_MAX_RADIUS_MILES,
 } from "../_shared/domain.ts";
 
 Deno.serve(async (req) => {
@@ -23,9 +29,10 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const pilotMode = Deno.env.get("FINDIT_PILOT_MODE") !== "false";
-  const bypassLimits =
-    Deno.env.get("FINDIT_BYPASS_PLAN_LIMITS") === "true" || pilotMode;
+  const bypassConsumerLimits =
+    Deno.env.get("FINDIT_BYPASS_PLAN_LIMITS") === "true";
+  const bypassStoreCaps =
+    bypassConsumerLimits || Deno.env.get("FINDIT_PILOT_MODE") === "true";
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
@@ -88,6 +95,20 @@ Deno.serve(async (req) => {
   if (categoryRaw && !(PRODUCT_CATEGORIES as readonly string[]).includes(categoryRaw)) {
     return jsonResponse({ error: "Invalid category" }, 400, origin);
   }
+  if (
+    isAgeRestrictedFind({
+      category: categoryRaw,
+      productName,
+      description,
+    }) &&
+    !Boolean(body.ageRestrictedConfirmed)
+  ) {
+    return jsonResponse(
+      { error: AGE_RESTRICTED_ID_REQUIRED, code: "age_restricted" },
+      400,
+      origin
+    );
+  }
   if (imageUrl && imageUrl.startsWith("data:")) {
     return jsonResponse(
       { error: "Please upload the photo again (image storage required)." },
@@ -104,15 +125,6 @@ Deno.serve(async (req) => {
 
   if (!profile || profile.is_suspended) {
     return jsonResponse({ error: "Account unavailable" }, 403, origin);
-  }
-  if (profile.account_type === "admin") {
-    // admins may still create for testing
-  } else if (profile.account_type !== "customer") {
-    return jsonResponse(
-      { error: "Only customer accounts can create product requests in the app." },
-      403,
-      origin
-    );
   }
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -159,26 +171,39 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (!bypassLimits && profile.subscription_plan !== "plus") {
+  if (!bypassConsumerLimits) {
+    const isPlus = profile.subscription_plan === "plus";
+    const monthlyLimit = isPlus ? PLUS_MONTHLY_REQUEST_LIMIT : FREE_MONTHLY_REQUEST_LIMIT;
+    const maxRadius = isPlus ? PLUS_MAX_RADIUS_MILES : FREE_MAX_RADIUS_MILES;
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
+    // Count every created Find this month, including cancelled ones.
     const { count } = await admin
       .from("customer_requests")
       .select("*", { count: "exact", head: true })
       .eq("customer_id", user.id)
-      .gte("created_at", monthStart.toISOString())
-      .neq("status", "cancelled");
-    if ((count || 0) >= 3) {
+      .gte("created_at", monthStart.toISOString());
+    if ((count || 0) >= monthlyLimit) {
       return jsonResponse(
-        { error: "FINDIT FREE includes 3 requests per month." },
+        {
+          error: isPlus
+            ? `FINDIT+ includes ${monthlyLimit} Finds per month.`
+            : `You've used your ${monthlyLimit} free Finds this month.`,
+          code: "plan_limit",
+          upgradeRequired: !isPlus,
+        },
         429,
         origin
       );
     }
-    if (radiusMiles > 10) {
+    if (radiusMiles > maxRadius) {
       return jsonResponse(
-        { error: "FINDIT FREE searches up to 10 miles." },
+        {
+          error: `${isPlus ? "FINDIT+" : "FINDIT"} searches up to ${maxRadius} miles.`,
+          code: "radius_limit",
+          upgradeRequired: !isPlus,
+        },
         400,
         origin
       );
@@ -212,6 +237,24 @@ Deno.serve(async (req) => {
     .single();
 
   if (error || !request) {
+    const capHit = /Finds this month/i.test(error?.message || "");
+    if (capHit) {
+      const isPlus = profile.subscription_plan === "plus";
+      const monthlyLimit = isPlus
+        ? PLUS_MONTHLY_REQUEST_LIMIT
+        : FREE_MONTHLY_REQUEST_LIMIT;
+      return jsonResponse(
+        {
+          error: isPlus
+            ? `FINDIT+ includes ${monthlyLimit} Finds per month.`
+            : `You've used your ${monthlyLimit} free Finds this month.`,
+          code: "plan_limit",
+          upgradeRequired: !isPlus,
+        },
+        429,
+        origin
+      );
+    }
     return jsonResponse(
       { error: "Couldn't create your request. Please try again." },
       500,
@@ -305,7 +348,7 @@ Deno.serve(async (req) => {
       },
       stores: candidates,
       alreadyTargetedStoreIds: (existingTargets || []).map((t) => t.store_id),
-      bypassPlanCaps: bypassLimits,
+      bypassPlanCaps: bypassStoreCaps,
     });
 
     const nowIso = new Date().toISOString();

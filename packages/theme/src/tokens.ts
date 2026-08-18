@@ -1,9 +1,8 @@
 /**
- * FINDIT design tokens — the single source of truth for the "clear glass" system.
+ * FINDIT design tokens — source of truth for web and native.
  *
- * Consumed directly by the React Native apps. The web mirrors these values as CSS
- * custom properties in `src/app/globals.css`; `src/__tests__/theme-tokens.test.ts`
- * asserts the two stay in sync, so change hex values here first.
+ * Web CSS in `src/app/globals.css` must stay in lockstep (`theme-tokens.test.ts`).
+ * The product default is light: white surfaces, black type, cherry red for actions.
  */
 
 /** Brand palette. Black and white carry structure; red is the action colour. */
@@ -20,7 +19,7 @@ export const palette = {
   red600: "#C81109",
   red700: "#A00D07",
 
-  /** Neutral "ink" ramp, very slightly cool so it reads as glass rather than grey. */
+  /** Neutral ink ramp. */
   ink50: "#F7F7F8",
   ink100: "#EFEFF1",
   ink200: "#E2E2E6",
@@ -41,73 +40,147 @@ export const palette = {
  * saturated `solid` (fills, accent rails) with a darker `ink` that clears 4.5:1 on
  * light glass, plus a translucent `tint` for the pill background.
  */
-export const status = {
+export const statusDark = {
   inStock: {
-    solid: "#0E9F6E",
-    ink: "#07704D",
-    tint: "rgba(14, 159, 110, 0.14)",
-    border: "rgba(14, 159, 110, 0.30)",
+    solid: "#30D158",
+    ink: "#63E089",
+    tint: "rgba(48, 209, 88, 0.18)",
+    border: "rgba(48, 209, 88, 0.38)",
   },
   canOrder: {
-    solid: "#C77700",
-    ink: "#8A5300",
-    tint: "rgba(199, 119, 0, 0.14)",
-    border: "rgba(199, 119, 0, 0.30)",
+    solid: "#FF9F0A",
+    ink: "#FFD60A",
+    tint: "rgba(255, 159, 10, 0.18)",
+    border: "rgba(255, 159, 10, 0.38)",
   },
   outOfStock: {
-    solid: "#9A9AA3",
-    ink: "#4A4A52",
-    tint: "rgba(110, 110, 120, 0.12)",
-    border: "rgba(110, 110, 120, 0.26)",
+    solid: "#8E8E93",
+    ink: "#C7C7CC",
+    tint: "rgba(142, 142, 147, 0.16)",
+    border: "rgba(142, 142, 147, 0.32)",
   },
   pending: {
-    solid: "#9A9AA3",
-    ink: "#4A4A52",
-    tint: "rgba(110, 110, 120, 0.10)",
-    border: "rgba(110, 110, 120, 0.22)",
+    solid: "#8E8E93",
+    ink: "#C7C7CC",
+    tint: "rgba(142, 142, 147, 0.12)",
+    border: "rgba(142, 142, 147, 0.28)",
   },
 } as const;
 
+export const statusLight = {
+  inStock: {
+    solid: "#248A3D",
+    ink: "#187A34",
+    tint: "rgba(36, 138, 61, 0.12)",
+    border: "rgba(36, 138, 61, 0.28)",
+  },
+  canOrder: {
+    solid: "#C77B00",
+    ink: "#9A5F00",
+    tint: "rgba(199, 123, 0, 0.12)",
+    border: "rgba(199, 123, 0, 0.28)",
+  },
+  outOfStock: {
+    solid: "#8E8E93",
+    ink: "#6E6E73",
+    tint: "rgba(142, 142, 147, 0.12)",
+    border: "rgba(142, 142, 147, 0.24)",
+  },
+  pending: {
+    solid: "#8E8E93",
+    ink: "#6E6E73",
+    tint: "rgba(142, 142, 147, 0.10)",
+    border: "rgba(142, 142, 147, 0.22)",
+  },
+} as const;
+
+/** Web + default native: light, high-contrast response colours. */
+export const status = statusLight;
+
 export type StatusTone = keyof typeof status;
+export type ColorSchemeName = "dark" | "light";
 
-/** Semantic surface + text roles. Everything visual should reference these. */
-export const theme = {
-  /** Base canvas sitting behind the glass; the mesh tints below sit on top of it. */
-  canvas: "#F4F4F6",
-  canvasDeep: "#E8E8EC",
-
-  /** Layered translucency. 1 = faintest, 3 = most opaque / most "solid" glass. */
-  glass1: "rgba(255, 255, 255, 0.44)",
-  glass2: "rgba(255, 255, 255, 0.62)",
-  glass3: "rgba(255, 255, 255, 0.78)",
-  /** Chrome (nav bars, tab bars) needs a touch more opacity to stay legible. */
-  glassChrome: "rgba(255, 255, 255, 0.72)",
-  /** Dark glass, used sparingly for inverted panels and the landing hero. */
-  glassDark: "rgba(11, 11, 12, 0.58)",
-
-  /** Hairline borders and the inner top highlight that sells the glass edge. */
-  hairline: "rgba(255, 255, 255, 0.55)",
-  hairlineStrong: "rgba(11, 11, 12, 0.10)",
-  highlight: "rgba(255, 255, 255, 0.85)",
-
-  /** Opaque equivalents for reduced-transparency / no-blur fallbacks. */
-  solid1: "#FBFBFC",
-  solid2: "#FFFFFF",
-  solid3: "#FFFFFF",
-  solidChrome: "#FFFFFF",
-
-  ink: palette.ink900,
-  inkMuted: palette.ink500,
-  inkSubtle: palette.ink400,
+/** Semantic surface + text roles for dark mode. Web CSS stays in lockstep with this. */
+export const darkTheme = {
+  scheme: "dark" as const,
+  status: statusDark,
+  canvas: "#000000",
+  canvasDeep: "#0B0B0C",
+  glass1: "rgba(255, 255, 255, 0.06)",
+  glass2: "rgba(255, 255, 255, 0.10)",
+  glass3: "rgba(255, 255, 255, 0.16)",
+  glassChrome: "rgba(18, 18, 20, 0.62)",
+  glassDark: "rgba(11, 11, 12, 0.72)",
+  hairline: "rgba(255, 255, 255, 0.18)",
+  hairlineStrong: "rgba(255, 255, 255, 0.10)",
+  highlight: "rgba(255, 255, 255, 0.22)",
+  solid1: "#141416",
+  solid2: "#1C1C1E",
+  solid3: "#2C2C2E",
+  solidChrome: "#1C1C1E",
+  flatFill: {
+    subtle: "rgba(28, 28, 30, 0.82)",
+    base: "rgba(28, 28, 30, 0.90)",
+    strong: "rgba(44, 44, 46, 0.94)",
+    chrome: "rgba(22, 22, 24, 0.92)",
+  },
+  ink: "#F5F5F7",
+  inkMuted: "#A1A1A6",
+  inkSubtle: "#636366",
   inkInverse: palette.white,
+  accent: palette.red500,
+  accentHover: palette.red400,
+  accentInk: palette.red300,
+  accentSoft: "rgba(229, 35, 27, 0.16)",
+  accentRing: "rgba(229, 35, 27, 0.40)",
+  accentGlow: "rgba(229, 35, 27, 0.22)",
+} as const;
 
+/** Light counterpart: same cherry accent, inverted canvas and ink. */
+export const lightTheme = {
+  scheme: "light" as const,
+  status: statusLight,
+  canvas: "#F2F2F7",
+  canvasDeep: "#FFFFFF",
+  glass1: "rgba(255, 255, 255, 0.72)",
+  glass2: "rgba(255, 255, 255, 0.86)",
+  glass3: "rgba(255, 255, 255, 0.94)",
+  glassChrome: "rgba(255, 255, 255, 0.78)",
+  glassDark: "rgba(255, 255, 255, 0.92)",
+  hairline: "rgba(0, 0, 0, 0.14)",
+  hairlineStrong: "rgba(0, 0, 0, 0.08)",
+  highlight: "rgba(255, 255, 255, 0.90)",
+  solid1: "#FFFFFF",
+  solid2: "#FFFFFF",
+  solid3: "#E5E5EA",
+  solidChrome: "#F9F9FB",
+  flatFill: {
+    subtle: "rgba(255, 255, 255, 0.88)",
+    base: "rgba(255, 255, 255, 0.94)",
+    strong: "rgba(255, 255, 255, 0.98)",
+    chrome: "rgba(249, 249, 251, 0.94)",
+  },
+  ink: "#1C1C1E",
+  inkMuted: "#6E6E73",
+  inkSubtle: "#8E8E93",
+  inkInverse: palette.white,
   accent: palette.red500,
   accentHover: palette.red600,
   accentInk: palette.red600,
-  accentSoft: "rgba(229, 35, 27, 0.12)",
-  accentRing: "rgba(229, 35, 27, 0.38)",
-  accentGlow: "rgba(229, 35, 27, 0.28)",
+  accentSoft: "rgba(229, 35, 27, 0.10)",
+  accentRing: "rgba(229, 35, 27, 0.28)",
+  accentGlow: "rgba(229, 35, 27, 0.10)",
 } as const;
+
+export type SemanticTheme = typeof darkTheme | typeof lightTheme;
+
+export const schemes = {
+  dark: darkTheme,
+  light: lightTheme,
+} as const;
+
+/** Default for web and first-run native. Dark is an explicit user choice. */
+export const theme = lightTheme;
 
 /** Blur intensities, in px for CSS and as `expo-blur` intensity for native. */
 export const blur = {
@@ -118,14 +191,14 @@ export const blur = {
 } as const;
 
 /** Saturation boost applied alongside blur — what makes it read as glass, not fog. */
-export const saturate = 180;
+export const saturate = 200;
 
 export const radius = {
   sm: 10,
-  md: 14,
-  lg: 20,
-  xl: 26,
-  xxl: 34,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
   pill: 999,
 } as const;
 
@@ -175,25 +248,25 @@ export const typography = {
 /** Native shadow presets (iOS values; `elevation` covers Android). */
 export const shadow = {
   card: {
-    shadowColor: "#0B0B0C",
-    shadowOpacity: 0.1,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
+    shadowColor: "#000000",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
   },
   chrome: {
-    shadowColor: "#0B0B0C",
+    shadowColor: "#000000",
     shadowOpacity: 0.08,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -1 },
+    elevation: 4,
   },
   accent: {
     shadowColor: palette.red500,
-    shadowOpacity: 0.32,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 } as const;
 
@@ -201,6 +274,9 @@ export const tokens = {
   palette,
   status,
   theme,
+  darkTheme,
+  lightTheme,
+  schemes,
   blur,
   saturate,
   radius,

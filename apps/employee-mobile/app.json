@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FINDIT Employee",
+    "name": "FINDIT Business",
     "slug": "findit-employee",
     "version": "1.0.0",
     "orientation": "default",
@@ -17,7 +17,7 @@
     "android": {
       "package": "com.findit.employee",
       "adaptiveIcon": {
-        "backgroundColor": "#0b1220",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"

@@ -14,7 +14,7 @@ import type { ResponseType } from "@/types/database";
  */
 export function StatusBadge({ type }: { type: ResponseType | "pending" }) {
   const tone: StatusTone = type === "pending" ? "pending" : toneForResponse(type);
-  return <StatusPill tone={tone}>{type === "pending" ? "WAITING" : responseLabel(type)}</StatusPill>;
+  return <StatusPill tone={tone}>{type === "pending" ? "Waiting" : responseLabel(type)}</StatusPill>;
 }
 
 export function ResponseAccent({ type }: { type: ResponseType }) {

@@ -1,18 +1,18 @@
-import { theme } from '@findit/theme';
-
-/**
- * The app renders the light "clear glass" system only, so both schemes resolve to
- * the same tokens rather than flipping to a dark palette.
- */
-const glass = {
-  text: theme.ink,
-  background: theme.canvas,
-  tint: theme.accent,
-  tabIconDefault: theme.inkSubtle,
-  tabIconSelected: theme.accent,
-};
+import { darkTheme, lightTheme } from "@findit/theme";
 
 export default {
-  light: glass,
-  dark: glass,
+  light: {
+    text: lightTheme.ink,
+    background: lightTheme.canvas,
+    tint: lightTheme.accent,
+    tabIconDefault: lightTheme.inkSubtle,
+    tabIconSelected: lightTheme.accent,
+  },
+  dark: {
+    text: darkTheme.ink,
+    background: darkTheme.canvas,
+    tint: darkTheme.accent,
+    tabIconDefault: darkTheme.inkSubtle,
+    tabIconSelected: darkTheme.accent,
+  },
 };

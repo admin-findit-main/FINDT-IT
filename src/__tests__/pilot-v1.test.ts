@@ -22,7 +22,7 @@ import {
   median,
 } from "@/lib/services/request-lifecycle";
 import { isStoreOpenAt } from "@/lib/services/store-hours";
-import { bypassPlanLimits, isPilotMode } from "@/lib/config/env";
+import { bypassConsumerPlanLimits, bypassPlanLimits, isPilotMode } from "@/lib/config/env";
 
 beforeEach(() => {
   resetDemoState();
@@ -243,11 +243,12 @@ describe("store hours", () => {
 });
 
 describe("pilot mode flags", () => {
-  it("relaxes limits when pilot mode is on", () => {
+  it("relaxes store routing caps when pilot mode is on, not consumer Finds", () => {
     process.env.FINDIT_PILOT_MODE = "true";
     process.env.FINDIT_BYPASS_PLAN_LIMITS = "false";
     expect(isPilotMode()).toBe(true);
     expect(bypassPlanLimits()).toBe(true);
+    expect(bypassConsumerPlanLimits()).toBe(false);
   });
 
   it("respects bypass off when pilot mode is off", () => {
@@ -255,6 +256,13 @@ describe("pilot mode flags", () => {
     process.env.FINDIT_BYPASS_PLAN_LIMITS = "false";
     expect(isPilotMode()).toBe(false);
     expect(bypassPlanLimits()).toBe(false);
+    expect(bypassConsumerPlanLimits()).toBe(false);
+  });
+
+  it("skips consumer Finds only with FINDIT_BYPASS_PLAN_LIMITS", () => {
+    process.env.FINDIT_PILOT_MODE = "false";
+    process.env.FINDIT_BYPASS_PLAN_LIMITS = "true";
+    expect(bypassConsumerPlanLimits()).toBe(true);
   });
 });
 

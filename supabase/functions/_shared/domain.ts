@@ -1,4 +1,9 @@
-/** Shared helpers for FINDIT Edge Functions (Deno). */
+/** Shared helpers for FINDIT Edge Functions (Deno).
+ * Keep numeric caps in lockstep with packages/domain/src/constants.ts
+ * (FREE_MONTHLY_REQUEST_LIMIT, PLUS_MONTHLY_REQUEST_LIMIT, FREE_MAX_RADIUS_MILES,
+ * PLUS_MAX_RADIUS_MILES, STORE_PLANS.free.monthlyRequests, MAX_CUSTOMER_RADIUS_MILES).
+ * The domain vitest `edge-sync` test fails if these literals drift.
+ */
 
 export const PRODUCT_CATEGORIES = [
   "Grocery",
@@ -9,12 +14,17 @@ export const PRODUCT_CATEGORIES = [
   "Clothing",
   "Collectibles",
   "Hardware",
+  "Tobacco & Vape",
   "Specialty",
   "Other",
 ] as const;
 
 export const STORE_PLANS_FREE_MONTHLY = 20;
 export const MAX_CUSTOMER_RADIUS_MILES = 25;
+export const FREE_MONTHLY_REQUEST_LIMIT = 5;
+export const PLUS_MONTHLY_REQUEST_LIMIT = 25;
+export const PLUS_MAX_RADIUS_MILES = 25;
+export const FREE_MAX_RADIUS_MILES = 10;
 
 export function normalizeProductName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
@@ -34,10 +44,44 @@ export function storeCategoriesForRequestCategory(
     clothing: ["Clothing"],
     collectibles: ["Collectibles"],
     hardware: ["Hardware"],
+    "tobacco & vape": ["Smoke Shop", "Convenience", "Tobacco & Vape"],
     specialty: ["Specialty Retail", "Other", "Specialty"],
     other: ["Other", "Specialty Retail", "Convenience", "Grocery"],
   };
   return map[key] || [requestCategory];
+}
+
+export const AGE_RESTRICTED_ID_REQUIRED =
+  "Confirm you are 21 or older before asking stores for tobacco or vape products.";
+
+export function isAgeRestrictedFind(input: {
+  category?: string | null;
+  productName?: string | null;
+  description?: string | null;
+}): boolean {
+  const category = (input.category || "").trim().toLowerCase();
+  if (category === "tobacco & vape" || category === "smoke shop") return true;
+  const text = [input.category, input.productName, input.description]
+    .map((part) => (part || "").trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+  if (!text) return false;
+  const phrases = [
+    "tobacco & vape",
+    "smoke shop",
+    "elf bar",
+    "geek bar",
+    "lost mary",
+    "vape juice",
+    "e-liquid",
+    "salt nic",
+    "nicotine pouch",
+    "disposable vape",
+  ];
+  if (phrases.some((term) => text.includes(term))) return true;
+  return /\b(vape|vapes|vaping|tobacco|cigarette|cigarettes|cigar|cigars|nicotine|hookah|shisha|zyn)\b/i.test(
+    text
+  );
 }
 
 function normalizeCategoryLabel(value: string): string {

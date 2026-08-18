@@ -27,13 +27,13 @@ export function formatPrice(price: number | null | undefined): string | null {
 export function responseLabel(type: string): string {
   switch (type) {
     case "in_stock":
-      return "IN STOCK";
+      return "In stock";
     case "out_of_stock":
-      return "OUT OF STOCK";
+      return "Out of stock";
     case "can_order":
-      return "CAN ORDER";
+      return "Can order";
     default:
-      return type.toUpperCase();
+      return type.replaceAll("_", " ");
   }
 }
 

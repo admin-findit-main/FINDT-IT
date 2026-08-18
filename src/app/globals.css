@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 /*
- * FINDIT "clear glass" design system.
+ * FINDIT design system.
  *
- * Hex values mirror `packages/theme/src/tokens.ts`, which is the source of truth
- * shared with the React Native apps. `src/__tests__/theme-tokens.test.ts` fails if
- * the two drift, so edit the token module first.
+ * Light by default: white surfaces, black type, cherry red for actions.
+ * Hex values mirror `packages/theme/src/tokens.ts`. `theme-tokens.test.ts`
+ * fails if the two drift, so edit the token module first.
  */
 
 :root {
@@ -33,67 +33,65 @@
   --fd-ink-900: #0b0b0c;
 
   /* ---- Semantic surfaces ---------------------------------------------- */
-  --canvas: #f4f4f6;
-  --canvas-deep: #e8e8ec;
+  --canvas: #f2f2f7;
+  --canvas-deep: #ffffff;
 
-  --glass-1: rgba(255, 255, 255, 0.44);
-  --glass-2: rgba(255, 255, 255, 0.62);
-  --glass-3: rgba(255, 255, 255, 0.78);
-  --glass-chrome: rgba(255, 255, 255, 0.72);
-  --glass-dark: rgba(11, 11, 12, 0.58);
+  --glass-1: rgba(255, 255, 255, 0.72);
+  --glass-2: rgba(255, 255, 255, 0.86);
+  --glass-3: rgba(255, 255, 255, 0.94);
+  --glass-chrome: rgba(255, 255, 255, 0.78);
+  --glass-dark: rgba(255, 255, 255, 0.92);
 
-  --hairline: rgba(255, 255, 255, 0.55);
-  --hairline-strong: rgba(11, 11, 12, 0.1);
-  --highlight: rgba(255, 255, 255, 0.85);
+  --hairline: rgba(0, 0, 0, 0.14);
+  --hairline-strong: rgba(0, 0, 0, 0.08);
+  --highlight: rgba(255, 255, 255, 0.9);
 
   /* Opaque equivalents used when transparency is reduced or unsupported. */
-  --solid-1: #fbfbfc;
+  --solid-1: #ffffff;
   --solid-2: #ffffff;
-  --solid-3: #ffffff;
-  --solid-chrome: #ffffff;
+  --solid-3: #e5e5ea;
+  --solid-chrome: #f9f9fb;
 
   /* ---- Text ------------------------------------------------------------ */
-  --ink: var(--fd-ink-900);
-  --ink-muted: var(--fd-ink-500);
-  --ink-subtle: var(--fd-ink-400);
+  --ink: #1c1c1e;
+  --ink-muted: #6e6e73;
+  --ink-subtle: #8e8e93;
   --ink-inverse: var(--fd-white);
 
   /* ---- Accent (the only red in the system) ----------------------------- */
   --accent: var(--fd-red-500);
   --accent-hover: var(--fd-red-600);
   --accent-ink: var(--fd-red-600);
-  --accent-soft: rgba(229, 35, 27, 0.12);
-  --accent-ring: rgba(229, 35, 27, 0.38);
-  --accent-glow: rgba(229, 35, 27, 0.28);
+  --accent-soft: rgba(229, 35, 27, 0.1);
+  --accent-ring: rgba(229, 35, 27, 0.28);
+  --accent-glow: rgba(229, 35, 27, 0.1);
 
   /* ---- Response status ------------------------------------------------- */
-  --stock: #0e9f6e;
-  --stock-ink: #07704d;
-  --stock-tint: rgba(14, 159, 110, 0.14);
-  --stock-border: rgba(14, 159, 110, 0.3);
+  --stock: #248a3d;
+  --stock-ink: #187a34;
+  --stock-tint: rgba(36, 138, 61, 0.12);
+  --stock-border: rgba(36, 138, 61, 0.28);
 
-  --order: #c77700;
-  --order-ink: #8a5300;
-  --order-tint: rgba(199, 119, 0, 0.14);
-  --order-border: rgba(199, 119, 0, 0.3);
+  --order: #c77b00;
+  --order-ink: #9a5f00;
+  --order-tint: rgba(199, 123, 0, 0.12);
+  --order-border: rgba(199, 123, 0, 0.28);
 
-  --oos: #9a9aa3;
-  --oos-ink: #4a4a52;
-  --oos-tint: rgba(110, 110, 120, 0.12);
-  --oos-border: rgba(110, 110, 120, 0.26);
+  --oos: #8e8e93;
+  --oos-ink: #6e6e73;
+  --oos-tint: rgba(142, 142, 147, 0.12);
+  --oos-border: rgba(142, 142, 147, 0.24);
 
-  /* ---- Glass geometry -------------------------------------------------- */
+  /* ---- Chrome geometry ------------------------------------------------- */
   --blur-subtle: 12px;
   --blur-base: 24px;
   --blur-strong: 40px;
   --blur-chrome: 30px;
   --glass-saturate: 180%;
 
-  --shadow-glass: 0 18px 48px -18px rgba(11, 11, 12, 0.28),
-    0 2px 8px -2px rgba(11, 11, 12, 0.08);
-  --shadow-glass-lg: 0 32px 80px -28px rgba(11, 11, 12, 0.34),
-    0 4px 12px -4px rgba(11, 11, 12, 0.1);
-  --shadow-accent: 0 14px 32px -12px rgba(229, 35, 27, 0.55);
+  --shadow-glass: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-glass-lg: 0 2px 4px rgba(0, 0, 0, 0.04), 0 16px 40px rgba(0, 0, 0, 0.08);
+  --shadow-accent: 0 8px 20px -8px rgba(229, 35, 27, 0.45);
 }
 
 @theme inline {
@@ -132,10 +130,10 @@
   --color-brand-red: var(--fd-red-500);
 
   --radius-glass-sm: 10px;
-  --radius-glass-md: 14px;
-  --radius-glass-lg: 20px;
-  --radius-glass-xl: 26px;
-  --radius-glass-2xl: 34px;
+  --radius-glass-md: 12px;
+  --radius-glass-lg: 16px;
+  --radius-glass-xl: 20px;
+  --radius-glass-2xl: 24px;
 
   --shadow-glass: var(--shadow-glass);
   --shadow-glass-lg: var(--shadow-glass-lg);
@@ -186,28 +184,12 @@ h1 {
 }
 
 /* ---------------------------------------------------------------------- */
-/* Canvas — the luminous field the glass refracts                          */
+/* Canvas                                                                  */
 /* ---------------------------------------------------------------------- */
 
 .app-canvas {
   position: relative;
   background-color: var(--canvas);
-  isolation: isolate;
-}
-
-/* Soft red + graphite glows. Fixed so glass keeps something to sample while
-   the page scrolls. */
-.app-canvas::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(60rem 40rem at 82% -10%, var(--accent-glow) 0%, transparent 60%),
-    radial-gradient(50rem 34rem at 8% 12%, rgba(11, 11, 12, 0.12) 0%, transparent 62%),
-    radial-gradient(46rem 34rem at 50% 108%, rgba(229, 35, 27, 0.12) 0%, transparent 62%),
-    linear-gradient(180deg, #ffffff 0%, var(--canvas) 42%, var(--canvas-deep) 100%);
 }
 
 /* Inverted canvas for the marketing hero. */
@@ -231,41 +213,31 @@ h1 {
 }
 
 /* ---------------------------------------------------------------------- */
-/* Glass surfaces                                                          */
+/* Surfaces — opaque cards; frost only on chrome                           */
 /* ---------------------------------------------------------------------- */
 
 .glass,
 .glass-subtle,
-.glass-strong,
-.glass-chrome,
-.glass-dark {
+.glass-strong {
   position: relative;
   background-clip: padding-box;
+  background-color: var(--solid-2);
   border: 1px solid var(--hairline-strong);
-  box-shadow: var(--shadow-glass), inset 0 1px 0 0 var(--highlight);
+  box-shadow: var(--shadow-glass);
 }
 
 .glass-subtle {
-  background-color: var(--glass-1);
-  backdrop-filter: blur(var(--blur-subtle)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--blur-subtle)) saturate(var(--glass-saturate));
-}
-
-.glass {
-  background-color: var(--glass-2);
-  backdrop-filter: blur(var(--blur-base)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--blur-base)) saturate(var(--glass-saturate));
+  background-color: var(--solid-1);
+  box-shadow: none;
 }
 
 .glass-strong {
-  background-color: var(--glass-3);
-  backdrop-filter: blur(var(--blur-strong)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--blur-strong)) saturate(var(--glass-saturate));
+  box-shadow: var(--shadow-glass-lg);
 }
 
-/* Navigation chrome: more opaque, and the highlight sits on the inner edge
-   facing the content. */
+/* Navigation, tab bars, sticky headers — the only place frost belongs. */
 .glass-chrome {
+  position: relative;
   background-color: var(--glass-chrome);
   backdrop-filter: blur(var(--blur-chrome)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--blur-chrome)) saturate(var(--glass-saturate));
@@ -274,26 +246,15 @@ h1 {
 }
 
 .glass-dark {
-  background-color: var(--glass-dark);
+  position: relative;
+  background-color: var(--fd-black);
   color: var(--ink-inverse);
-  border-color: rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(var(--blur-base)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--blur-base)) saturate(var(--glass-saturate));
-  box-shadow: var(--shadow-glass), inset 0 1px 0 0 rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: none;
 }
 
-/* Specular sheen across the top edge of large cards. */
 .glass-sheen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(
-    160deg,
-    rgba(255, 255, 255, 0.5) 0%,
-    rgba(255, 255, 255, 0) 38%
-  );
+  display: none;
 }
 
 .glass-lift {
@@ -324,64 +285,21 @@ h1 {
 /* No backdrop-filter support: swap translucency for opaque surfaces so text
    never lands on an unpredictable background. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass-subtle {
-    background-color: var(--solid-1);
-  }
-
-  .glass,
-  .glass-strong {
-    background-color: var(--solid-2);
-  }
-
   .glass-chrome {
     background-color: var(--solid-chrome);
-  }
-
-  .glass-dark {
-    background-color: var(--fd-ink-800);
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  .glass-subtle,
-  .glass,
-  .glass-strong,
   .glass-chrome {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-  }
-
-  .glass-subtle {
-    background-color: var(--solid-1);
-  }
-
-  .glass,
-  .glass-strong {
-    background-color: var(--solid-2);
-  }
-
-  .glass-chrome {
     background-color: var(--solid-chrome);
     border-bottom: 1px solid var(--hairline-strong);
   }
 
-  .glass-dark {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background-color: var(--fd-ink-800);
-  }
-
-  .glass-sheen::after {
-    display: none;
-  }
-
-  .app-canvas::before,
   .app-canvas-dark::before {
     background: none;
-  }
-
-  .app-canvas {
-    background-color: var(--solid-2);
   }
 }
 
@@ -409,9 +327,12 @@ h1 {
   .glass,
   .glass-strong,
   .glass-chrome {
-    background-color: var(--solid-2);
+    border-color: var(--hairline);
+  }
+
+  .glass-chrome {
+    background-color: var(--solid-chrome);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border-color: var(--fd-ink-700);
   }
 }

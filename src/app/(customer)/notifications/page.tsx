@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import {
   getNotificationsAction,
@@ -11,6 +11,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import type { Notification } from "@/types/database";
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,64 +23,55 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 4000);
+    const t = setInterval(load, 15000);
     return () => clearInterval(t);
   }, []);
 
   return (
-    <div className="px-5 pt-6">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">Notifications</h1>
-      <div className="mt-6 space-y-3">
+    <div className="mx-auto max-w-xl px-5 py-8 sm:px-8">
+      <h1 className="text-2xl font-bold tracking-tight text-ink">Alerts</h1>
+      <div className="mt-6">
         {loading ? (
           <Skeleton className="h-24 w-full" />
         ) : items.length === 0 ? (
           <EmptyState
-            title="You're all caught up"
-            description="Store replies and request updates will appear here."
+            title="No alerts yet."
+            description="When a store answers, it shows up here."
           />
         ) : (
-          items.map((n) => (
-            <button
-              key={n.id}
-              type="button"
-              className="block w-full text-left"
-              onClick={async () => {
-                await markNotificationReadAction(n.id);
-                load();
-              }}
-            >
-              <Card
-                interactive
-                level={n.read_at ? "subtle" : "base"}
-                className={`p-4 ${n.read_at ? "opacity-75" : ""}`}
+          <Card padded={false} className="overflow-hidden">
+            {items.map((n, i) => (
+              <button
+                key={n.id}
+                type="button"
+                className={`flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-black/[0.03] ${
+                  i < items.length - 1 ? "border-b border-hairline-strong" : ""
+                }`}
+                onClick={async () => {
+                  await markNotificationReadAction(n.id);
+                  if (n.related_request_id) {
+                    router.push(`/requests/${n.related_request_id}`);
+                    return;
+                  }
+                  load();
+                }}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-ink">{n.title}</p>
-                    <p className="mt-1 text-sm text-ink-muted">{n.body}</p>
-                    <p className="mt-2 text-xs text-ink-muted">
-                      {formatRelativeTime(n.created_at)}
-                    </p>
-                  </div>
-                  {!n.read_at ? (
-                    <span
-                      aria-hidden
-                      className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-accent shadow-accent"
-                    />
-                  ) : null}
-                </div>
-                {n.related_request_id ? (
-                  <Link
-                    href={`/requests/${n.related_request_id}`}
-                    className="mt-3 inline-block text-sm font-semibold text-accent-ink underline underline-offset-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    View request
-                  </Link>
-                ) : null}
-              </Card>
-            </button>
-          ))
+                <span
+                  aria-hidden
+                  className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                    n.read_at ? "bg-transparent" : "bg-ink"
+                  }`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-ink">{n.title}</span>
+                  <span className="mt-1 block text-sm text-ink-muted">{n.body}</span>
+                  <span className="mt-2 block text-xs text-ink-subtle">
+                    {formatRelativeTime(n.created_at)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </Card>
         )}
       </div>
     </div>

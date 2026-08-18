@@ -7,6 +7,7 @@ export const PRODUCT_CATEGORIES = [
   "Clothing",
   "Collectibles",
   "Hardware",
+  "Tobacco & Vape",
   "Specialty",
   "Other",
 ] as const;
@@ -20,6 +21,7 @@ export const STORE_CATEGORIES = [
   "Clothing",
   "Collectibles",
   "Hardware",
+  "Smoke Shop",
   "Specialty Retail",
   "Other",
 ] as const;
@@ -88,32 +90,48 @@ export const DAYS_OF_WEEK = [
   "Saturday",
 ] as const;
 
-/** Days of free pilot after a store application is approved */
-export const STORE_TRIAL_DAYS = 60;
+/** Days of free FINDIT+ Business trial after a store application is approved */
+export const STORE_TRIAL_DAYS = 30;
+
+/** FINDIT Free monthly Finds. Change here — do not scatter. */
+export const FREE_MONTHLY_REQUEST_LIMIT = 5;
 
 /**
- * Customer plan definitions — do not hardcode prices in UI.
- * Soft monthly request limits apply unless FINDIT_BYPASS_PLAN_LIMITS=true.
+ * FINDIT+ monthly Finds cap. Configurable product knob (not unlimited).
+ * Change this single value when the Plus allowance is decided.
+ */
+export const PLUS_MONTHLY_REQUEST_LIMIT = 25;
+
+/** Keep Edge `_shared/domain.ts` in lockstep with these radius caps. */
+export const FREE_MAX_RADIUS_MILES = 10;
+export const PLUS_MAX_RADIUS_MILES = 25;
+
+/** FINDIT+ Business price after trial. Billing is not connected yet. */
+export const BUSINESS_PRICE_MONTHLY = 49.99;
+
+/**
+ * Consumer plans — FINDIT+ is a PLAN, not a role.
+ * Plus price is omitted until billing exists (do not invent checkout).
  */
 export const CUSTOMER_PLANS = {
   free: {
     id: "free",
-    name: "FINDIT FREE",
-    tagline: "Ask nearby stores — limited requests",
-    priceMonthly: 0,
-    monthlyRequests: 3,
-    maxRadiusMiles: 10,
+    name: "FINDIT",
+    tagline: "Ask nearby stores — 5 Finds each month",
+    priceMonthly: 0 as number | null,
+    monthlyRequests: FREE_MONTHLY_REQUEST_LIMIT as number | null,
+    maxRadiusMiles: FREE_MAX_RADIUS_MILES,
     savedSearches: false,
-    requestHistory: false,
+    requestHistory: true,
     futureAlerts: false,
   },
   plus: {
     id: "plus",
     name: "FINDIT+",
-    tagline: "Unlimited asks, larger radius, saved searches",
-    priceMonthly: 3.99,
-    monthlyRequests: null as number | null,
-    maxRadiusMiles: 25,
+    tagline: "More Finds, larger radius, Expand Search",
+    priceMonthly: null as number | null,
+    monthlyRequests: PLUS_MONTHLY_REQUEST_LIMIT as number | null,
+    maxRadiusMiles: PLUS_MAX_RADIUS_MILES,
     savedSearches: true,
     requestHistory: true,
     futureAlerts: true,
@@ -123,14 +141,26 @@ export const CUSTOMER_PLANS = {
 export type CustomerPlanId = keyof typeof CUSTOMER_PLANS;
 
 /**
- * Store plan definitions (per location) — do not hardcode prices in UI.
- * Approved stores start on a 60-day free trial/pilot, then Starter or Pro.
+ * FINDIT+ Business: 30-day trial, then $49.99/month per location.
+ * `starter` / `pro` keys remain so existing store rows still resolve.
  */
+const FINDIT_PLUS_BUSINESS = {
+  name: "FINDIT+ Business",
+  tagline: "30-day free trial, then $49.99/month",
+  monthlyRequests: null as number | null,
+  analytics: true,
+  multipleLocations: false,
+  teamManagement: true,
+  advancedAnalytics: true,
+  priceMonthly: BUSINESS_PRICE_MONTHLY,
+  trial: false,
+};
+
 export const STORE_PLANS = {
   free: {
     id: "free",
-    name: "Pilot",
-    tagline: "60-day free trial",
+    name: "Trial",
+    tagline: "30-day free trial",
     monthlyRequests: 20,
     analytics: true,
     multipleLocations: false,
@@ -141,32 +171,19 @@ export const STORE_PLANS = {
   },
   starter: {
     id: "starter",
-    name: "Starter",
-    tagline: "Per location",
-    monthlyRequests: null as number | null,
-    analytics: true,
-    multipleLocations: false,
-    teamManagement: true,
-    advancedAnalytics: false,
-    priceMonthly: 29,
-    trial: false,
+    ...FINDIT_PLUS_BUSINESS,
   },
   pro: {
     id: "pro",
-    name: "Pro",
-    tagline: "Per location",
-    monthlyRequests: null as number | null,
-    analytics: true,
-    multipleLocations: true,
-    teamManagement: true,
-    advancedAnalytics: true,
-    priceMonthly: 59,
-    trial: false,
+    ...FINDIT_PLUS_BUSINESS,
   },
 } as const;
 
 export type PlanId = keyof typeof STORE_PLANS;
 export type StorePlanId = PlanId;
+
+/** Trial store monthly inbound-request cap used by routing. Keep Edge in lockstep. */
+export const STORE_PLANS_FREE_MONTHLY = STORE_PLANS.free.monthlyRequests;
 
 export const MAX_ACTIVE_REQUESTS_PER_HOUR = 10;
 export const MAX_APPLICATIONS_PER_DAY = 3;

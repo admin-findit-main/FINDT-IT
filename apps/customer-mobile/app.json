@@ -1,16 +1,17 @@
 {
   "expo": {
     "name": "FINDIT",
-    "slug": "findit-customer",
+    "slug": "find-it",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "findit",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.findit.customer",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "FINDIT uses the camera so you can attach a product photo.",
         "NSPhotoLibraryUsageDescription": "FINDIT uses your photos so you can attach a product image.",
         "NSLocationWhenInUseUsageDescription": "FINDIT uses your location to find nearby stores. You can enter a ZIP instead."
@@ -19,7 +20,7 @@
     "android": {
       "package": "com.findit.customer",
       "adaptiveIcon": {
-        "backgroundColor": "#F4F4F6",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -34,11 +35,18 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "FINDIT uses the camera so you can attach a product photo.",
+          "photosPermission": "FINDIT uses your photos so you can attach a product image."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#F4F4F6"
+          "backgroundColor": "#F2F2F7"
         }
       ],
       [
@@ -54,7 +62,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "replace-with-eas-project-id"
+        "projectId": "860ebbc7-a62b-43c2-bbd2-d6307627b5b2"
       }
     }
   }

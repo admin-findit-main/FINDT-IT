@@ -6,6 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { GlassNav, GlassNotice } from "@/components/ui/glass";
+import { BrandHomeLink } from "@/components/brand/logo";
 import { Card } from "@/components/ui/primitives";
 import { roleLabel } from "@/lib/auth/store-role";
 import {
@@ -61,13 +62,7 @@ export default function AcceptInvitePage() {
     <div className="app-canvas min-h-screen">
       <GlassNav>
         <div className="mx-auto flex max-w-md items-center px-6 py-4">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xl font-bold tracking-tight text-ink"
-          >
-            FINDIT
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
-          </Link>
+          <BrandHomeLink href="/" />
         </div>
       </GlassNav>
       <main className="mx-auto max-w-md px-6 py-16">

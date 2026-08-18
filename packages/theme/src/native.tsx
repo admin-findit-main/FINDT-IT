@@ -1,20 +1,22 @@
 /**
- * Shared "clear glass" primitives for the FINDIT React Native apps.
+ * Shared surfaces for the FINDIT React Native apps.
  *
- * Every surface is a real `expo-blur` BlurView on iOS/Android. When the platform
- * can't blur, or the user has asked for reduced transparency, each primitive falls
- * back to an opaque surface of equivalent contrast rather than a washed-out tint.
+ * Cards are opaque. Frosted blur is reserved for navigation chrome
+ * (tab bar, headers, sheets) so the app reads as a native product, not a
+ * glass demo.
  */
 import { BlurTargetView, BlurView } from "expo-blur";
 import * as React from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Animated,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type ColorValue,
   type PressableProps,
@@ -25,8 +27,8 @@ import {
   type ViewStyle,
 } from "react-native";
 
-import { blur, radius, shadow, spacing, status, theme, typography } from "./tokens";
-import type { StatusTone } from "./tokens";
+import { blur, darkTheme, lightTheme, palette, radius, shadow, spacing, typography } from "./tokens";
+import type { ColorSchemeName, SemanticTheme, StatusTone } from "./tokens";
 
 /**
  * Tracks the OS "Reduce Transparency" setting so glass can degrade to solid.
@@ -80,19 +82,26 @@ export function useReducedMotion(): boolean {
 
 type GlassLevel = "subtle" | "base" | "strong" | "chrome";
 
-const LEVEL_FILL: Record<GlassLevel, string> = {
-  subtle: theme.glass1,
-  base: theme.glass2,
-  strong: theme.glass3,
-  chrome: theme.glassChrome,
-};
+const ThemeContext = React.createContext<SemanticTheme>(lightTheme);
 
-const LEVEL_SOLID: Record<GlassLevel, string> = {
-  subtle: theme.solid1,
-  base: theme.solid2,
-  strong: theme.solid3,
-  chrome: theme.solidChrome,
-};
+export function AppThemeProvider({
+  scheme,
+  children,
+}: {
+  scheme: ColorSchemeName;
+  children: React.ReactNode;
+}) {
+  const value = scheme === "light" ? lightTheme : darkTheme;
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+export function useAppTheme(): SemanticTheme {
+  return React.useContext(ThemeContext);
+}
+
+export function useColorSchemeName(): ColorSchemeName {
+  return useAppTheme().scheme;
+}
 
 const LEVEL_INTENSITY: Record<GlassLevel, number> = {
   subtle: blur.subtle,
@@ -101,17 +110,16 @@ const LEVEL_INTENSITY: Record<GlassLevel, number> = {
   chrome: blur.chrome,
 };
 
-/**
- * Fills used when the platform renders a flat translucent view instead of a real
- * blur (Android without a `blurTarget`). Without the blur there is nothing to
- * separate text from the content behind it, so these are noticeably more opaque.
- */
-const LEVEL_FILL_FLAT: Record<GlassLevel, string> = {
-  subtle: "rgba(255, 255, 255, 0.78)",
-  base: "rgba(255, 255, 255, 0.88)",
-  strong: "rgba(255, 255, 255, 0.94)",
-  chrome: "rgba(255, 255, 255, 0.92)",
-};
+function levelSolid(theme: SemanticTheme, level: GlassLevel) {
+  if (level === "chrome") return theme.solidChrome;
+  if (level === "strong") return theme.solid3;
+  if (level === "subtle") return theme.solid1;
+  return theme.solid2;
+}
+
+function iosChromeTint(scheme: ColorSchemeName) {
+  return scheme === "light" ? ("systemChromeMaterialLight" as const) : ("systemChromeMaterialDark" as const);
+}
 
 /**
  * A ref to a `BlurTargetView`. Android can only blur content that is inside one,
@@ -155,8 +163,8 @@ export type GlassSurfaceProps = ViewProps & {
 };
 
 /**
- * The base layered surface every other primitive builds on: a blurred fill, a
- * translucent wash to lift contrast, a hairline border, and an inner top highlight.
+ * The base surface every other primitive builds on.
+ * Cards stay opaque. Chrome (`level="chrome"`) may frost when the OS allows it.
  */
 export function GlassSurface({
   level = "base",
@@ -167,6 +175,7 @@ export function GlassSurface({
   children,
   ...rest
 }: GlassSurfaceProps) {
+  const theme = useAppTheme();
   const reduced = useReducedTransparency();
   const shape: ViewStyle = {
     borderRadius: cornerRadius,
@@ -175,10 +184,12 @@ export function GlassSurface({
     borderColor: bordered ? theme.hairlineStrong : "transparent",
   };
 
-  if (reduced) {
+  const useFrost = level === "chrome" && !reduced;
+
+  if (!useFrost) {
     return (
       <View
-        style={[shape, { backgroundColor: LEVEL_SOLID[level] }, style]}
+        style={[shape, { backgroundColor: levelSolid(theme, level) }, style]}
         {...rest}
       >
         {children}
@@ -192,7 +203,7 @@ export function GlassSurface({
     <View style={[shape, style]} {...rest}>
       <BlurView
         intensity={LEVEL_INTENSITY[level]}
-        tint={Platform.OS === "ios" ? "systemThinMaterialLight" : "light"}
+        tint={Platform.OS === "ios" ? iosChromeTint(theme.scheme) : theme.scheme}
         style={StyleSheet.absoluteFill}
         {...androidBlurProps(blurTarget)}
       />
@@ -200,34 +211,25 @@ export function GlassSurface({
         pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: flat ? LEVEL_FILL_FLAT[level] : LEVEL_FILL[level] },
+          { backgroundColor: flat ? theme.flatFill.chrome : theme.glassChrome },
         ]}
-      />
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 1,
-          backgroundColor: theme.highlight,
-        }}
       />
       {children}
     </View>
   );
 }
 
-/** A floating glass card with the standard drop shadow. */
+/** Grouped card: white on the canvas, no cheap drop shadow in light mode. */
 export function GlassCard({
   style,
   children,
   padded = true,
   ...rest
 }: GlassSurfaceProps & { padded?: boolean }) {
+  const theme = useAppTheme();
+  const lift = theme.scheme === "dark" ? shadow.card : undefined;
   return (
-    <View style={[shadow.card, { borderRadius: rest.cornerRadius ?? radius.xl }]}>
+    <View style={[lift, { borderRadius: rest.cornerRadius ?? radius.lg }]}>
       <GlassSurface
         {...rest}
         style={[padded ? { padding: spacing.lg } : null, style]}
@@ -238,49 +240,11 @@ export function GlassCard({
   );
 }
 
-/**
- * Screen shell: the tinted canvas plus the soft red/black glows that give the
- * glass something worth refracting.
- */
+/** Screen canvas. Intentionally plain — cards and type do the work. */
 export function GlassBackdrop({ children, style }: ViewProps) {
+  const theme = useAppTheme();
   return (
     <View style={[{ flex: 1, backgroundColor: theme.canvas }, style]}>
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <View
-          style={{
-            position: "absolute",
-            top: -140,
-            right: -110,
-            width: 340,
-            height: 340,
-            borderRadius: 999,
-            backgroundColor: theme.accentGlow,
-            opacity: 0.5,
-          }}
-        />
-        <View
-          style={{
-            position: "absolute",
-            top: 180,
-            left: -150,
-            width: 320,
-            height: 320,
-            borderRadius: 999,
-            backgroundColor: "rgba(11, 11, 12, 0.10)",
-          }}
-        />
-        <View
-          style={{
-            position: "absolute",
-            bottom: -160,
-            right: -80,
-            width: 300,
-            height: 300,
-            borderRadius: 999,
-            backgroundColor: "rgba(229, 35, 27, 0.10)",
-          }}
-        />
-      </View>
       {children}
     </View>
   );
@@ -308,20 +272,22 @@ export function GlassButton({
   disabled,
   ...rest
 }: GlassButtonProps) {
+  const theme = useAppTheme();
   // The `glass` variant delegates to GlassSurface, which handles reduced
   // transparency itself; the solid variants have nothing to degrade.
-  const height = size === "lg" ? 56 : 48;
+  const height = size === "lg" ? 52 : 48;
   const isDisabled = disabled || loading;
 
   const base: ViewStyle = {
     height,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: spacing.sm,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     overflow: "hidden",
+    maxWidth: "100%",
     opacity: isDisabled ? 0.55 : 1,
   };
 
@@ -347,7 +313,13 @@ export function GlassButton({
         {loading ? (
           <ActivityIndicator color={theme.inkInverse} />
         ) : (
-          <Text style={[label, { color: theme.inkInverse }, textStyle]}>{title}</Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={[label, { color: theme.inkInverse }, textStyle]}
+          >
+            {title}
+          </Text>
         )}
       </Pressable>
     );
@@ -360,7 +332,7 @@ export function GlassButton({
         disabled={isDisabled}
         style={({ pressed }) => [
           base,
-          { backgroundColor: pressed ? "#2E2E34" : theme.ink },
+          { backgroundColor: pressed ? palette.ink700 : palette.black },
           style,
         ]}
         {...rest}
@@ -368,7 +340,13 @@ export function GlassButton({
         {loading ? (
           <ActivityIndicator color={theme.inkInverse} />
         ) : (
-          <Text style={[label, { color: theme.inkInverse }, textStyle]}>{title}</Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={[label, { color: theme.inkInverse }, textStyle]}
+          >
+            {title}
+          </Text>
         )}
       </Pressable>
     );
@@ -381,12 +359,18 @@ export function GlassButton({
         disabled={isDisabled}
         style={({ pressed }) => [
           base,
-          { backgroundColor: pressed ? theme.accentSoft : "transparent" },
+          { backgroundColor: pressed ? theme.glass2 : "transparent" },
           style,
         ]}
         {...rest}
       >
-        <Text style={[label, { color: theme.accentInk }, textStyle]}>{title}</Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={[label, { color: theme.inkMuted }, textStyle]}
+        >
+          {title}
+        </Text>
       </Pressable>
     );
   }
@@ -402,7 +386,13 @@ export function GlassButton({
           {loading ? (
             <ActivityIndicator color={theme.ink} />
           ) : (
-            <Text style={[label, { color: theme.ink }, textStyle]}>{title}</Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={[label, { color: theme.ink }, textStyle]}
+            >
+              {title}
+            </Text>
           )}
         </GlassSurface>
       )}
@@ -410,45 +400,165 @@ export function GlassButton({
   );
 }
 
+/** iOS Settings switch: 51×31 capsule, white thumb, system green. */
+export function IosSwitch({
+  value,
+  disabled = false,
+}: {
+  value: boolean;
+  disabled?: boolean;
+}) {
+  const theme = useAppTheme();
+  const reducedMotion = useReducedMotion();
+  const progress = React.useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  React.useEffect(() => {
+    if (reducedMotion) {
+      progress.setValue(value ? 1 : 0);
+      return;
+    }
+    Animated.spring(progress, {
+      toValue: value ? 1 : 0,
+      useNativeDriver: true,
+      speed: 18,
+      bounciness: 2,
+    }).start();
+  }, [value, progress, reducedMotion]);
+
+  const offTrack = theme.scheme === "dark" ? "#39393D" : "#E9E9EA";
+  const onTrack = theme.scheme === "dark" ? "#30D158" : "#34C759";
+
+  return (
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        width: 51,
+        height: 31,
+        borderRadius: 15.5,
+        padding: 2,
+        justifyContent: "center",
+        backgroundColor: offTrack,
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            borderRadius: 15.5,
+            backgroundColor: onTrack,
+            opacity: progress,
+          },
+        ]}
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            borderRadius: 15.5,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.scheme === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.04)",
+          },
+        ]}
+      />
+      <Animated.View
+        style={{
+          width: 27,
+          height: 27,
+          borderRadius: 13.5,
+          backgroundColor: "#FFFFFF",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.18,
+          shadowRadius: 3,
+          elevation: 3,
+          zIndex: 2,
+          transform: [
+            {
+              translateX: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 20],
+              }),
+            },
+          ],
+        }}
+      />
+    </View>
+  );
+}
+
 export type GlassInputProps = TextInputProps & {
   label?: string;
   containerStyle?: StyleProp<ViewStyle>;
+  /** Hairline row inside a card instead of a nested glass field. */
+  inset?: boolean;
+  last?: boolean;
 };
 
-/** Frosted text field with a floating label. */
+/** Frosted text field. Use `inset` inside a `GlassCard` so fields don't nest. */
 export function GlassInput({
   label,
   containerStyle,
   style,
   multiline,
+  inset = false,
+  last = false,
   ...rest
 }: GlassInputProps) {
+  const theme = useAppTheme();
+  const field = (
+    <TextInput
+      placeholderTextColor={theme.inkSubtle}
+      keyboardAppearance={theme.scheme}
+      selectionColor={theme.accent}
+      cursorColor={theme.accent}
+      multiline={multiline}
+      style={[
+        {
+          paddingHorizontal: inset ? 0 : spacing.lg,
+          paddingVertical: multiline ? spacing.md : inset ? 14 : 14,
+          minHeight: multiline ? 88 : inset ? 48 : 50,
+          fontSize: typography.size.body,
+          color: theme.ink,
+          textAlignVertical: multiline ? "top" : "center",
+          width: "100%",
+        },
+        style,
+      ]}
+      {...rest}
+    />
+  );
+
   return (
-    <View style={[{ marginBottom: spacing.md }, containerStyle]}>
+    <View
+      style={[
+        {
+          marginBottom: inset ? 0 : spacing.md,
+          minWidth: 0,
+          flexShrink: 1,
+          borderBottomWidth: inset && !last ? StyleSheet.hairlineWidth : 0,
+          borderBottomColor: theme.hairlineStrong,
+        },
+        containerStyle,
+      ]}
+    >
       {label ? <GlassLabel>{label}</GlassLabel> : null}
-      <GlassSurface level="strong" cornerRadius={radius.md}>
-        <TextInput
-          placeholderTextColor={theme.inkSubtle}
-          multiline={multiline}
-          style={[
-            {
-              paddingHorizontal: spacing.lg,
-              paddingVertical: multiline ? spacing.md : 14,
-              minHeight: multiline ? 96 : 50,
-              fontSize: typography.size.body,
-              color: theme.ink,
-              textAlignVertical: multiline ? "top" : "center",
-            },
-            style,
-          ]}
-          {...rest}
-        />
-      </GlassSurface>
+      {inset ? (
+        field
+      ) : (
+        <GlassSurface level="strong" cornerRadius={radius.md}>
+          {field}
+        </GlassSurface>
+      )}
     </View>
   );
 }
 
 export function GlassLabel({ children }: { children: React.ReactNode }) {
+  const theme = useAppTheme();
   return (
     <Text
       style={{
@@ -475,6 +585,9 @@ export function GlassChip({
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
+  const theme = useAppTheme();
+  const { width } = useWindowDimensions();
+  const compact = width < 400;
   return (
     <Pressable
       accessibilityRole="button"
@@ -482,12 +595,15 @@ export function GlassChip({
       onPress={onPress}
       style={[
         {
-          paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.sm,
+          paddingHorizontal: compact ? 12 : 14,
+          paddingVertical: 8,
+          minHeight: 36,
+          flexShrink: 0,
           borderRadius: radius.pill,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: selected ? theme.accent : theme.hairlineStrong,
-          backgroundColor: selected ? theme.accent : theme.glass2,
+          borderColor: selected ? theme.ink : theme.hairlineStrong,
+          backgroundColor: selected ? theme.ink : "transparent",
+          justifyContent: "center",
         },
         style,
       ]}
@@ -506,10 +622,10 @@ export function GlassChip({
 }
 
 const STATUS_LABEL: Record<StatusTone, string> = {
-  inStock: "IN STOCK",
-  canOrder: "CAN ORDER",
-  outOfStock: "OUT OF STOCK",
-  pending: "WAITING",
+  inStock: "In stock",
+  canOrder: "Can order",
+  outOfStock: "Out of stock",
+  pending: "Waiting",
 };
 
 /** Maps the database `response_type` onto a design tone. */
@@ -536,7 +652,8 @@ export function StatusPill({
   label?: string;
   style?: StyleProp<ViewStyle>;
 }) {
-  const palette = status[tone];
+  const theme = useAppTheme();
+  const tonePalette = theme.status[tone];
   return (
     <View
       style={[
@@ -545,9 +662,9 @@ export function StatusPill({
           paddingHorizontal: spacing.md,
           paddingVertical: 5,
           borderRadius: radius.pill,
-          backgroundColor: palette.tint,
+          backgroundColor: tonePalette.tint,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: palette.border,
+          borderColor: tonePalette.border,
         },
         style,
       ]}
@@ -555,9 +672,8 @@ export function StatusPill({
       <Text
         style={{
           fontSize: typography.size.caption,
-          fontWeight: "700",
-          letterSpacing: typography.tracking.caption,
-          color: palette.ink,
+          fontWeight: "600",
+          color: tonePalette.ink,
         }}
       >
         {label ?? STATUS_LABEL[tone]}
@@ -568,6 +684,7 @@ export function StatusPill({
 
 /** Coloured rail down the leading edge of a response card. */
 export function StatusRail({ tone }: { tone: StatusTone }) {
+  const theme = useAppTheme();
   return (
     <View
       pointerEvents="none"
@@ -577,7 +694,7 @@ export function StatusRail({ tone }: { tone: StatusTone }) {
         top: 0,
         bottom: 0,
         width: 4,
-        backgroundColor: status[tone].solid,
+        backgroundColor: theme.status[tone].solid,
       }}
     />
   );
@@ -595,6 +712,7 @@ export function GlassSheet({
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const theme = useAppTheme();
   return (
     <GlassSurface
       level="chrome"
@@ -657,6 +775,7 @@ export function GlassChromeBackground({
   edge?: "top" | "bottom";
   blurTarget?: BlurTargetRef;
 }) {
+  const theme = useAppTheme();
   const reduced = useReducedTransparency();
   if (reduced) {
     return (
@@ -672,7 +791,7 @@ export function GlassChromeBackground({
     <View style={StyleSheet.absoluteFill}>
       <BlurView
         intensity={blur.chrome}
-        tint={Platform.OS === "ios" ? "systemChromeMaterialLight" : "light"}
+        tint={Platform.OS === "ios" ? iosChromeTint(theme.scheme) : theme.scheme}
         style={StyleSheet.absoluteFill}
         {...androidBlurProps(blurTarget)}
       />
@@ -680,7 +799,7 @@ export function GlassChromeBackground({
         style={[
           StyleSheet.absoluteFill,
           {
-            backgroundColor: flat ? LEVEL_FILL_FLAT.chrome : theme.glassChrome,
+            backgroundColor: flat ? theme.flatFill.chrome : theme.glassChrome,
           },
         ]}
       />
@@ -726,25 +845,21 @@ export function GlassEmptyState({
   description?: string;
   action?: React.ReactNode;
 }) {
+  const theme = useAppTheme();
   return (
     <View
       style={{
         alignItems: "center",
         justifyContent: "center",
-        paddingVertical: 48,
+        paddingVertical: 56,
         paddingHorizontal: spacing.xl,
-        borderRadius: radius.xl,
-        borderWidth: 1,
-        borderStyle: "dashed",
-        borderColor: theme.hairlineStrong,
-        backgroundColor: theme.glass1,
       }}
     >
       <Text
         style={{
-          fontSize: typography.size.callout,
-          fontWeight: "700",
-          color: theme.ink,
+          fontSize: typography.size.body,
+          fontWeight: "500",
+          color: theme.inkMuted,
           textAlign: "center",
         }}
       >
@@ -776,6 +891,7 @@ export function GlassNotice({
   children: React.ReactNode;
   tone?: "accent" | "muted";
 }) {
+  const theme = useAppTheme();
   const isAccent = tone === "accent";
   return (
     <View
@@ -802,7 +918,7 @@ export function GlassNotice({
   );
 }
 
-/** Shared screen title block. */
+/** Shared screen title block. Shrinks on narrow phones so headlines wrap cleanly. */
 export function ScreenTitle({
   title,
   subtitle,
@@ -812,25 +928,29 @@ export function ScreenTitle({
   subtitle?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const theme = useAppTheme();
   return (
-    <View style={[{ marginBottom: spacing.xl }, style]}>
+    <View style={[{ marginBottom: spacing.lg }, style]}>
       <Text
+        numberOfLines={2}
         style={{
-          fontSize: typography.size.title1,
-          fontWeight: "800",
+          fontSize: typography.size.title2,
+          fontWeight: "700",
           color: theme.ink,
-          letterSpacing: typography.tracking.hero,
+          letterSpacing: typography.tracking.title,
+          lineHeight: 30,
         }}
       >
         {title}
       </Text>
       {subtitle ? (
         <Text
+          numberOfLines={2}
           style={{
-            marginTop: spacing.sm,
-            fontSize: typography.size.body,
+            marginTop: 6,
+            fontSize: typography.size.footnote,
             color: theme.inkMuted,
-            lineHeight: 21,
+            lineHeight: 18,
           }}
         >
           {subtitle}
@@ -840,10 +960,20 @@ export function ScreenTitle({
   );
 }
 
+export function useNavigationOptions() {
+  const theme = useAppTheme();
+  return {
+    tabBarActiveTintColor: theme.accent as ColorValue,
+    tabBarInactiveTintColor: theme.inkSubtle as ColorValue,
+    headerTintColor: theme.ink as ColorValue,
+    headerTitleStyle: { fontWeight: "600" as const, color: theme.ink },
+  };
+}
+
 /** Tab bar / header colour options shared by both apps. */
 export const navigationOptions = {
-  tabBarActiveTintColor: theme.accent as ColorValue,
-  tabBarInactiveTintColor: theme.inkSubtle as ColorValue,
-  headerTintColor: theme.ink as ColorValue,
-  headerTitleStyle: { fontWeight: "700" as const, color: theme.ink },
+  tabBarActiveTintColor: lightTheme.accent as ColorValue,
+  tabBarInactiveTintColor: lightTheme.inkSubtle as ColorValue,
+  headerTintColor: lightTheme.ink as ColorValue,
+  headerTitleStyle: { fontWeight: "600" as const, color: lightTheme.ink },
 };

@@ -1,4 +1,4 @@
-import { CustomerNav, CustomerTopBar } from "@/components/shared/nav";
+import { CustomerTopBar } from "@/components/customer/app-menu";
 import { getCurrentProfile } from "@/lib/services/actions";
 import { redirect } from "next/navigation";
 
@@ -15,10 +15,9 @@ export default async function CustomerLayout({
   return (
     <div className="app-canvas min-h-screen">
       <CustomerTopBar />
-      <div className="mx-auto min-h-[calc(100vh-3.5rem)] w-full max-w-lg pb-24 md:max-w-3xl md:pb-10 lg:max-w-5xl">
+      <div className="mx-auto min-h-[calc(100vh-3.5rem)] w-full max-w-3xl">
         {children}
       </div>
-      <CustomerNav />
     </div>
   );
 }

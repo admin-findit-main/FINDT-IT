@@ -12,7 +12,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { privacySafeRequestPayload } from "@findit/domain";
+import { isAgeRestrictedFind, privacySafeRequestPayload } from "@findit/domain";
 import { radius, spacing, status, theme, typography, type StatusTone } from "@findit/theme";
 import {
   GlassBackdrop,
@@ -175,6 +175,13 @@ export default function RespondScreen() {
           <Text style={styles.meta}>
             {safe.category || "Uncategorized"} · near {safe.area_city}
           </Text>
+          {isAgeRestrictedFind({
+            category: safe.category,
+            productName: safe.product_name,
+            description: safe.description,
+          }) ? (
+            <Text style={styles.meta}>Check ID at pickup</Text>
+          ) : null}
           {safe.image_url ? (
             <Image source={{ uri: safe.image_url }} style={styles.image} resizeMode="cover" />
           ) : null}
@@ -208,7 +215,7 @@ export default function RespondScreen() {
         <View style={[styles.actions, tablet && styles.actionsRow]}>
           <AnswerButton
             tone="inStock"
-            label="IN STOCK"
+            label="In stock"
             minHeight={btnHeight}
             disabled={busy}
             onPress={() => submit("in_stock")}
@@ -216,7 +223,7 @@ export default function RespondScreen() {
           />
           <AnswerButton
             tone="outOfStock"
-            label="OUT"
+            label="Out"
             minHeight={btnHeight}
             disabled={busy}
             onPress={() => submit("out_of_stock")}
@@ -224,7 +231,7 @@ export default function RespondScreen() {
           />
           <AnswerButton
             tone="canOrder"
-            label="CAN ORDER"
+            label="Can order"
             minHeight={btnHeight}
             disabled={busy}
             onPress={() => submit("can_order")}

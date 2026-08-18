@@ -1,17 +1,21 @@
-import { Link, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
-import { spacing, theme, typography } from '@findit/theme';
-import { GlassBackdrop, GlassEmptyState } from '@findit/theme/native';
+import { Link, Stack } from "expo-router";
+import { StyleSheet } from "react-native";
+import { spacing, typography } from "@findit/theme";
+import { GlassBackdrop, GlassEmptyState, useAppTheme } from "@findit/theme/native";
 
 export default function NotFoundScreen() {
+  const theme = useAppTheme();
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
+      <Stack.Screen options={{ title: "Oops!" }} />
       <GlassBackdrop style={styles.container}>
         <GlassEmptyState
           title="This screen doesn't exist."
           action={
-            <Link href="/" style={styles.linkText}>
+            <Link
+              href="/"
+              style={[styles.linkText, { color: theme.accentInk }]}
+            >
               Go to home screen!
             </Link>
           }
@@ -23,14 +27,13 @@ export default function NotFoundScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    justifyContent: 'center',
+    justifyContent: "center",
     padding: spacing.xl,
   },
   linkText: {
     fontSize: typography.size.body,
     fontWeight: typography.weight.semibold,
-    color: theme.accentInk,
     paddingVertical: spacing.md,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });

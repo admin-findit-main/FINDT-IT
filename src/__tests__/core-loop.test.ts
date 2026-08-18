@@ -12,7 +12,12 @@ import {
   getDemoState,
   resetDemoState,
 } from "@/lib/demo/store";
-import { CUSTOMER_PLANS, STORE_PLANS } from "@/lib/config/constants";
+import {
+  AGE_RESTRICTED_ID_REQUIRED,
+  CUSTOMER_PLANS,
+  STORE_PLANS,
+  createdInMonthlyFindWindow,
+} from "@/lib/config/constants";
 import { normalizeProductName } from "@/lib/utils";
 
 beforeEach(() => {
@@ -31,10 +36,10 @@ describe("normalizeProductName", () => {
 
 describe("plan config", () => {
   it("exposes customer and store pricing from config", () => {
-    expect(CUSTOMER_PLANS.free.monthlyRequests).toBe(3);
-    expect(CUSTOMER_PLANS.plus.priceMonthly).toBe(3.99);
-    expect(STORE_PLANS.starter.priceMonthly).toBe(29);
-    expect(STORE_PLANS.pro.priceMonthly).toBe(59);
+    expect(CUSTOMER_PLANS.free.monthlyRequests).toBe(5);
+    expect(CUSTOMER_PLANS.plus.priceMonthly).toBeNull();
+    expect(STORE_PLANS.starter.priceMonthly).toBe(49.99);
+    expect(STORE_PLANS.pro.priceMonthly).toBe(49.99);
   });
 });
 
@@ -60,6 +65,35 @@ describe("FINDIT core loop", () => {
 
     const targets = getDemoState().targets.filter((t) => t.request_id === request.id);
     expect(targets.length).toBe(storesTargeted);
+  });
+
+  it("blocks tobacco Finds until the customer confirms they are 21+", () => {
+    const customer = demoLogin("customer@demo.findit.local", "demo1234")!;
+    const denied = demoCreateRequest({
+      customerId: customer.id,
+      productName: "Elf Bar BC5000 Blue Razz Ice 5%",
+      category: "Tobacco & Vape",
+      city: "Falls Church",
+      state: "VA",
+      postalCode: "22044",
+      radiusMiles: 10,
+      expirationHours: 24,
+    });
+    expect(denied.blocked).toBe(AGE_RESTRICTED_ID_REQUIRED);
+
+    const allowed = demoCreateRequest({
+      customerId: customer.id,
+      productName: "Elf Bar BC5000 Blue Razz Ice 5%",
+      category: "Tobacco & Vape",
+      city: "Falls Church",
+      state: "VA",
+      postalCode: "22044",
+      radiusMiles: 10,
+      expirationHours: 24,
+      ageRestrictedConfirmed: true,
+    });
+    expect(allowed.blocked).toBeUndefined();
+    expect(allowed.request.category).toBe("Tobacco & Vape");
   });
 
   it("does not let a store respond if it was not targeted", () => {
@@ -264,6 +298,30 @@ describe("store join applications", () => {
     expect(store.trial_ends_at).toBeTruthy();
     expect(store.subscription_plan).toBe("free");
   });
+
+  it("copies the ID requirement from a smoke shop application onto the store", () => {
+    const admin = demoLogin("admin@demo.findit.local", "demo1234")!;
+    const application = demoSubmitStoreApplication({
+      businessName: "Falls Church Smoke Shop",
+      businessType: "Smoke Shop",
+      streetAddress: "18 Hillwood Ave",
+      city: "Falls Church",
+      state: "VA",
+      postalCode: "22046",
+      phone: "703-555-0188",
+      ownerName: "Jordan Owner",
+      ownerEmail: "jordan@fcsmoke.example",
+      whyLegit:
+        "Licensed tobacco retailer. We check government ID for every nicotine sale.",
+      confirmedLegitimate: true,
+      requestCategories: ["Tobacco & Vape", "Convenience"],
+      requiresCustomerId: true,
+    });
+    expect(application.requires_customer_id).toBe(true);
+
+    const { store } = demoApproveStoreApplication(application.id, admin.id);
+    expect(store.age_restricted).toBe(true);
+  });
 });
 
 describe("customer free plan soft limit", () => {
@@ -272,14 +330,10 @@ describe("customer free plan soft limit", () => {
     const customer = demoLogin("customer@demo.findit.local", "demo1234")!;
     // Seeded requests already count toward the month; ensure we're over the free cap
     const limit = CUSTOMER_PLANS.free.monthlyRequests!;
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
     const existing = getDemoState().requests.filter(
       (r) =>
         r.customer_id === customer.id &&
-        new Date(r.created_at) >= monthStart &&
-        r.status !== "cancelled"
+        createdInMonthlyFindWindow(r.created_at)
     ).length;
     expect(existing).toBeGreaterThanOrEqual(limit);
 
@@ -292,6 +346,6 @@ describe("customer free plan soft limit", () => {
       radiusMiles: 5,
       expirationHours: 24,
     });
-    expect(blocked).toMatch(/FINDIT FREE|requests per month/i);
+    expect(blocked).toMatch(/free Finds this month/i);
   });
 });

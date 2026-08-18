@@ -1,10 +1,8 @@
 /**
- * FINDIT "clear glass" primitives for the web.
+ * FINDIT UI primitives for the web.
  *
- * Every translucent surface in the app should come from here rather than from
- * one-off `bg-white/60 backdrop-blur` classes, so the blur strength, hairline and
- * reduced-transparency fallbacks stay consistent. The `.glass*` classes these
- * compose are defined in `src/app/globals.css`.
+ * Cards are opaque. Frost lives on `.glass-chrome` (nav, tab bars). Red is
+ * reserved for the primary action.
  */
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
@@ -105,10 +103,10 @@ export const glassButtonVariants = cva(
         glass:
           "glass text-ink hover:bg-glass-3 rounded-glass-lg",
         /** Solid black — structural actions such as sign-in. */
-        ink: "bg-ink text-ink-inverse hover:bg-[var(--fd-ink-700)]",
+        ink: "bg-[var(--fd-black)] text-ink-inverse hover:bg-[var(--fd-ink-700)]",
         /** Hairline outline on the canvas. */
         outline:
-          "border border-hairline-strong bg-glass-1 text-ink hover:bg-glass-2 backdrop-blur-sm",
+          "border border-hairline-strong bg-white text-ink hover:bg-[var(--solid-3)]",
         /** Text-only. */
         ghost: "text-ink-muted hover:bg-glass-2 hover:text-ink",
         /** Tinted red, for destructive-but-secondary actions. */
@@ -160,7 +158,7 @@ GlassButton.displayName = "GlassButton";
 /* -------------------------------------------------------------------------- */
 
 const fieldClass =
-  "w-full rounded-glass-lg border border-hairline-strong bg-glass-3 text-ink placeholder:text-ink-subtle backdrop-blur-sm shadow-[inset_0_1px_0_0_var(--highlight)] transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:border-accent focus-visible:ring-4 focus-visible:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full rounded-glass-lg border border-hairline-strong bg-white text-ink placeholder:text-ink-subtle transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:border-accent focus-visible:ring-4 focus-visible:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50";
 
 export const GlassInput = React.forwardRef<
   HTMLInputElement,
@@ -224,8 +222,8 @@ export function GlassChip({
       className={cn(
         "glass-press rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
         selected
-          ? "bg-accent text-ink-inverse shadow-accent"
-          : "border border-hairline-strong bg-glass-2 text-ink-muted hover:bg-glass-3 hover:text-ink",
+          ? "bg-[var(--fd-black)] text-ink-inverse"
+          : "border border-hairline-strong bg-white text-ink-muted hover:bg-[var(--solid-3)] hover:text-ink",
         className
       )}
       {...props}
@@ -311,7 +309,7 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider",
+        "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[12px] font-semibold",
         STATUS_PILL[tone],
         className
       )}
@@ -344,7 +342,7 @@ export function GlassBadge({
   const tones: Record<string, string> = {
     neutral: "border-hairline-strong bg-glass-2 text-ink-muted",
     accent: "border-[var(--accent-ring)] bg-accent-soft text-accent-ink",
-    ink: "border-transparent bg-ink text-ink-inverse",
+    ink: "border-transparent bg-[var(--fd-black)] text-ink-inverse",
     stock: STATUS_PILL.stock,
     order: STATUS_PILL.order,
     oos: STATUS_PILL.oos,
@@ -379,7 +377,7 @@ export function GlassEmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-glass-xl border border-dashed border-hairline-strong bg-glass-1 px-6 py-14 text-center backdrop-blur-sm",
+        "flex flex-col items-center justify-center px-6 py-16 text-center",
         className
       )}
     >
@@ -426,7 +424,7 @@ export function GlassNotice({
   return (
     <div
       className={cn(
-        "rounded-glass-lg border p-4 text-sm leading-relaxed backdrop-blur-sm",
+        "rounded-glass-lg border p-4 text-sm leading-relaxed",
         tones[tone],
         className
       )}
@@ -443,7 +441,7 @@ export function Overline({
   return (
     <p
       className={cn(
-        "text-[11px] font-bold uppercase tracking-[0.14em] text-ink-subtle",
+        "text-[12px] font-semibold tracking-wide text-ink-muted",
         className
       )}
       {...props}

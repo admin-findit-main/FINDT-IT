@@ -22,6 +22,7 @@ export type ProductCategory =
   | "Clothing"
   | "Collectibles"
   | "Hardware"
+  | "Tobacco & Vape"
   | "Specialty"
   | "Other";
 
@@ -34,6 +35,7 @@ export type StoreCategory =
   | "Clothing"
   | "Collectibles"
   | "Hardware"
+  | "Smoke Shop"
   | "Specialty Retail"
   | "Other";
 
@@ -46,7 +48,9 @@ export type StoreApplicationStatus =
 
 export interface Profile {
   id: string;
-  email: string;
+  email: string | null;
+  /** Customer auth phone in E.164. Never send this to stores. */
+  phone_e164: string | null;
   first_name: string | null;
   last_name: string | null;
   display_name: string | null;
@@ -88,7 +92,7 @@ export interface Store {
   age_restricted: boolean;
   subscription_plan: string;
   subscription_status: string;
-  /** ISO timestamp when 60-day pilot ends; null if not on trial */
+  /** ISO timestamp when the 30-day FINDIT+ Business trial ends; null if not on trial */
   trial_ends_at: string | null;
   avg_response_minutes: number | null;
   service_radius_miles: number;
@@ -112,6 +116,8 @@ export interface StoreApplication {
   why_legit: string;
   confirmed_legitimate: boolean;
   request_categories: string[];
+  /** Store checks a government ID from customers at pickup / purchase. */
+  requires_customer_id: boolean;
   status: StoreApplicationStatus;
   applicant_user_id: string | null;
   created_store_id?: string | null;
@@ -232,6 +238,8 @@ export interface DemandItem {
 export interface StoreMetrics {
   requests_today: number;
   answered_today: number;
+  requests_yesterday: number;
+  answered_yesterday: number;
   waiting_today: number;
   in_stock_today: number;
   total_received: number;
@@ -286,6 +294,32 @@ export interface DevicePushToken {
   store_id: string | null;
   app_surface: "customer" | "employee" | "web";
   updated_at: string;
+  created_at: string;
+}
+
+/** Paired FINDIT Hub terminal (counter tablet / POS browser). */
+export interface StoreDevice {
+  id: string;
+  store_id: string;
+  device_name: string;
+  token_hash: string;
+  paired_by: string | null;
+  paired_at: string;
+  last_seen_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DevicePairingCode {
+  id: string;
+  code_hash: string;
+  requester_secret_hash: string;
+  expires_at: string;
+  used_at: string | null;
+  store_id: string | null;
+  device_id: string | null;
+  issued_token: string | null;
   created_at: string;
 }
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GlassNav } from "@/components/ui/glass";
+import { BrandHomeLink } from "@/components/brand/logo";
 
 type AppHeaderProps = {
   brandHref?: string;
@@ -16,7 +17,7 @@ type AppHeaderProps = {
   children?: React.ReactNode;
 };
 
-/** Frosted top bar. The brand dot is the only red in the chrome. */
+/** Customer top bar with the FINDIT F-mark. */
 export function AppHeader({
   brandHref = "/home",
   brandLabel = "FINDIT",
@@ -45,13 +46,7 @@ export function AppHeader({
             <span className="max-w-36 truncate sm:max-w-none">{backLabel}</span>
           </Link>
         ) : null}
-        <Link
-          href={brandHref}
-          className="flex shrink-0 items-center gap-1.5 text-xl font-bold tracking-tight text-ink"
-        >
-          {brandLabel}
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
-        </Link>
+        <BrandHomeLink href={brandHref} className="shrink-0" />
         {title ? (
           <>
             <span className="hidden text-ink-subtle sm:inline" aria-hidden>

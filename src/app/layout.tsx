@@ -23,6 +23,13 @@ export const metadata: Metadata = {
     "Tell FINDIT what you're looking for and nearby stores can tell you if they have it.",
   applicationName: "FINDIT",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/findit-icon.png", sizes: "1024x1024", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -36,7 +43,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f4f4f6",
+  themeColor: "#F2F2F7",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

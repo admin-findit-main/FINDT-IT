@@ -8,6 +8,7 @@ import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import { parseEmployeeDeepLink } from "@findit/domain";
 import { theme } from "@findit/theme";
+import { AppThemeProvider } from "@findit/theme/native";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import {
   getRequestIdFromNotificationData,
@@ -20,17 +21,13 @@ if (Platform.OS !== "web") {
   SplashScreen.preventAutoHideAsync().catch(() => {});
 }
 
-/**
- * The clear-glass system is light-only — the translucent surfaces need a bright
- * canvas to refract, so we never hand the navigator the dark theme.
- */
-const glassNavigationTheme = {
+const navigationTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
     primary: theme.accent,
     background: theme.canvas,
-    card: theme.canvas,
+    card: theme.solidChrome,
     text: theme.ink,
     border: theme.hairlineStrong,
     notification: theme.accent,
@@ -39,9 +36,11 @@ const glassNavigationTheme = {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <AppThemeProvider scheme="light">
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </AppThemeProvider>
   );
 }
 
@@ -100,7 +99,7 @@ function RootNavigator() {
   }, [router]);
 
   return (
-    <ThemeProvider value={glassNavigationTheme}>
+    <ThemeProvider value={navigationTheme}>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{

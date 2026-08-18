@@ -49,8 +49,10 @@ export default function StoreAccountPage() {
           <p className="text-sm text-ink-muted">{roleLabel(role)}</p>
         </div>
         <div className="border-t border-hairline-strong pt-4">
-          <Overline>Email</Overline>
-          <p className="mt-1 text-sm text-ink">{profile.email}</p>
+          <Overline>{profile.email ? "Email" : "Phone"}</Overline>
+          <p className="mt-1 text-sm text-ink">
+            {profile.email || profile.phone_e164 || "—"}
+          </p>
         </div>
         <div>
           <Overline>Name</Overline>

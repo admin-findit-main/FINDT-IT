@@ -30,10 +30,11 @@ export const createRequestSchema = z.object({
     .max(MAX_PRODUCT_NAME_LENGTH),
   description: z.string().max(MAX_DESCRIPTION_LENGTH).optional().or(z.literal("")),
   category: z.enum(PRODUCT_CATEGORIES).optional().or(z.literal("")),
-  city: z.string().min(2, "City is required").max(80),
-  state: z.string().min(2).max(2).default("VA"),
+  city: z.string().trim().min(2, "City is required").max(80),
+  state: z.string().trim().min(2).max(2).default("VA"),
   postalCode: z
     .string()
+    .trim()
     .regex(/^\d{5}(-\d{4})?$/, "Enter a valid ZIP code"),
   radiusMiles: z.coerce.number().int().min(1).max(25).default(10),
   expirationHours: z.coerce.number().int().refine((v) => [4, 12, 24, 48].includes(v), {
@@ -50,6 +51,7 @@ export const createRequestSchema = z.object({
   forceDuplicate: z.boolean().optional().default(false),
   latitude: z.coerce.number().optional().nullable(),
   longitude: z.coerce.number().optional().nullable(),
+  ageRestrictedConfirmed: z.boolean().optional().default(false),
 });
 
 export const inStockResponseSchema = z.object({
@@ -98,6 +100,7 @@ export const storeJoinApplicationSchema = z.object({
   requestCategories: z
     .array(z.string().min(1))
     .min(1, "Select at least one product category you want to receive"),
+  requiresCustomerId: z.boolean(),
   confirmedLegitimate: z.boolean().refine((v) => v === true, {
     message: "Confirm you are a legitimate business",
   }),

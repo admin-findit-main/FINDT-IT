@@ -185,7 +185,7 @@ Deno.serve(async (req) => {
       type: responseType,
       title:
         responseType === "in_stock"
-          ? `${store?.name || "A store"} says your item is IN STOCK`
+          ? `${store?.name || "A store"} has it in stock`
           : `${store?.name || "A store"} can order it`,
       body: `${requestRow.product_name}`,
       related_request_id: requestId,

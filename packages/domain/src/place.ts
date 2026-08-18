@@ -1,0 +1,210 @@
+export type ShortPlace = {
+  city: string;
+  state: string;
+  postalCode: string;
+};
+
+export const US_STATES = [
+  { code: "AL", name: "Alabama" },
+  { code: "AK", name: "Alaska" },
+  { code: "AZ", name: "Arizona" },
+  { code: "AR", name: "Arkansas" },
+  { code: "CA", name: "California" },
+  { code: "CO", name: "Colorado" },
+  { code: "CT", name: "Connecticut" },
+  { code: "DE", name: "Delaware" },
+  { code: "DC", name: "District of Columbia" },
+  { code: "FL", name: "Florida" },
+  { code: "GA", name: "Georgia" },
+  { code: "HI", name: "Hawaii" },
+  { code: "ID", name: "Idaho" },
+  { code: "IL", name: "Illinois" },
+  { code: "IN", name: "Indiana" },
+  { code: "IA", name: "Iowa" },
+  { code: "KS", name: "Kansas" },
+  { code: "KY", name: "Kentucky" },
+  { code: "LA", name: "Louisiana" },
+  { code: "ME", name: "Maine" },
+  { code: "MD", name: "Maryland" },
+  { code: "MA", name: "Massachusetts" },
+  { code: "MI", name: "Michigan" },
+  { code: "MN", name: "Minnesota" },
+  { code: "MS", name: "Mississippi" },
+  { code: "MO", name: "Missouri" },
+  { code: "MT", name: "Montana" },
+  { code: "NE", name: "Nebraska" },
+  { code: "NV", name: "Nevada" },
+  { code: "NH", name: "New Hampshire" },
+  { code: "NJ", name: "New Jersey" },
+  { code: "NM", name: "New Mexico" },
+  { code: "NY", name: "New York" },
+  { code: "NC", name: "North Carolina" },
+  { code: "ND", name: "North Dakota" },
+  { code: "OH", name: "Ohio" },
+  { code: "OK", name: "Oklahoma" },
+  { code: "OR", name: "Oregon" },
+  { code: "PA", name: "Pennsylvania" },
+  { code: "RI", name: "Rhode Island" },
+  { code: "SC", name: "South Carolina" },
+  { code: "SD", name: "South Dakota" },
+  { code: "TN", name: "Tennessee" },
+  { code: "TX", name: "Texas" },
+  { code: "UT", name: "Utah" },
+  { code: "VT", name: "Vermont" },
+  { code: "VA", name: "Virginia" },
+  { code: "WA", name: "Washington" },
+  { code: "WV", name: "West Virginia" },
+  { code: "WI", name: "Wisconsin" },
+  { code: "WY", name: "Wyoming" },
+] as const;
+
+export type UsStateCode = (typeof US_STATES)[number]["code"];
+
+const STATE_BY_CODE = new Map(US_STATES.map((s) => [s.code, s]));
+const STATE_BY_NAME = new Map(US_STATES.map((s) => [s.name.toLowerCase(), s]));
+
+export function digitsPostalCode(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 5);
+}
+
+export function isUsZip(value: string): boolean {
+  return /^\d{5}$/.test(digitsPostalCode(value)) && digitsPostalCode(value).length === 5;
+}
+
+export function normalizeStateCode(value: string | null | undefined): string {
+  const raw = (value || "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase();
+  if (STATE_BY_CODE.has(upper as UsStateCode)) return upper;
+  const named = STATE_BY_NAME.get(raw.toLowerCase());
+  return named?.code || "";
+}
+
+export function stateName(code: string): string {
+  return STATE_BY_CODE.get(normalizeStateCode(code) as UsStateCode)?.name || code;
+}
+
+/** City, ST ZIP — never a street address. */
+export function formatShortPlace(place: {
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+}): string {
+  const city = (place.city || "").trim();
+  const state = normalizeStateCode(place.state);
+  const zip = digitsPostalCode(place.postalCode || "");
+  if (city && state && zip) return `${city}, ${state} ${zip}`;
+  if (city && state) return `${city}, ${state}`;
+  if (city && zip) return `${city} ${zip}`;
+  if (state && zip) return `${state} ${zip}`;
+  return zip || city || state || "";
+}
+
+export function emptyShortPlace(): ShortPlace {
+  return { city: "", state: "", postalCode: "" };
+}
+
+export function isCompleteShortPlace(place: ShortPlace): boolean {
+  return (
+    place.city.trim().length >= 2 &&
+    normalizeStateCode(place.state).length === 2 &&
+    isUsZip(place.postalCode)
+  );
+}
+
+export function shortPlaceFromProfile(profile: {
+  default_city?: string | null;
+  default_state?: string | null;
+  default_postal_code?: string | null;
+} | null | undefined): ShortPlace {
+  return {
+    city: (profile?.default_city || "").trim(),
+    state: normalizeStateCode(profile?.default_state) || "VA",
+    postalCode: digitsPostalCode(profile?.default_postal_code || ""),
+  };
+}
+
+type ZippoPlace = {
+  "place name"?: string;
+  state?: string;
+  "state abbreviation"?: string;
+};
+
+type ZippoPayload = {
+  "post code"?: string;
+  places?: ZippoPlace[];
+};
+
+export function parseZipLookup(payload: unknown, fallbackZip = ""): ShortPlace | null {
+  if (!payload || typeof payload !== "object") return null;
+  const data = payload as ZippoPayload;
+  const first = data.places?.[0];
+  if (!first) return null;
+  const state = normalizeStateCode(first["state abbreviation"] || first.state);
+  const city = (first["place name"] || "").trim();
+  const postalCode = digitsPostalCode(data["post code"] || fallbackZip);
+  if (!city || !state) return null;
+  return { city, state, postalCode };
+}
+
+export function parseCityLookup(payload: unknown, stateHint = ""): ShortPlace[] {
+  if (!payload || typeof payload !== "object") return [];
+  const data = payload as ZippoPayload & { "state abbreviation"?: string };
+  const state = normalizeStateCode(data["state abbreviation"] || stateHint);
+  const seen = new Set<string>();
+  const out: ShortPlace[] = [];
+  for (const place of data.places || []) {
+    const city = (place["place name"] || "").trim();
+    const postalCode = digitsPostalCode(
+      typeof (place as { "post code"?: string })["post code"] === "string"
+        ? (place as { "post code": string })["post code"]
+        : ""
+    );
+    if (!city || !postalCode) continue;
+    const key = `${postalCode}:${city}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      city,
+      state: normalizeStateCode(place["state abbreviation"] || state),
+      postalCode,
+    });
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
+const ZIPPO = "https://api.zippopotam.us/us";
+
+/** Resolve a US ZIP to city + state. No street address. */
+export async function lookupUsZip(zip: string): Promise<ShortPlace | null> {
+  const code = digitsPostalCode(zip);
+  if (code.length !== 5) return null;
+  try {
+    const res = await fetch(`${ZIPPO}/${code}`);
+    if (!res.ok) return null;
+    return parseZipLookup(await res.json(), code);
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve a US city to matching ZIPs in that state. */
+export async function lookupUsCity(
+  state: string,
+  city: string
+): Promise<ShortPlace[]> {
+  const st = normalizeStateCode(state).toLowerCase();
+  const q = city.trim();
+  if (!st || q.length < 3) return [];
+  try {
+    const res = await fetch(`${ZIPPO}/${st}/${encodeURIComponent(q)}`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as ZippoPayload & {
+      places?: Array<ZippoPlace & { "post code"?: string }>;
+    };
+    return parseCityLookup(data, st.toUpperCase());
+  } catch {
+    return [];
+  }
+}
