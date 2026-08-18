@@ -174,7 +174,42 @@ export function parseCityLookup(payload: unknown, stateHint = ""): ShortPlace[] 
   return out;
 }
 
+type ReverseGeocodePayload = {
+  countryCode?: string;
+  country_code?: string;
+  principalSubdivision?: string;
+  principalSubdivisionCode?: string;
+  city?: string;
+  locality?: string;
+  localityName?: string;
+  postcode?: string;
+  postalCode?: string;
+  postCode?: string;
+};
+
+/** Parse a reverse-geocode payload into city / state / ZIP. No street. */
+export function parseReverseGeocode(payload: unknown): ShortPlace | null {
+  if (!payload || typeof payload !== "object") return null;
+  const data = payload as ReverseGeocodePayload;
+  const country = String(data.countryCode || data.country_code || "").toUpperCase();
+  if (country && country !== "US" && country !== "USA") return null;
+  const postalCode = digitsPostalCode(
+    String(data.postcode || data.postalCode || data.postCode || "")
+  );
+  const subdivision = String(data.principalSubdivisionCode || "");
+  const stateFromCode = subdivision.includes("-")
+    ? normalizeStateCode(subdivision.split("-").pop() || "")
+    : normalizeStateCode(subdivision);
+  const state =
+    stateFromCode || normalizeStateCode(String(data.principalSubdivision || ""));
+  const city = String(data.city || data.locality || data.localityName || "").trim();
+  if (!city && !postalCode) return null;
+  return { city, state, postalCode };
+}
+
 const ZIPPO = "https://api.zippopotam.us/us";
+const REVERSE_GEOCODE =
+  "https://api.bigdatacloud.net/data/reverse-geocode-client";
 
 /** Resolve a US ZIP to city + state. No street address. */
 export async function lookupUsZip(zip: string): Promise<ShortPlace | null> {
@@ -184,6 +219,29 @@ export async function lookupUsZip(zip: string): Promise<ShortPlace | null> {
     const res = await fetch(`${ZIPPO}/${code}`);
     if (!res.ok) return null;
     return parseZipLookup(await res.json(), code);
+  } catch {
+    return null;
+  }
+}
+
+/** GPS → city, state, ZIP. Never a street address. */
+export async function reverseGeocodeUs(
+  latitude: number,
+  longitude: number
+): Promise<ShortPlace | null> {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  try {
+    const res = await fetch(
+      `${REVERSE_GEOCODE}?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
+    );
+    if (!res.ok) return null;
+    const parsed = parseReverseGeocode(await res.json());
+    if (!parsed) return null;
+    if (parsed.postalCode) {
+      const fromZip = await lookupUsZip(parsed.postalCode);
+      if (fromZip) return fromZip;
+    }
+    return parsed;
   } catch {
     return null;
   }

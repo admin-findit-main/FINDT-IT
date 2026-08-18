@@ -16,6 +16,7 @@ import {
   PLUS_MONTHLY_REQUEST_LIMIT,
   PLUS_MAX_RADIUS_MILES,
 } from "../_shared/domain.ts";
+import { sendExpoPush } from "../_shared/push.ts";
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
@@ -400,8 +401,7 @@ Deno.serve(async (req) => {
           await admin.from("notifications").insert(notifications);
         }
 
-        // Stub Expo push: look up tokens; send only if EXPO_ACCESS_TOKEN set
-        await stubFanoutPush(admin, members || [], {
+        await fanoutEmployeePush(admin, members || [], {
           title: "New FINDIT request",
           body: request.product_name,
           data: {
@@ -445,7 +445,7 @@ Deno.serve(async (req) => {
   );
 });
 
-async function stubFanoutPush(
+async function fanoutEmployeePush(
   admin: ReturnType<typeof createClient>,
   members: { user_id: string | null; store_id: string }[],
   payload: { title: string; body: string; data: Record<string, string> }
@@ -461,33 +461,13 @@ async function stubFanoutPush(
     .eq("app_surface", "employee");
   if (!tokens?.length) return;
 
-  const expoToken = Deno.env.get("EXPO_ACCESS_TOKEN");
-  if (!expoToken) {
-    console.log(
-      `[push stub] Would notify ${tokens.length} device(s); set EXPO_ACCESS_TOKEN to send.`
-    );
-    return;
-  }
-
-  const messages = tokens.map((t) => ({
-    to: t.token,
-    sound: "default",
-    title: payload.title,
-    body: payload.body,
-    data: payload.data,
-  }));
-
-  try {
-    await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${expoToken}`,
-      },
-      body: JSON.stringify(messages),
-    });
-  } catch (e) {
-    console.error("[push] send failed", e);
-  }
+  await sendExpoPush(
+    tokens.map((t) => ({
+      to: t.token,
+      sound: "default",
+      title: payload.title,
+      body: payload.body,
+      data: payload.data,
+    }))
+  );
 }

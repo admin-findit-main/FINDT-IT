@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import {
   getNotificationsAction,
@@ -14,6 +16,9 @@ export default function NotificationsPage() {
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [browserPermission, setBrowserPermission] = useState<NotificationPermission | "unsupported">(
+    "default"
+  );
 
   async function load() {
     const data = await getNotificationsAction();
@@ -27,9 +32,35 @@ export default function NotificationsPage() {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    if (typeof Notification === "undefined") {
+      setBrowserPermission("unsupported");
+      return;
+    }
+    setBrowserPermission(Notification.permission);
+  }, []);
+
+  async function enableBrowserAlerts() {
+    if (typeof Notification === "undefined") return;
+    const next = await Notification.requestPermission();
+    setBrowserPermission(next);
+    if (next === "granted") toast.success("Browser alerts are on for this device.");
+    else toast.message("You can still see alerts here.");
+  }
+
   return (
     <div className="mx-auto max-w-xl px-5 py-8 sm:px-8">
       <h1 className="text-2xl font-bold tracking-tight text-ink">Alerts</h1>
+      {browserPermission === "default" ? (
+        <div className="mt-4">
+          <Button type="button" variant="outline" className="w-full" onClick={enableBrowserAlerts}>
+            Turn on alerts on this device
+          </Button>
+        </div>
+      ) : null}
+      {browserPermission === "granted" ? (
+        <p className="mt-3 text-sm text-ink-subtle">Browser alerts are on for this device.</p>
+      ) : null}
       <div className="mt-6">
         {loading ? (
           <Skeleton className="h-24 w-full" />

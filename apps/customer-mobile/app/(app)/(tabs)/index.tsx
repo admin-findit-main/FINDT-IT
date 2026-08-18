@@ -2,7 +2,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -26,6 +26,7 @@ import {
   CUSTOMER_PLANS,
   PRODUCT_CATEGORIES,
   createRequestSchema,
+  digitsPostalCode,
   findPlaceholderForCategory,
   formatShortPlace,
   getConsumerEntitlements,
@@ -34,6 +35,7 @@ import {
   isMonthlyFindCapError,
   lookupUsZip,
   normalizeStateCode,
+  reverseGeocodeUs,
   planLimitReachedMessage,
   radiusLimitMessage,
   radiusOptionsForPlan,
@@ -94,6 +96,8 @@ export default function HomeFindItScreen() {
   const [showDetails, setShowDetails] = useState(false);
   const [editPlace, setEditPlace] = useState(false);
   const [idFrom, setIdFrom] = useState<Step>("query");
+  const [locating, setLocating] = useState(false);
+  const autoLocated = useRef(false);
 
   const loadUsage = useCallback(async () => {
     const usage = await fetchPlanUsage();
@@ -147,23 +151,52 @@ export default function HomeFindItScreen() {
   };
 
   const useLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      setError("Location denied — enter city and ZIP manually.");
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setError("Location denied — enter city and ZIP manually.");
+        setEditPlace(true);
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({});
+      setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+      const places = await Location.reverseGeocodeAsync(loc.coords);
+      const p = places[0];
+      let next: ShortPlace = {
+        city: p?.city || p?.subregion || "",
+        state: normalizeStateCode(p?.region) || "",
+        postalCode: digitsPostalCode(p?.postalCode || ""),
+      };
+      if (!isCompleteShortPlace(next)) {
+        const found = await reverseGeocodeUs(loc.coords.latitude, loc.coords.longitude);
+        if (found) next = found;
+      } else if (next.postalCode) {
+        const zip = await lookupUsZip(next.postalCode);
+        if (zip) next = zip;
+      }
+      setPlace(next);
+      setEditPlace(!isCompleteShortPlace(next));
+      if (!isCompleteShortPlace(next)) {
+        setError("Confirm your city and ZIP so we can ask nearby stores.");
+      } else {
+        setError(null);
+      }
+    } catch {
+      setError("Couldn’t get location. Enter city and ZIP manually.");
       setEditPlace(true);
-      return;
+    } finally {
+      setLocating(false);
     }
-    const loc = await Location.getCurrentPositionAsync({});
-    setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-    const places = await Location.reverseGeocodeAsync(loc.coords);
-    const p = places[0];
-    setPlace((prev) => ({
-      city: p?.city || p?.subregion || prev.city,
-      state: normalizeStateCode(p?.region) || prev.state,
-      postalCode: (p?.postalCode || prev.postalCode).replace(/\D/g, "").slice(0, 5),
-    }));
-    setEditPlace(false);
   };
+
+  useEffect(() => {
+    if (step !== "radius" || autoLocated.current) return;
+    if (isCompleteShortPlace(place)) return;
+    autoLocated.current = true;
+    void useLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot when the radius step opens
+  }, [step]);
 
   const uploadImage = async (uri: string, userId: string) => {
     const ext = uri.split(".").pop()?.split("?")[0] || "jpg";
@@ -627,7 +660,7 @@ export default function HomeFindItScreen() {
                     <PlaceFields value={place} onChange={setPlace} />
                     <Pressable onPress={useLocation} style={styles.linkPress}>
                       <Text style={[styles.link, { color: theme.inkMuted }]}>
-                        Use my location
+                        {locating ? "Getting ZIP…" : "Use my location"}
                       </Text>
                     </Pressable>
                   </View>

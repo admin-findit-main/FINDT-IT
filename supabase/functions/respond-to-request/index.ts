@@ -5,6 +5,7 @@ import {
   jsonResponse,
   responseTimeSeconds,
 } from "../_shared/domain.ts";
+import { sendExpoPush } from "../_shared/push.ts";
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
@@ -180,34 +181,36 @@ Deno.serve(async (req) => {
       .select("name")
       .eq("id", storeId)
       .single();
-    await admin.from("notifications").insert({
-      user_id: requestRow.customer_id,
-      type: responseType,
-      title:
-        responseType === "in_stock"
-          ? `${store?.name || "A store"} has it in stock`
-          : `${store?.name || "A store"} can order it`,
-      body: `${requestRow.product_name}`,
-      related_request_id: requestId,
-      related_store_id: storeId,
-    });
+    const { data: customer } = await admin
+      .from("profiles")
+      .select("notify_in_stock, notify_can_order")
+      .eq("id", requestRow.customer_id)
+      .maybeSingle();
+    const wantsAlert =
+      responseType === "in_stock"
+        ? customer?.notify_in_stock !== false
+        : customer?.notify_can_order !== false;
+    if (wantsAlert) {
+      const storeName = store?.name || "A store";
+      await admin.from("notifications").insert({
+        user_id: requestRow.customer_id,
+        type: responseType,
+        title:
+          responseType === "in_stock"
+            ? `${storeName} has it in stock`
+            : `${storeName} can order it`,
+        body: `${requestRow.product_name}`,
+        related_request_id: requestId,
+        related_store_id: storeId,
+      });
 
-    // Stub customer push
-    const { data: tokens } = await admin
-      .from("device_push_tokens")
-      .select("token")
-      .eq("user_id", requestRow.customer_id)
-      .eq("app_surface", "customer");
-    const expoToken = Deno.env.get("EXPO_ACCESS_TOKEN");
-    if (tokens?.length && expoToken) {
-      await fetch("https://exp.host/--/api/v2/push/send", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${expoToken}`,
-        },
-        body: JSON.stringify(
+      const { data: tokens } = await admin
+        .from("device_push_tokens")
+        .select("token")
+        .eq("user_id", requestRow.customer_id)
+        .eq("app_surface", "customer");
+      if (tokens?.length) {
+        await sendExpoPush(
           tokens.map((t) => ({
             to: t.token,
             sound: "default",
@@ -218,12 +221,8 @@ Deno.serve(async (req) => {
             body: requestRow.product_name,
             data: { type: responseType, requestId },
           }))
-        ),
-      });
-    } else if (tokens?.length) {
-      console.log(
-        `[push stub] Would notify customer ${tokens.length} device(s)`
-      );
+        );
+      }
     }
   }
 

@@ -53,7 +53,7 @@ npx supabase functions deploy respond-to-request
 npx supabase db push   # applies device_push_tokens + notification RLS migration
 ```
 
-Optional secret for real Expo push sends: `EXPO_ACCESS_TOKEN` (without it, fanout is stubbed / logged).
+Optional secret for Expo push: `EXPO_ACCESS_TOKEN` (push still sends without it; the token is recommended in production).
 
 ## EAS / TestFlight
 

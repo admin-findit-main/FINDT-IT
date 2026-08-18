@@ -13,4 +13,5 @@ export * from "./deep-links";
 export * from "./phone";
 export * from "./entitlements";
 export * from "./place";
+export * from "./notify";
 export * from "./age-restricted";

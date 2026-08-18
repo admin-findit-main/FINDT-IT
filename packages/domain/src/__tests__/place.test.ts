@@ -5,6 +5,7 @@ import {
   isCompleteShortPlace,
   normalizeStateCode,
   parseCityLookup,
+  parseReverseGeocode,
   parseZipLookup,
 } from "../place";
 
@@ -79,5 +80,30 @@ describe("zip lookup parsers", () => {
 
   it("strips ZIP to five digits", () => {
     expect(digitsPostalCode("22044-8910")).toBe("22044");
+  });
+});
+
+describe("parseReverseGeocode", () => {
+  it("reads a US GPS payload into city, state, ZIP", () => {
+    expect(
+      parseReverseGeocode({
+        countryCode: "US",
+        principalSubdivision: "Virginia",
+        principalSubdivisionCode: "US-VA",
+        city: "Falls Church",
+        locality: "Falls Church",
+        postcode: "22044-1234",
+      })
+    ).toEqual({ city: "Falls Church", state: "VA", postalCode: "22044" });
+  });
+
+  it("rejects non-US results", () => {
+    expect(
+      parseReverseGeocode({
+        countryCode: "CA",
+        city: "Toronto",
+        postcode: "M5V",
+      })
+    ).toBeNull();
   });
 });
