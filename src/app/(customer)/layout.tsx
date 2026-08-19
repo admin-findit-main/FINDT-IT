@@ -3,6 +3,8 @@ import { CustomerAlertListener } from "@/components/customer/alert-listener";
 import { getCurrentProfile } from "@/lib/services/actions";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function CustomerLayout({
   children,
 }: {

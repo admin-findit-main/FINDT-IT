@@ -9,8 +9,9 @@
 # If you ever move the Next.js app into apps/web, delete this line first.
 apps/
 
-# Backend source. Migrations and Edge Functions deploy with the Supabase CLI.
-supabase/
+# Backend source at repo root only. A bare `supabase/` also matches
+# src/lib/supabase/ and Vercel then cannot resolve @/lib/supabase/*.
+/supabase/
 
 # Local-only seed and env-check tooling; nothing in src/ imports it.
 scripts/

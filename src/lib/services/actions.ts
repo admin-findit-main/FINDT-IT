@@ -1,6 +1,7 @@
 "use server";
 
-import { isDemoMode } from "@/lib/config/env";
+import { isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
+import { isSoloAdmin, isSoloAdminEmail } from "@/lib/auth/admin";
 import { resolveAppHome, type AppHomePath } from "@/lib/auth/home-path";
 import {
   canManageFromRole,
@@ -34,6 +35,12 @@ import {
 } from "@/lib/demo/store";
 import { createRequestSchema, storeJoinApplicationSchema, storeOnboardingSchema } from "@/lib/validations";
 import { normalizeProductName } from "@/lib/utils";
+import { notifyCustomerDevices } from "@/lib/services/expo-push";
+import {
+  customerReplyAlertCopy,
+  customerReplyPushCopy,
+  shouldNotifyCustomerOfReply,
+} from "@findit/domain";
 import type {
   CustomerRequest,
   DemandItem,
@@ -42,12 +49,23 @@ import type {
   Profile,
   Store,
   StoreApplication,
+  StoreDevice,
   StoreMemberRole,
   StoreMetrics,
   StoreResponse,
 } from "@/types/database";
 import { CUSTOMER_PLANS, STORE_PLANS } from "@/lib/config/constants";
-import { bypassPlanLimits, isPilotMode } from "@/lib/config/env";
+import { bypassConsumerPlanLimits, bypassPlanLimits, isPilotMode } from "@/lib/config/env";
+import {
+  accountContactLabel,
+  AGE_RESTRICTED_ID_REQUIRED,
+  getConsumerEntitlements,
+  isAgeRestrictedFind,
+  isMonthlyFindCapError,
+  monthlyFindWindowStart,
+  planLimitReachedMessage,
+  radiusLimitMessage,
+} from "@findit/domain";
 import { selectEligibleStores } from "@/lib/services/routing";
 import {
   canRebroadcastStillLooking,
@@ -59,11 +77,16 @@ import {
 } from "@/lib/services/request-lifecycle";
 import { isStoreOpenAt } from "@/lib/services/store-hours";
 import { trackEvent } from "@/lib/services/analytics";
+import { getHubDeviceSession } from "@/lib/hub/session";
 
 async function getDemoSessionId(): Promise<string | null> {
-  const { cookies } = await import("next/headers");
-  const jar = await cookies();
-  return jar.get(DEMO_SESSION_COOKIE)?.value || null;
+  try {
+    const { cookies } = await import("next/headers");
+    const jar = await cookies();
+    return jar.get(DEMO_SESSION_COOKIE)?.value || getDemoState().currentSessionId;
+  } catch {
+    return getDemoState().currentSessionId;
+  }
 }
 
 async function setDemoSessionCookie(sessionId: string | null) {
@@ -95,10 +118,67 @@ export async function getCurrentProfile(): Promise<Profile | null> {
     const sessionId = await getDemoSessionId();
     return demoCurrentUser(sessionId);
   }
+  if (!isSupabaseConfigured()) return null;
   const { supabase, user } = await getSupabaseUser();
   if (!user) return null;
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  return data as Profile | null;
+  const profile = data as Profile | null;
+  if (!profile) return null;
+  // Belt-and-suspenders: only stirux.invest@gmail.com may appear as admin in-app.
+  if (profile.account_type === "admin" && !isSoloAdminEmail(profile.email)) {
+    return { ...profile, account_type: "customer" };
+  }
+  return profile;
+}
+
+type StoreActor =
+  | { kind: "member"; userId: string; role: string; storeId: string }
+  | {
+      kind: "device";
+      userId: string;
+      deviceId: string;
+      storeId: string;
+      deviceName: string;
+    };
+
+async function getStoreActor(storeId: string): Promise<StoreActor | null> {
+  const profile = await getCurrentProfile();
+  if (profile) {
+    if (isSoloAdmin(profile)) {
+      return { kind: "member", userId: profile.id, role: "owner", storeId };
+    }
+    if (isDemoMode()) {
+      const member = getDemoState().storeMembers.find(
+        (m) => m.store_id === storeId && m.user_id === profile.id && m.status === "active"
+      );
+      if (!member) return null;
+      return { kind: "member", userId: profile.id, role: member.role, storeId };
+    }
+    const { supabase, user } = await getSupabaseUser();
+    if (!user) return null;
+    const { data: membership } = await supabase
+      .from("store_members")
+      .select("role")
+      .eq("store_id", storeId)
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .maybeSingle();
+    if (!membership) return null;
+    return { kind: "member", userId: user.id, role: membership.role, storeId };
+  }
+
+  const device = await getHubDeviceSession();
+  if (device) {
+    if (device.store_id !== storeId) return null;
+    return {
+      kind: "device",
+      userId: device.paired_by || device.store.owner_id,
+      deviceId: device.id,
+      storeId: device.store_id,
+      deviceName: device.device_name,
+    };
+  }
+  return null;
 }
 
 export async function signInAction(email: string, password: string) {
@@ -145,7 +225,7 @@ export async function getAppWorkspaceAction(): Promise<{
   return {
     homePath,
     accountType: profile.account_type,
-    isAdmin: profile.account_type === "admin",
+    isAdmin: isSoloAdmin(profile),
     hasStore: hasStore || profile.account_type === "business",
     label:
       profile.account_type === "admin"
@@ -184,6 +264,28 @@ export async function getStoreWorkspaceAction(): Promise<StoreWorkspace | null> 
   }
 
   return null;
+}
+
+async function canViewOwnerAnalytics(storeId: string): Promise<boolean> {
+  const profile = await getCurrentProfile();
+  if (!profile) return false;
+  if (isSoloAdmin(profile)) return true;
+  if (isDemoMode()) {
+    const member = getDemoState().storeMembers.find(
+      (m) => m.store_id === storeId && m.user_id === profile.id && m.status === "active"
+    );
+    return Boolean(member && canManageFromRole(member.role));
+  }
+  const { supabase, user } = await getSupabaseUser();
+  if (!user) return false;
+  const { data: membership } = await supabase
+    .from("store_members")
+    .select("role")
+    .eq("store_id", storeId)
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+  return Boolean(membership && canManageFromRole(membership.role));
 }
 
 export async function getInviteByTokenAction(token: string) {
@@ -239,6 +341,11 @@ export async function acceptStoreInviteAction(token: string) {
     if (!invite) return { error: "Invite not found" };
     if (invite.accepted_at) return { error: "Invite already used" };
     if (new Date(invite.expires_at) < new Date()) return { error: "Invite expired" };
+    if (!profile.email) {
+      return {
+        error: `Sign in as ${invite.email} to accept this invite`,
+      };
+    }
     if (profile.email.toLowerCase() !== invite.email.toLowerCase()) {
       return {
         error: `Sign in as ${invite.email} to accept this invite`,
@@ -263,6 +370,7 @@ export async function acceptStoreInviteAction(token: string) {
     invite.accepted_at = new Date().toISOString();
     const p = state.profiles.find((x) => x.id === profile.id);
     if (p && p.account_type === "customer") p.account_type = "business";
+    if (p && !p.first_name && invite.invitee_name) p.first_name = invite.invitee_name;
     return { ok: true as const };
   }
 
@@ -276,6 +384,9 @@ export async function acceptStoreInviteAction(token: string) {
   if (error || !invite) return { error: "Invite not found" };
   if (invite.accepted_at) return { error: "Invite already used" };
   if (new Date(invite.expires_at) < new Date()) return { error: "Invite expired" };
+  if (!profile.email) {
+    return { error: `Sign in as ${invite.email} to accept this invite` };
+  }
   if (profile.email.toLowerCase() !== String(invite.email).toLowerCase()) {
     return { error: `Sign in as ${invite.email} to accept this invite` };
   }
@@ -298,6 +409,12 @@ export async function acceptStoreInviteAction(token: string) {
 
   if (profile.account_type === "customer") {
     await admin.from("profiles").update({ account_type: "business" }).eq("id", profile.id);
+  }
+  if (!profile.first_name && invite.invitee_name) {
+    await admin
+      .from("profiles")
+      .update({ first_name: invite.invitee_name })
+      .eq("id", profile.id);
   }
 
   return { ok: true as const };
@@ -327,7 +444,7 @@ export async function signUpAction(input: {
   }
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: input.email,
     password: input.password,
     options: {
@@ -343,6 +460,7 @@ export async function signUpAction(input: {
     },
   });
   if (error) return { error: error.message };
+  if (!data.session) return { ok: true, needsEmailConfirm: true };
   return { ok: true };
 }
 
@@ -367,6 +485,16 @@ export async function createCustomerRequestAction(raw: unknown) {
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message || "Invalid request" };
   }
+  if (
+    isAgeRestrictedFind({
+      category: parsed.data.category,
+      productName: parsed.data.productName,
+      description: parsed.data.description,
+    }) &&
+    !parsed.data.ageRestrictedConfirmed
+  ) {
+    return { error: AGE_RESTRICTED_ID_REQUIRED, code: "age_restricted" as const };
+  }
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Please sign in to submit a request", needsAuth: true };
 
@@ -386,6 +514,7 @@ export async function createCustomerRequestAction(raw: unknown) {
       forceDuplicate: parsed.data.forceDuplicate,
       latitude: parsed.data.latitude,
       longitude: parsed.data.longitude,
+      ageRestrictedConfirmed: parsed.data.ageRestrictedConfirmed,
     });
     if (result.duplicateOf) {
       return {
@@ -394,7 +523,16 @@ export async function createCustomerRequestAction(raw: unknown) {
         request: result.request,
       };
     }
-    if (result.blocked) return { error: result.blocked };
+    if (result.blocked) {
+      const entitlements = getConsumerEntitlements(profile.subscription_plan);
+      return {
+        error: result.blocked,
+        code: result.blocked.includes("miles") ? "radius_limit" : "plan_limit",
+        upgradeRequired:
+          entitlements.planId === "free" &&
+          /Finds this month/i.test(result.blocked),
+      };
+    }
     return {
       request: result.request,
       storesTargeted: result.storesTargeted,
@@ -438,28 +576,25 @@ export async function createCustomerRequestAction(raw: unknown) {
     }
   }
 
-  if (!bypassPlanLimits()) {
-    const planId = profile.subscription_plan === "plus" ? "plus" : "free";
-    const plan = CUSTOMER_PLANS[planId];
-    if (plan.monthlyRequests != null) {
-      const monthStart = new Date();
-      monthStart.setDate(1);
-      monthStart.setHours(0, 0, 0, 0);
-      const { count } = await supabase
-        .from("customer_requests")
-        .select("*", { count: "exact", head: true })
-        .eq("customer_id", user.id)
-        .gte("created_at", monthStart.toISOString())
-        .neq("status", "cancelled");
-      if ((count || 0) >= plan.monthlyRequests) {
-        return {
-          error: `${CUSTOMER_PLANS.free.name} includes ${plan.monthlyRequests} requests per month.`,
-        };
-      }
-    }
-    if (parsed.data.radiusMiles > plan.maxRadiusMiles) {
+  if (!bypassConsumerPlanLimits()) {
+    const entitlements = getConsumerEntitlements(profile.subscription_plan);
+    const { count } = await supabase
+      .from("customer_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("customer_id", user.id)
+      .gte("created_at", monthlyFindWindowStart().toISOString());
+    if ((count || 0) >= entitlements.monthlyRequestLimit) {
       return {
-        error: `${plan.name} searches up to ${plan.maxRadiusMiles} miles.`,
+        error: planLimitReachedMessage(entitlements),
+        code: "plan_limit" as const,
+        upgradeRequired: entitlements.planId === "free",
+      };
+    }
+    if (parsed.data.radiusMiles > entitlements.maxSearchRadiusMiles) {
+      return {
+        error: radiusLimitMessage(entitlements),
+        code: "radius_limit" as const,
+        upgradeRequired: entitlements.planId === "free",
       };
     }
   }
@@ -502,6 +637,14 @@ export async function createCustomerRequestAction(raw: unknown) {
     .single();
 
   if (error || !request) {
+    if (isMonthlyFindCapError(error?.message)) {
+      const entitlements = getConsumerEntitlements(profile.subscription_plan);
+      return {
+        error: planLimitReachedMessage(entitlements),
+        code: "plan_limit" as const,
+        upgradeRequired: entitlements.planId === "free",
+      };
+    }
     return { error: "Couldn't create your request. Please try again." };
   }
 
@@ -791,14 +934,14 @@ export async function respondToRequestAction(input: {
   availabilityAmount?: "plenty" | "few_left" | "last_one" | null;
   trackDemand?: boolean;
 }) {
-  const profile = await getCurrentProfile();
-  if (!profile) return { error: "Unauthorized" };
+  const actor = await getStoreActor(input.storeId);
+  if (!actor) return { error: "Unauthorized" };
 
   if (isDemoMode()) {
     try {
       const response = demoRespondToRequest({
         ...input,
-        userId: profile.id,
+        userId: actor.userId,
       });
       return { response };
     } catch (e) {
@@ -806,21 +949,10 @@ export async function respondToRequestAction(input: {
     }
   }
 
-  const { supabase, user } = await getSupabaseUser();
-  if (!user) return { error: "Unauthorized" };
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
 
-  const { data: membership } = await supabase
-    .from("store_members")
-    .select("id, role, status")
-    .eq("store_id", input.storeId)
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .maybeSingle();
-  if (!membership && profile.account_type !== "admin") {
-    return { error: "Not a store member" };
-  }
-
-  const { data: target } = await supabase
+  const { data: target } = await admin
     .from("request_targets")
     .select("*")
     .eq("request_id", input.requestId)
@@ -828,7 +960,7 @@ export async function respondToRequestAction(input: {
     .maybeSingle();
   if (!target) return { error: "Request was not sent to this store" };
 
-  const { data: requestRow } = await supabase
+  const { data: requestRow } = await admin
     .from("customer_requests")
     .select("id, status, expires_at, customer_id, product_name, stores_targeted")
     .eq("id", input.requestId)
@@ -844,7 +976,7 @@ export async function respondToRequestAction(input: {
     return { error: "This request has expired" };
   }
 
-  const { data: existing } = await supabase
+  const { data: existing } = await admin
     .from("store_responses")
     .select("id")
     .eq("request_id", input.requestId)
@@ -855,7 +987,7 @@ export async function respondToRequestAction(input: {
   const payload = {
     request_id: input.requestId,
     store_id: input.storeId,
-    responded_by: user.id,
+    responded_by: actor.userId,
     response_type: input.responseType,
     price: input.price ?? null,
     quantity: input.quantity ?? null,
@@ -868,18 +1000,18 @@ export async function respondToRequestAction(input: {
   };
 
   const { data, error } = existing
-    ? await supabase
+    ? await admin
         .from("store_responses")
         .update(payload)
         .eq("id", existing.id)
         .select("*")
         .single()
-    : await supabase.from("store_responses").insert(payload).select("*").single();
+    : await admin.from("store_responses").insert(payload).select("*").single();
 
   if (error) return { error: "Couldn't save your response. Please try again." };
 
   const secs = responseTimeSeconds(target.route_sent_at || target.created_at, respondedAt);
-  await supabase
+  await admin
     .from("request_targets")
     .update({
       responded_at: respondedAt,
@@ -889,7 +1021,7 @@ export async function respondToRequestAction(input: {
     })
     .eq("id", target.id);
 
-  const { count } = await supabase
+  const { count } = await admin
     .from("store_responses")
     .select("*", { count: "exact", head: true })
     .eq("request_id", input.requestId);
@@ -898,29 +1030,55 @@ export async function respondToRequestAction(input: {
     responseCount: count || 0,
     targetCount: requestRow.stores_targeted || 0,
   });
-  await supabase.from("customer_requests").update({ status }).eq("id", input.requestId);
+  await admin.from("customer_requests").update({ status }).eq("id", input.requestId);
 
   if (input.responseType === "in_stock" || input.responseType === "can_order") {
-    const { data: store } = await supabase
+    const { data: store } = await admin
       .from("stores")
       .select("name")
       .eq("id", input.storeId)
       .single();
-    await supabase.from("notifications").insert({
-      user_id: requestRow.customer_id,
-      type: input.responseType,
-      title:
-        input.responseType === "in_stock"
-          ? `${store?.name || "A store"} says your item is IN STOCK`
-          : `${store?.name || "A store"} can order it`,
-      body: `${requestRow.product_name}`,
-      related_request_id: input.requestId,
-      related_store_id: input.storeId,
+    const { data: customer } = await admin
+      .from("profiles")
+      .select("notify_in_stock, notify_can_order")
+      .eq("id", requestRow.customer_id)
+      .maybeSingle();
+    const copy = customerReplyAlertCopy({
+      responseType: input.responseType,
+      storeName: store?.name,
+      productName: requestRow.product_name,
     });
+    const wantsAlert = shouldNotifyCustomerOfReply(input.responseType, customer || {});
+    if (copy && wantsAlert) {
+      await admin.from("notifications").insert({
+        user_id: requestRow.customer_id,
+        type: input.responseType,
+        title: copy.title,
+        body: copy.body,
+        related_request_id: input.requestId,
+        related_store_id: input.storeId,
+      });
+      const push = customerReplyPushCopy({
+        responseType: input.responseType,
+        productName: requestRow.product_name,
+      });
+      if (push) {
+        await notifyCustomerDevices({
+          admin,
+          customerId: requestRow.customer_id,
+          title: push.title,
+          body: push.body,
+          data: {
+            type: input.responseType,
+            requestId: input.requestId,
+          },
+        });
+      }
+    }
   }
 
   await trackEvent("store_response_created", {
-    userId: user.id,
+    userId: actor.userId,
     storeId: input.storeId,
     requestId: input.requestId,
     metadata: { responseType: input.responseType, responseTimeSeconds: secs },
@@ -934,15 +1092,15 @@ export async function getStoreIncomingRequestsAction(
   filter: string = "all",
   range: string = "today"
 ) {
-  const profile = await getCurrentProfile();
-  if (!profile) return [];
+  const actor = await getStoreActor(storeId);
+  if (!actor) return [];
 
   if (isDemoMode()) {
     const state = getDemoState();
     const member = state.storeMembers.find(
-      (m) => m.store_id === storeId && m.user_id === profile.id && m.status === "active"
+      (m) => m.store_id === storeId && m.user_id === actor.userId && m.status === "active"
     );
-    if (!member && profile.account_type !== "admin") return [];
+    if (!member && actor.kind !== "device") return [];
 
     const start = new Date();
     if (range === "today") start.setHours(0, 0, 0, 0);
@@ -983,36 +1141,61 @@ export async function getStoreIncomingRequestsAction(
     })[];
   }
 
-  // Supabase path with filter/range applied in app layer
-  const { supabase } = await getSupabaseUser();
+  // Device sessions have no store_members row, so they read via service role
+  // after getStoreActor verified the hashed device cookie.
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const supabase =
+    actor.kind === "device"
+      ? createServiceClient()
+      : (await getSupabaseUser()).supabase;
   const start = new Date();
   if (range === "today") start.setHours(0, 0, 0, 0);
   else if (range === "7d") start.setDate(start.getDate() - 7);
   else start.setDate(start.getDate() - 30);
 
-  const { data } = await supabase
+  // request_targets has no FK to store_responses, so PostgREST cannot embed
+  // both in one select (PGRST200). Load replies in a second query.
+  const { data, error } = await supabase
     .from("request_targets")
-    .select("*, request:customer_requests(*), response:store_responses(*)")
+    .select("*, request:customer_requests(*)")
     .eq("store_id", storeId)
     .gte("created_at", start.toISOString())
     .order("created_at", { ascending: false })
     .limit(100);
 
-  return (data || [])
-    .map((row: {
-      id: string;
-      request?: CustomerRequest | CustomerRequest[] | null;
-      response?: StoreResponse | StoreResponse[] | null;
-    }) => {
+  if (error) {
+    console.error("[FINDIT] store inbox query failed", error.message);
+    return [];
+  }
+
+  const rows = data || [];
+  const requestIds = rows
+    .map((row: { request?: CustomerRequest | CustomerRequest[] | null }) => {
+      const request = Array.isArray(row.request) ? row.request[0] : row.request;
+      return request?.id;
+    })
+    .filter((id): id is string => Boolean(id));
+
+  const { data: responses } = requestIds.length
+    ? await supabase
+        .from("store_responses")
+        .select("*")
+        .eq("store_id", storeId)
+        .in("request_id", requestIds)
+    : { data: [] as StoreResponse[] };
+
+  const responseByRequest = new Map(
+    (responses || []).map((response) => [response.request_id, response as StoreResponse])
+  );
+
+  return rows
+    .map((row: { id: string; request?: CustomerRequest | CustomerRequest[] | null }) => {
       const request = Array.isArray(row.request) ? row.request[0] : row.request;
       if (!request) return null;
-      const response = Array.isArray(row.response)
-        ? row.response.find((r) => r.store_id === storeId) || row.response[0] || null
-        : row.response;
       return {
         ...request,
         target: { id: row.id },
-        response: response || null,
+        response: responseByRequest.get(request.id) || null,
       };
     })
     .filter(Boolean)
@@ -1144,6 +1327,7 @@ export async function createStoreAction(raw: unknown) {
 }
 
 export async function getStoreDemandAction(storeId: string): Promise<DemandItem[]> {
+  if (!(await canViewOwnerAnalytics(storeId))) return [];
   const { computeStoreDemandFromSupabase } = await import(
     "@/lib/services/store-provisioning"
   );
@@ -1152,6 +1336,28 @@ export async function getStoreDemandAction(storeId: string): Promise<DemandItem[
 }
 
 export async function getStoreMetricsAction(storeId: string): Promise<StoreMetrics> {
+  const empty: StoreMetrics = {
+    requests_today: 0,
+    answered_today: 0,
+    requests_yesterday: 0,
+    answered_yesterday: 0,
+    waiting_today: 0,
+    in_stock_today: 0,
+    total_received: 0,
+    total_answered: 0,
+    avg_response_minutes: null,
+    in_stock_pct: 0,
+    out_of_stock_pct: 0,
+    can_order_pct: 0,
+    unanswered_pct: 0,
+    week_received: 0,
+    week_answered: 0,
+    week_response_rate: 0,
+    week_avg_response_minutes: null,
+    week_in_stock: 0,
+    week_customer_finds: 0,
+  };
+  if (!(await canViewOwnerAnalytics(storeId))) return empty;
   const { computeStoreMetricsFromSupabase } = await import(
     "@/lib/services/store-provisioning"
   );
@@ -1221,50 +1427,32 @@ export async function getStoreBySlugAction(slug: string) {
 
 export async function getAdminStatsAction() {
   const profile = await getCurrentProfile();
-  if (!profile || profile.account_type !== "admin") return null;
+  if (!isSoloAdmin(profile)) return null;
 
   if (isDemoMode()) {
     const state = getDemoState();
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const week = new Date();
-    week.setDate(week.getDate() - 7);
+    const applications = demoListStoreApplications();
     return {
       totalUsers: state.profiles.length,
       activeCustomers: state.profiles.filter((p) => p.account_type === "customer").length,
       activeStores: state.stores.filter((s) => s.is_active && !s.is_suspended).length,
-      requestsToday: state.requests.filter((r) => new Date(r.created_at) >= start).length,
-      requestsWeek: state.requests.filter((r) => new Date(r.created_at) >= week).length,
-      responseRate: Math.round(
-        (state.responses.length / Math.max(state.targets.length, 1)) * 100
-      ),
-      unanswered: state.targets.length - state.responses.length,
-      reports: 0,
-      users: state.profiles,
+      pendingApplications: applications.filter(
+        (a) => a.status === "pending" || a.status === "needs_info"
+      ).length,
       stores: state.stores,
-      requests: state.requests.slice(0, 50),
-      storeApplications: demoListStoreApplications(),
+      storeApplications: applications,
     };
   }
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const week = new Date();
-  week.setDate(week.getDate() - 7);
 
   const [
     { count: totalUsers },
     { count: activeCustomers },
     { count: activeStores },
-    { count: requestsToday },
-    { count: requestsWeek },
-    { count: targetsCount },
-    { count: responsesCount },
-    { data: users },
+    { count: pendingApplications },
     { data: stores },
-    { data: requests },
     { data: storeApplications },
   ] = await Promise.all([
     admin.from("profiles").select("*", { count: "exact", head: true }),
@@ -1278,22 +1466,10 @@ export async function getAdminStatsAction() {
       .eq("is_active", true)
       .eq("is_suspended", false),
     admin
-      .from("customer_requests")
+      .from("store_applications")
       .select("*", { count: "exact", head: true })
-      .gte("created_at", start.toISOString()),
-    admin
-      .from("customer_requests")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", week.toISOString()),
-    admin.from("request_targets").select("*", { count: "exact", head: true }),
-    admin.from("store_responses").select("*", { count: "exact", head: true }),
-    admin.from("profiles").select("*").order("created_at", { ascending: false }).limit(100),
+      .in("status", ["pending", "needs_info"]),
     admin.from("stores").select("*").order("created_at", { ascending: false }).limit(100),
-    admin
-      .from("customer_requests")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50),
     admin
       .from("store_applications")
       .select("*")
@@ -1305,15 +1481,116 @@ export async function getAdminStatsAction() {
     totalUsers: totalUsers || 0,
     activeCustomers: activeCustomers || 0,
     activeStores: activeStores || 0,
-    requestsToday: requestsToday || 0,
-    requestsWeek: requestsWeek || 0,
-    responseRate: Math.round(((responsesCount || 0) / Math.max(targetsCount || 1, 1)) * 100),
-    unanswered: (targetsCount || 0) - (responsesCount || 0),
-    reports: 0,
-    users: (users || []) as Profile[],
+    pendingApplications: pendingApplications || 0,
     stores: (stores || []) as Store[],
-    requests: (requests || []) as CustomerRequest[],
     storeApplications: (storeApplications || []) as StoreApplication[],
+  };
+}
+
+function adminPersonName(profile: {
+  first_name?: string | null;
+  last_name?: string | null;
+  display_name?: string | null;
+} | null | undefined) {
+  if (!profile) return "—";
+  return (
+    [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
+    profile.display_name ||
+    "—"
+  );
+}
+
+export type AdminStoreTeamRow = {
+  id: string;
+  userId: string | null;
+  name: string;
+  contact: string;
+  role: string;
+  status: string;
+};
+
+export async function getAdminStoreDetailAction(storeId: string) {
+  const profile = await getCurrentProfile();
+  if (!isSoloAdmin(profile)) return null;
+
+  if (isDemoMode()) {
+    const state = getDemoState();
+    const store = state.stores.find((s) => s.id === storeId);
+    if (!store) return null;
+    const team: AdminStoreTeamRow[] = state.storeMembers
+      .filter((m) => m.store_id === storeId)
+      .map((m) => {
+        const user = state.profiles.find((p) => p.id === m.user_id);
+        return {
+          id: m.id,
+          userId: m.user_id,
+          name: adminPersonName(user),
+          contact: user ? accountContactLabel(user) : "—",
+          role: m.role,
+          status: m.status,
+        };
+      });
+    const devices = (state.storeDevices || [])
+      .filter((d) => d.store_id === storeId)
+      .map((d) => ({
+        id: d.id,
+        name: d.device_name,
+        lastSeenAt: d.last_seen_at,
+        revokedAt: d.revoked_at,
+      }));
+    return { store, team, devices };
+  }
+
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data: store } = await admin.from("stores").select("*").eq("id", storeId).maybeSingle();
+  if (!store) return null;
+
+  const [{ data: memberRows }, { data: deviceRows }] = await Promise.all([
+    admin
+      .from("store_members")
+      .select("id, role, status, user_id, profile:profiles(id, email, phone_e164, first_name, last_name, display_name, account_type)")
+      .eq("store_id", storeId)
+      .order("created_at", { ascending: true }),
+    admin
+      .from("store_devices")
+      .select("id, device_name, last_seen_at, revoked_at")
+      .eq("store_id", storeId)
+      .order("paired_at", { ascending: false }),
+  ]);
+
+  const team: AdminStoreTeamRow[] = (memberRows || []).map((m) => {
+    const raw = (m as { profile?: unknown }).profile;
+    const user = (Array.isArray(raw) ? raw[0] : raw) as
+      | {
+          first_name?: string | null;
+          last_name?: string | null;
+          display_name?: string | null;
+          email?: string | null;
+          phone_e164?: string | null;
+        }
+      | null;
+    return {
+      id: String(m.id),
+      userId: m.user_id ? String(m.user_id) : null,
+      name: adminPersonName(user),
+      contact: user ? accountContactLabel(user) : "—",
+      role: String(m.role),
+      status: String(m.status),
+    };
+  });
+
+  return {
+    store: store as Store,
+    team,
+    devices: ((deviceRows || []) as Pick<StoreDevice, "id" | "device_name" | "last_seen_at" | "revoked_at">[]).map(
+      (d) => ({
+        id: d.id,
+        name: d.device_name,
+        lastSeenAt: d.last_seen_at,
+        revokedAt: d.revoked_at,
+      })
+    ),
   };
 }
 
@@ -1396,7 +1673,8 @@ export async function saveRequestAction(requestId: string) {
 export async function inviteEmployeeAction(
   storeId: string,
   email: string,
-  role: "manager" | "employee"
+  role: "manager" | "employee",
+  inviteeName?: string
 ) {
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Unauthorized" };
@@ -1420,6 +1698,7 @@ export async function inviteEmployeeAction(
       token,
       expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
       accepted_at: null,
+      invitee_name: inviteeName?.trim() || null,
     });
     return { token, ok: true as const };
   }
@@ -1439,6 +1718,7 @@ export async function inviteEmployeeAction(
       store_id: storeId,
       email: email.toLowerCase(),
       role,
+      invitee_name: inviteeName?.trim() || null,
     })
     .select("token")
     .single();
@@ -1473,6 +1753,7 @@ export async function submitStoreApplicationAction(raw: unknown) {
       whyLegit: parsed.data.whyLegit,
       confirmedLegitimate: parsed.data.confirmedLegitimate === true,
       requestCategories: parsed.data.requestCategories,
+      requiresCustomerId: parsed.data.requiresCustomerId,
       applicantUserId: profile?.id || null,
     });
     return { application };
@@ -1499,6 +1780,7 @@ export async function submitStoreApplicationAction(raw: unknown) {
       why_legit: parsed.data.whyLegit,
       confirmed_legitimate: true,
       request_categories: parsed.data.requestCategories,
+      requires_customer_id: parsed.data.requiresCustomerId,
       applicant_user_id: profile?.id || null,
       status: "pending",
     })
@@ -1510,7 +1792,7 @@ export async function submitStoreApplicationAction(raw: unknown) {
 
 export async function getStoreApplicationsAction() {
   const profile = await getCurrentProfile();
-  if (!profile || profile.account_type !== "admin") return [];
+  if (!isSoloAdmin(profile)) return [];
   if (isDemoMode()) return demoListStoreApplications();
   const { supabase } = await getSupabaseUser();
   const { data } = await supabase
@@ -1526,7 +1808,7 @@ export async function reviewStoreApplicationAction(
   notes?: string
 ) {
   const profile = await getCurrentProfile();
-  if (!profile || profile.account_type !== "admin") {
+  if (!profile || !isSoloAdmin(profile)) {
     return { error: "Admin only" };
   }
   if (isDemoMode()) {
@@ -1612,6 +1894,7 @@ export async function getMyStoreApplicationStatusAction() {
   if (isDemoMode()) {
     return demoGetPendingApplicationForEmail(profile.email) || null;
   }
+  if (!profile.email) return null;
   const { supabase } = await getSupabaseUser();
   const { data } = await supabase
     .from("store_applications")
@@ -1627,34 +1910,27 @@ export async function getMyStoreApplicationStatusAction() {
 export async function getCustomerPlanUsageAction() {
   const profile = await getCurrentProfile();
   if (!profile) return null;
-  const planId = profile.subscription_plan === "plus" ? "plus" : "free";
-  const plan = CUSTOMER_PLANS[planId];
+  const entitlements = getConsumerEntitlements(profile.subscription_plan);
   let used = 0;
   if (isDemoMode()) {
     used = demoCountCustomerRequestsThisMonth(profile.id);
   } else {
     const { supabase, user } = await getSupabaseUser();
     if (!user) return null;
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
     const { count } = await supabase
       .from("customer_requests")
       .select("*", { count: "exact", head: true })
       .eq("customer_id", user.id)
-      .gte("created_at", monthStart.toISOString())
-      .neq("status", "cancelled");
+      .gte("created_at", monthlyFindWindowStart().toISOString());
     used = count || 0;
   }
   return {
-    plan,
+    plan: CUSTOMER_PLANS[entitlements.planId],
+    entitlements,
     used,
-    limit: plan.monthlyRequests,
-    remaining:
-      plan.monthlyRequests == null
-        ? null
-        : Math.max(0, plan.monthlyRequests - used),
-    bypassed: bypassPlanLimits(),
+    limit: entitlements.monthlyRequestLimit,
+    remaining: Math.max(0, entitlements.monthlyRequestLimit - used),
+    bypassed: bypassConsumerPlanLimits(),
     allPlans: CUSTOMER_PLANS,
   };
 }
@@ -1836,15 +2112,15 @@ export async function stillLookingAction(requestId: string) {
 }
 
 export async function markStoreRequestOpenedAction(storeId: string, requestId: string) {
-  const profile = await getCurrentProfile();
-  if (!profile) return;
+  const actor = await getStoreActor(storeId);
+  if (!actor) return;
   if (isDemoMode()) {
-    demoMarkTargetOpened(storeId, requestId, profile.id);
+    demoMarkTargetOpened(storeId, requestId, actor.userId);
     return;
   }
-  const { supabase, user } = await getSupabaseUser();
-  if (!user) return;
-  const { data: target } = await supabase
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data: target } = await admin
     .from("request_targets")
     .select("id, opened_at")
     .eq("store_id", storeId)
@@ -1852,12 +2128,12 @@ export async function markStoreRequestOpenedAction(storeId: string, requestId: s
     .maybeSingle();
   if (!target || target.opened_at) return;
   const opened = new Date().toISOString();
-  await supabase
+  await admin
     .from("request_targets")
     .update({ opened_at: opened, viewed_at: opened })
     .eq("id", target.id);
   await trackEvent("store_request_opened", {
-    userId: user.id,
+    userId: actor.userId,
     storeId,
     requestId,
   });
@@ -2054,7 +2330,7 @@ export async function getStoreSettingsAction(storeId: string) {
 
 export async function getPilotAdminStatsAction(): Promise<PilotAdminStats | null> {
   const profile = await getCurrentProfile();
-  if (!profile || profile.account_type !== "admin") return null;
+  if (!isSoloAdmin(profile)) return null;
   if (isDemoMode()) return demoGetPilotAdminStats();
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
@@ -2203,3 +2479,132 @@ export async function getPilotAdminStatsAction(): Promise<PilotAdminStats | null
 export async function isPilotModeAction() {
   return isPilotMode();
 }
+
+export async function updateStoreProfileAction(
+  storeId: string,
+  input: {
+    name?: string;
+    description?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    streetAddress?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    ageRestricted?: boolean;
+  }
+) {
+  const profile = await getCurrentProfile();
+  if (!profile) return { error: "Unauthorized" };
+  const { supabase, user } = await getSupabaseUser();
+  if (!user) return { error: "Unauthorized" };
+  const { data: membership } = await supabase
+    .from("store_members")
+    .select("role")
+    .eq("store_id", storeId)
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!membership || (membership.role !== "owner" && membership.role !== "manager")) {
+    return { error: "Only owners and managers can update store profile" };
+  }
+  const patch: Record<string, unknown> = {};
+  if (input.name != null) patch.name = input.name.trim();
+  if (input.description !== undefined) patch.description = input.description;
+  if (input.phone !== undefined) patch.phone = input.phone;
+  if (input.website !== undefined) patch.website = input.website;
+  if (input.streetAddress != null) patch.street_address = input.streetAddress.trim();
+  if (input.city != null) patch.city = input.city.trim();
+  if (input.state != null) patch.state = input.state.trim();
+  if (input.postalCode != null) patch.postal_code = input.postalCode.trim();
+  if (input.ageRestricted != null) patch.age_restricted = input.ageRestricted;
+  const { error } = await supabase.from("stores").update(patch).eq("id", storeId);
+  if (error) return { error: "Couldn't save store profile." };
+  return { ok: true };
+}
+
+export async function setMemberStatusAction(
+  storeId: string,
+  memberId: string,
+  status: "active" | "disabled"
+) {
+  const profile = await getCurrentProfile();
+  if (!profile) return { error: "Unauthorized" };
+
+  if (isDemoMode()) {
+    const state = getDemoState();
+    const actor = state.storeMembers.find(
+      (m) =>
+        m.store_id === storeId &&
+        m.user_id === profile.id &&
+        m.status === "active" &&
+        (m.role === "owner" || m.role === "manager")
+    );
+    if (!actor) return { error: "Only owners and managers can change staff status" };
+    const target = state.storeMembers.find((m) => m.id === memberId && m.store_id === storeId);
+    if (!target || target.role === "owner") return { error: "Couldn't update that teammate." };
+    target.status = status;
+    return { ok: true };
+  }
+
+  const { supabase, user } = await getSupabaseUser();
+  if (!user) return { error: "Unauthorized" };
+  const { data: membership } = await supabase
+    .from("store_members")
+    .select("role")
+    .eq("store_id", storeId)
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!membership || (membership.role !== "owner" && membership.role !== "manager")) {
+    return { error: "Only owners and managers can change staff status" };
+  }
+  const { error } = await supabase
+    .from("store_members")
+    .update({ status })
+    .eq("id", memberId)
+    .eq("store_id", storeId)
+    .neq("role", "owner");
+  if (error) return { error: "Couldn't update that teammate." };
+  return { ok: true };
+}
+
+export async function setStoreSuspendedAction(storeId: string, suspended: boolean) {
+  const profile = await getCurrentProfile();
+  if (!isSoloAdmin(profile)) return { error: "Admin only" };
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { error } = await admin
+    .from("stores")
+    .update({ is_suspended: suspended, is_active: suspended ? false : true })
+    .eq("id", storeId);
+  if (error) return { error: "Couldn't update store status." };
+  return { ok: true };
+}
+
+export async function getAdminReportsAction() {
+  const profile = await getCurrentProfile();
+  if (!isSoloAdmin(profile)) return [];
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data } = await admin
+    .from("reports")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  return data || [];
+}
+
+export async function getAdminActivityAction() {
+  const profile = await getCurrentProfile();
+  if (!isSoloAdmin(profile)) return [];
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data } = await admin
+    .from("analytics_events")
+    .select("id, event_name, store_id, request_id, created_at")
+    .order("created_at", { ascending: false })
+    .limit(40);
+  return data || [];
+}
+

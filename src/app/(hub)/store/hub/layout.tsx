@@ -6,6 +6,8 @@ import {
 } from "@/lib/services/actions";
 import { getHubRuntimeAction } from "@/lib/services/hub-devices";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "FINDIT Hub",
   applicationName: "FINDIT Hub",
