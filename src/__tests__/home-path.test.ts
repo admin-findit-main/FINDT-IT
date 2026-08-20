@@ -99,10 +99,14 @@ describe("resolvePostAuthDestination", () => {
 });
 
 describe("destinationAfterAuth", () => {
-  it("ignores customer next when the server said /admin", () => {
-    expect(destinationAfterAuth({ homePath: "/admin", next: "/home" })).toBe(
-      "/admin"
-    );
+  it("sends the operator email to /admin even if homePath is /home", () => {
+    expect(
+      destinationAfterAuth({
+        homePath: "/home",
+        next: "/home",
+        email: SOLO_ADMIN_EMAIL,
+      })
+    ).toBe("/admin");
   });
 
   it("sends customers to welcome when they still need a name", () => {

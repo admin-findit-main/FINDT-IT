@@ -1,7 +1,7 @@
 "use server";
 
 import { appUrl, isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
-import { coerceSoloAdminProfile, isSoloAdmin } from "@/lib/auth/admin";
+import { coerceSoloAdminProfile, isSoloAdmin, isSoloAdminEmail } from "@/lib/auth/admin";
 import { resolvePostAuthDestination, type AppHomePath } from "@/lib/auth/home-path";
 import {
   canManageFromRole,
@@ -180,28 +180,41 @@ async function getStoreActor(storeId: string): Promise<StoreActor | null> {
 }
 
 export async function signInAction(email: string, password: string) {
+  const normalized = email.trim().toLowerCase();
   if (isDemoMode()) {
-    const result = demoLoginWithSession(email, password);
+    const result = demoLoginWithSession(normalized, password);
     if (!result) return { error: "Invalid email or password" };
     await setDemoSessionCookie(result.sessionId);
     const stores = await getUserStoresAction();
     const homePath = resolvePostAuthDestination({
       profile: result.profile,
-      authEmail: result.profile.email,
+      authEmail: result.profile.email || normalized,
       hasActiveStoreMembership: stores.length > 0,
     }) as AppHomePath;
     return { profile: result.profile, homePath };
   }
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalized,
+    password,
+  });
   if (error) return { error: error.message };
-  const profile = await getCurrentProfile();
+  const user = data.user;
+  const { data: row } = user
+    ? await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const profile = row
+    ? (coerceSoloAdminProfile(row as Profile, user?.email || normalized) as Profile)
+    : null;
+  if (isSoloAdminEmail(normalized) || isSoloAdmin(profile) || isSoloAdminEmail(user?.email)) {
+    return { profile, homePath: "/admin" as AppHomePath };
+  }
   if (!profile) return { error: "Profile not found" };
   const stores = await getUserStoresAction();
   const homePath = resolvePostAuthDestination({
     profile,
-    authEmail: profile.email,
+    authEmail: profile.email || normalized,
     hasActiveStoreMembership: stores.length > 0,
   }) as AppHomePath;
   return { profile, homePath };

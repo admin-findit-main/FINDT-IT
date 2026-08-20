@@ -4,17 +4,19 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
+import { loginEmailPassword } from "@/lib/auth/client-login";
 import { PlaceFields } from "@/components/customer/place-fields";
-import { signInAction, signUpAction } from "@/lib/services/actions";
+import { signUpAction } from "@/lib/services/actions";
 import type { ShortPlace } from "@findit/domain";
 import type { AppHomePath } from "@/lib/auth/home-path";
 
 type Finished = { homePath: AppHomePath; needsName?: boolean };
 
 export function CustomerEmailLoginForm({
-  onFinished,
+  next,
 }: {
-  onFinished: (result: Finished) => void;
+  onFinished?: (result: Finished) => void;
+  next?: string | null;
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -22,15 +24,15 @@ export function CustomerEmailLoginForm({
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    const result = await signInAction(String(fd.get("email")), String(fd.get("password")));
+    const result = await loginEmailPassword(
+      String(fd.get("email")),
+      String(fd.get("password")),
+      next
+    );
     setLoading(false);
     if (result.error) {
       toast.error(result.error);
-      return;
     }
-    onFinished({
-      homePath: ("homePath" in result && result.homePath ? result.homePath : "/home") as AppHomePath,
-    });
   }
 
   return (

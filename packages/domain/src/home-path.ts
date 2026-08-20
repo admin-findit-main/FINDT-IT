@@ -112,7 +112,9 @@ export function destinationAfterAuth(input: {
   homePath?: string | null;
   next?: string | null;
   needsName?: boolean;
+  email?: string | null;
 }): string {
+  if (isSoloAdminEmail(input.email)) return OPERATOR_HOME_PATH;
   const homePath = (input.homePath || CUSTOMER_HOME_PATH) as AppHomePath;
   return resolvePostAuthDestination({
     profile: {
@@ -124,6 +126,7 @@ export function destinationAfterAuth(input: {
             ? "business"
             : "customer",
     },
+    authEmail: input.email,
     next: input.next,
     needsName: input.needsName,
   });

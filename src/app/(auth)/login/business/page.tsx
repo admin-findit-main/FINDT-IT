@@ -1,16 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
-import { signInAction } from "@/lib/services/actions";
-import { destinationAfterAuth } from "@/lib/auth/home-path";
+import { loginEmailPassword } from "@/lib/auth/client-login";
 
 function BusinessLoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [loading, setLoading] = useState(false);
   const next = params.get("next");
@@ -19,24 +17,15 @@ function BusinessLoginForm() {
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    const result = await signInAction(
+    const result = await loginEmailPassword(
       String(fd.get("email")),
-      String(fd.get("password"))
+      String(fd.get("password")),
+      next
     );
     setLoading(false);
     if (result.error) {
       toast.error(result.error);
-      return;
     }
-    const homePath =
-      "homePath" in result && result.homePath ? result.homePath : "/store";
-    router.push(
-      destinationAfterAuth({
-        homePath,
-        next,
-      })
-    );
-    router.refresh();
   }
 
   return (
@@ -45,7 +34,7 @@ function BusinessLoginForm() {
         Sign in to your store
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Owners and staff use email and password.
+        Owners, staff, and the FINDIT operator use email and password.
       </p>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <div>

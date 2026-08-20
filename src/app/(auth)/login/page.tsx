@@ -29,10 +29,10 @@ function LoginForm() {
     <Card className="p-6 sm:p-8">
       <h1 className="text-2xl font-bold tracking-tight text-ink">Sign in</h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Ask nearby stores who has it.
+        Shoppers, stores, and the FINDIT operator can sign in here.
       </p>
       {mode === "email" ? (
-        <CustomerEmailLoginForm onFinished={go} />
+        <CustomerEmailLoginForm next={next} />
       ) : (
         <PhoneOtpForm createIfMissing={false} onFinished={go} />
       )}
