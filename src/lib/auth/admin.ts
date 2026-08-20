@@ -1,5 +1,6 @@
 export {
   SOLO_ADMIN_EMAIL,
+  SUPPORT_EMAIL,
   isSoloAdminEmail,
   isSoloAdmin,
   coerceSoloAdminProfile,

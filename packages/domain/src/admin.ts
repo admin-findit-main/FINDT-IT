@@ -1,5 +1,8 @@
-/** The only email allowed to hold `account_type = admin`. */
-export const SOLO_ADMIN_EMAIL = "admin.findit@gmail.com";
+/** The only email allowed to hold `account_type = admin` (Google Workspace). */
+export const SOLO_ADMIN_EMAIL = "ceo@askfindit.com";
+
+/** Pilot support inbox — same Workspace mailbox as the operator. */
+export const SUPPORT_EMAIL = SOLO_ADMIN_EMAIL;
 
 export function isSoloAdminEmail(email: string | null | undefined): boolean {
   return (email || "").trim().toLowerCase() === SOLO_ADMIN_EMAIL;

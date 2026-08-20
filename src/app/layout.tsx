@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { AuthLinkCatcher } from "@/components/auth/auth-link-catcher";
 import { RegisterSW } from "@/components/shared/register-sw";
 import "./globals.css";
 
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col bg-canvas text-ink">
         {children}
+        <AuthLinkCatcher />
         <RegisterSW />
         <Toaster
           position="top-center"

@@ -90,7 +90,7 @@ export function isPilotMode(): boolean {
 }
 
 export function appUrl(): string {
-  return getEnv().NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  return getEnv().NEXT_PUBLIC_APP_URL || "http://localhost:3002";
 }
 
 /** Dedicated Business/Hub/Admin hostnames. Empty until DNS is ready. */

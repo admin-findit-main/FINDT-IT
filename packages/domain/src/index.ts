@@ -15,3 +15,4 @@ export * from "./entitlements";
 export * from "./place";
 export * from "./notify";
 export * from "./age-restricted";
+export * from "./auth-email";

@@ -16,12 +16,22 @@ const edgePath = resolve(
   here,
   "../../../../supabase/functions/_shared/domain.ts"
 );
+const authEmailDomainPath = resolve(here, "../auth-email.ts");
+const authEmailEdgePath = resolve(
+  here,
+  "../../../../supabase/functions/send-email/auth-email.ts"
+);
 const capMigrationPath = resolve(
   here,
   "../../../../supabase/migrations/20260326000013_monthly_find_cap.sql"
 );
 
 describe("Edge domain constants stay aligned with @findit/domain", () => {
+  it("keeps the auth email renderer identical for Resend", () => {
+    expect(readFileSync(authEmailEdgePath, "utf8")).toBe(
+      readFileSync(authEmailDomainPath, "utf8")
+    );
+  });
   it("matches the Deno copy used by create-and-route-request", () => {
     const edge = readFileSync(edgePath, "utf8");
     expect(edge).toContain(

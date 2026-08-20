@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   destinationAfterAuth,
+  destinationAfterEmailLink,
   isCustomerSurfacePath,
   isSafeNextPath,
   resolveAppHome,
@@ -78,6 +79,15 @@ describe("resolvePostAuthDestination", () => {
     ).toBe("/auth/update-password");
   });
 
+  it("keeps password-update for customers", () => {
+    expect(
+      resolvePostAuthDestination({
+        profile: { email: "shopper@test.com", account_type: "customer" },
+        next: "/auth/update-password",
+      })
+    ).toBe("/auth/update-password");
+  });
+
   it("does not let a customer next steal a store home", () => {
     expect(
       resolvePostAuthDestination({
@@ -113,6 +123,48 @@ describe("destinationAfterAuth", () => {
     expect(
       destinationAfterAuth({ homePath: "/home", needsName: true, next: "/requests" })
     ).toBe("/welcome");
+  });
+
+  it("keeps password-update even for the operator email helper", () => {
+    expect(
+      destinationAfterAuth({
+        homePath: "/admin",
+        next: "/auth/update-password",
+        email: SOLO_ADMIN_EMAIL,
+      })
+    ).toBe("/auth/update-password");
+  });
+});
+
+describe("destinationAfterEmailLink", () => {
+  it("sends recovery links to the password form", () => {
+    expect(
+      destinationAfterEmailLink({
+        type: "recovery",
+        email: "shopper@test.com",
+        homePath: "/home",
+      })
+    ).toBe("/auth/update-password");
+  });
+
+  it("signs confirmed customers into their home", () => {
+    expect(
+      destinationAfterEmailLink({
+        type: "email",
+        email: "shopper@test.com",
+        homePath: "/home",
+      })
+    ).toBe("/home");
+  });
+
+  it("signs the operator in after confirming email", () => {
+    expect(
+      destinationAfterEmailLink({
+        type: "email",
+        email: SOLO_ADMIN_EMAIL,
+        homePath: "/home",
+      })
+    ).toBe("/admin");
   });
 });
 

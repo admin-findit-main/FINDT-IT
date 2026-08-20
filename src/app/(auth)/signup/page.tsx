@@ -46,8 +46,7 @@ function SignupForm() {
       return;
     }
     if ("needsEmailConfirm" in result && result.needsEmailConfirm) {
-      toast.message("Check your inbox, tap the link once, then sign in.");
-      router.push("/login");
+      toast.message("Open the email we just sent — tapping the link signs you in.");
       return;
     }
     toast.success("Account created");

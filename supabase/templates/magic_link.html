@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FINDIT</title>
+</head>
+<body style="margin:0;padding:0;background:#F2F2F7;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F2F2F7;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="width:100%;max-width:560px;">
+          <tr>
+            <td style="padding:0 8px 20px;">
+              <img src="https://askfindit.com/brand/findit-mark-light.png" width="36" height="36" alt="FINDIT" style="display:block;border:0;">
+              <div style="margin-top:10px;font-size:12px;letter-spacing:0.22em;font-weight:700;color:#E5231B;">FINDIT</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#FFFFFF;border:1px solid #E2E2E6;border-radius:20px;padding:36px 32px;">
+              <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;color:#0B0B0C;font-weight:700;">Sign in to FINDIT</h1>
+              <p style="margin:0;font-size:16px;line-height:1.6;color:#4A4A52;">Tap the button below to sign in. This link expires shortly and can only be used once.</p>
+              <p style="margin:28px 0 8px;">
+                <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=magiclink" style="display:inline-block;background:#E5231B;color:#FFFFFF;text-decoration:none;font-weight:700;font-size:16px;line-height:1;padding:14px 24px;border-radius:999px;">Sign in</a>
+              </p>
+              <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#6E6E78;word-break:break-all;">Or paste this link into your browser:<br>{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=magiclink</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 8px 0;font-size:12px;line-height:1.6;color:#6E6E78;">
+              If you didn’t ask to sign in, you can ignore this email.<br><br>
+              FINDIT · ask nearby stores if they have it<br>
+              <a href="https://askfindit.com" style="color:#6E6E78;">askfindit.com</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

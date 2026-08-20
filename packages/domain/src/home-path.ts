@@ -72,10 +72,11 @@ export function resolvePostAuthDestination(input: {
     input.authEmail
   );
 
+  if (isSafeNextPath(input.next) && isPasswordUpdatePath(input.next)) {
+    return PASSWORD_UPDATE_PATH;
+  }
+
   if (isSoloAdmin(coerced) || isSoloAdminEmail(input.authEmail)) {
-    if (isSafeNextPath(input.next) && isPasswordUpdatePath(input.next)) {
-      return PASSWORD_UPDATE_PATH;
-    }
     return OPERATOR_HOME_PATH;
   }
 
@@ -96,15 +97,34 @@ export function resolvePostAuthDestination(input: {
     return STORE_HOME_PATH;
   }
 
-  if (
-    isSafeNextPath(input.next) &&
-    !input.next.startsWith("/admin") &&
-    !isPasswordUpdatePath(input.next)
-  ) {
+  if (isSafeNextPath(input.next) && !input.next.startsWith("/admin")) {
     return input.next;
   }
 
   return home;
+}
+
+export function isRecoveryAuthType(type: string | null | undefined): boolean {
+  return type === "recovery";
+}
+
+export function destinationAfterEmailLink(input: {
+  type?: string | null;
+  next?: string | null;
+  email?: string | null;
+  homePath?: string | null;
+}): string {
+  if (
+    isRecoveryAuthType(input.type) ||
+    (isSafeNextPath(input.next) && isPasswordUpdatePath(input.next))
+  ) {
+    return PASSWORD_UPDATE_PATH;
+  }
+  return destinationAfterAuth({
+    homePath: input.homePath,
+    next: input.next,
+    email: input.email,
+  });
 }
 
 /** Client helper when the server already returned a workspace homePath. */
@@ -114,6 +134,9 @@ export function destinationAfterAuth(input: {
   needsName?: boolean;
   email?: string | null;
 }): string {
+  if (isSafeNextPath(input.next) && isPasswordUpdatePath(input.next)) {
+    return PASSWORD_UPDATE_PATH;
+  }
   if (isSoloAdminEmail(input.email)) return OPERATOR_HOME_PATH;
   const homePath = (input.homePath || CUSTOMER_HOME_PATH) as AppHomePath;
   return resolvePostAuthDestination({

@@ -2,6 +2,7 @@
 
 import { appUrl, isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
 import { coerceSoloAdminProfile, isSoloAdmin, isSoloAdminEmail } from "@/lib/auth/admin";
+import { authEmailErrorMessage } from "@/lib/auth/email-error";
 import { resolvePostAuthDestination, type AppHomePath } from "@/lib/auth/home-path";
 import {
   canManageFromRole,
@@ -475,7 +476,7 @@ export async function signUpAction(input: {
         },
       },
     });
-    if (error) return { error: error.message };
+    if (error) return { error: authEmailErrorMessage(error.message) };
     if (!data.session) return { ok: true, needsEmailConfirm: true };
     const profile = await getCurrentProfile();
     const homePath = resolvePostAuthDestination({

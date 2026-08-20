@@ -70,7 +70,7 @@ Last updated for post-pilot readiness. The app is ready for **closed pilot / hea
 | Customer | `/signup` | `/home` |
 | Store owner | `/join` → you approve on `/admin` | `/store` (full nav) |
 | Employee | Owner **Team** invite link | `/store` (slim nav) |
-| You (admin) | `admin.findit@gmail.com` | `/admin` |
+| You (admin) | `ceo@askfindit.com` | `/admin` |
 
 **Rule:** log out between roles when testing. Same browser session = one account.
 

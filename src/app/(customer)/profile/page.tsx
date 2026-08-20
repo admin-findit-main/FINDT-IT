@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
 import { IosSwitch } from "@/components/ui/ios-switch";
 import { PlaceFields } from "@/components/customer/place-fields";
+import { SUPPORT_EMAIL } from "@/lib/auth/admin";
 import {
   getCurrentProfile,
   signOutAction,
@@ -138,8 +139,11 @@ export default function ProfilePage() {
           Log out
         </Button>
         <p className="text-xs leading-relaxed text-ink-muted">
-          Need to leave FINDIT? Email support and we&apos;ll help remove your
-          account after the pilot.
+          Need help, or want to leave FINDIT? Email{" "}
+          <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>
+            {SUPPORT_EMAIL}
+          </a>
+          . We don&apos;t offer text support during the pilot.
         </p>
       </Card>
     </div>

@@ -1,18 +1,43 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
 import { BrandHomeLink } from "@/components/brand/logo";
+import { isSoloAdminEmail } from "@findit/domain";
+import { destinationAfterAuth, type AppHomePath } from "@/lib/auth/home-path";
 import { getAppWorkspaceAction } from "@/lib/services/actions";
 
 export default function UpdatePasswordPage() {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (!session) {
+          window.location.replace("/login?error=auth_callback");
+          return;
+        }
+        setReady(true);
+      } catch {
+        if (!cancelled) window.location.replace("/login?error=auth_callback");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,15 +54,26 @@ export default function UpdatePasswordPage() {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const { error } = await supabase.auth.updateUser({ password });
-      setLoading(false);
       if (error) {
+        setLoading(false);
         toast.error(error.message);
         return;
       }
       toast.success("Password updated");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (isSoloAdminEmail(user?.email)) {
+        window.location.assign("/admin");
+        return;
+      }
       const workspace = await getAppWorkspaceAction();
-      router.push(workspace?.homePath || "/home");
-      router.refresh();
+      window.location.assign(
+        destinationAfterAuth({
+          homePath: (workspace?.homePath || "/home") as AppHomePath,
+          email: user?.email,
+        })
+      );
     } catch (err) {
       setLoading(false);
       toast.error(err instanceof Error ? err.message : "Could not update password");
@@ -55,35 +91,39 @@ export default function UpdatePasswordPage() {
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">
             You&apos;re signed in via the reset link. Set a new password to continue.
           </p>
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <div>
-              <Label htmlFor="password">New password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-            <div>
-              <Label htmlFor="confirm">Confirm password</Label>
-              <Input
-                id="confirm"
-                type="password"
-                required
-                minLength={8}
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
-              {loading ? "Saving…" : "Update password"}
-            </Button>
-          </form>
+          {ready ? (
+            <form onSubmit={onSubmit} className="mt-6 space-y-4">
+              <div>
+                <Label htmlFor="password">New password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <Label htmlFor="confirm">Confirm password</Label>
+                <Input
+                  id="confirm"
+                  type="password"
+                  required
+                  minLength={8}
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+              <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                {loading ? "Saving…" : "Update password"}
+              </Button>
+            </form>
+          ) : (
+            <p className="mt-6 text-sm text-ink-muted">Checking your reset link…</p>
+          )}
         </Card>
       </div>
     </div>

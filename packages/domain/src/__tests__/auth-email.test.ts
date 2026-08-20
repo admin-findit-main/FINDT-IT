@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import {
+  authEmailConfirmationUrl,
+  authEmailCopy,
+  escapeHtml,
+  otpTypeForAuthEmail,
+  renderFinditEmailHtml,
+} from "../auth-email";
+
+describe("auth email", () => {
+  it("sends signup confirms through the app callback", () => {
+    expect(otpTypeForAuthEmail("signup")).toBe("email");
+    expect(
+      authEmailConfirmationUrl({
+        appUrl: "https://askfindit.com",
+        tokenHash: "abc",
+        action: "signup",
+      })
+    ).toBe("https://askfindit.com/auth/callback?token_hash=abc&type=email");
+  });
+
+  it("uses a confirm subject customers can trust", () => {
+    expect(authEmailCopy("signup").subject).toBe("Confirm your FINDIT email");
+    expect(authEmailCopy("recovery").button).toBe("Choose a new password");
+  });
+
+  it("escapes names inside HTML", () => {
+    const html = renderFinditEmailHtml({
+      heading: "Confirm your email",
+      body: "Tap below",
+      buttonLabel: "Confirm email",
+      buttonUrl: "https://askfindit.com/auth/callback",
+      footnote: "Ignore if unexpected",
+      firstName: '<img src=x>',
+    });
+    expect(html).toContain("Hi &lt;img src=x&gt;,");
+    expect(html).toContain("FINDIT");
+    expect(html).toContain("#E5231B");
+  });
+
+  it("escapes markup in copy", () => {
+    expect(escapeHtml('<b>x</b>')).toBe("&lt;b&gt;x&lt;/b&gt;");
+  });
+});

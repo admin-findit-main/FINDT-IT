@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { GlassNotice } from "@/components/ui/glass";
 import { Card, Input, Label } from "@/components/ui/primitives";
+import { authEmailErrorMessage } from "@/lib/auth/email-error";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -17,8 +18,9 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const app = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const anon =
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
     if (!url || !anon) {
       setLoading(false);
@@ -31,13 +33,13 @@ export default function ForgotPasswordPage() {
     try {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
-      const redirectTo = `${app}/auth/callback?next=/auth/update-password`;
+      const redirectTo = `${window.location.origin}/auth/update-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo,
       });
       setLoading(false);
       if (error) {
-        toast.error(error.message);
+        toast.error(authEmailErrorMessage(error.message));
         return;
       }
       setSent(true);

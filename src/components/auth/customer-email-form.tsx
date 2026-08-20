@@ -96,7 +96,7 @@ export function CustomerEmailSignupForm({
         return;
       }
       if ("needsEmailConfirm" in result && result.needsEmailConfirm) {
-        toast.message("Check your inbox, tap the link once, then sign in with this password.");
+        toast.message("Open the email we just sent — tapping the link signs you in.");
         return;
       }
         onFinished({

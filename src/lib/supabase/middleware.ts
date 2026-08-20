@@ -58,6 +58,29 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const path = request.nextUrl.pathname;
+  const authCode = request.nextUrl.searchParams.get("code");
+  const tokenHash = request.nextUrl.searchParams.get("token_hash");
+  const isAuthHandoffPath =
+    path === "/" ||
+    path.startsWith("/login") ||
+    path.startsWith("/signup") ||
+    path.startsWith("/forgot-password") ||
+    path.startsWith("/auth/update-password");
+  if (
+    !path.startsWith("/auth/callback") &&
+    (tokenHash || (authCode && isAuthHandoffPath))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    if (
+      path.startsWith("/auth/update-password") &&
+      !url.searchParams.get("next")
+    ) {
+      url.searchParams.set("next", "/auth/update-password");
+    }
+    return NextResponse.redirect(url);
+  }
+
   const hostRedirect = resolveHostPathRedirect(
     matchHostSurface(request.headers.get("host") || "", dedicatedHosts()),
     path
@@ -234,13 +257,6 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(url);
       }
     }
-  }
-
-  if (!user && isPasswordUpdate) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
   }
 
   return supabaseResponse;
