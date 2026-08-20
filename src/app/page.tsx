@@ -9,12 +9,12 @@ import {
 } from "@/components/ui/glass";
 import { APP_NAME, STORE_TRIAL_DAYS } from "@/lib/config/constants";
 import { iosAppStoreUrl, playStoreUrl } from "@/lib/config/env";
-import { BrandHomeLink } from "@/components/brand/logo";
+import { SUPPORT_EMAIL } from "@/lib/auth/admin";
+import { BrandHomeLink, BrandLogo } from "@/components/brand/logo";
 
 export default function LandingPage() {
   const ios = iosAppStoreUrl();
   const play = playStoreUrl();
-  const hasStoreListing = Boolean(ios || play);
 
   return (
     <div className="app-canvas min-h-screen">
@@ -38,17 +38,9 @@ export default function LandingPage() {
             >
               <Link href="/login">Log in</Link>
             </Button>
-            {ios ? (
-              <Button asChild size="sm">
-                <a href={ios} rel="noreferrer">
-                  Get the app
-                </a>
-              </Button>
-            ) : (
-              <Button asChild size="sm">
-                <Link href="/signup">Web preview</Link>
-              </Button>
-            )}
+            <Button asChild size="sm">
+              <Link href="/signup">Sign up</Link>
+            </Button>
           </div>
         </div>
       </header>
@@ -57,7 +49,8 @@ export default function LandingPage() {
         <section className="app-canvas-dark relative overflow-hidden">
           <div className="relative mx-auto grid max-w-6xl gap-12 px-6 pb-24 pt-28 md:grid-cols-2 md:items-center md:pb-32 md:pt-36">
             <div>
-              <Overline className="text-ink-inverse/70">{APP_NAME}</Overline>
+              <BrandLogo kind="mark" tone="dark" className="h-12 w-auto" />
+              <Overline className="mt-6 text-ink-inverse/70">{APP_NAME}</Overline>
               <h1 className="mt-4 text-4xl font-bold tracking-tight text-ink-inverse sm:text-5xl md:text-6xl">
                 Stop calling stores. Ask once.
               </h1>
@@ -70,29 +63,17 @@ export default function LandingPage() {
                 how customers ask — this site is for stores and a web preview.
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                {ios ? (
-                  <Button asChild size="xl">
-                    <a href={ios} rel="noreferrer">
-                      Download FINDIT
-                    </a>
-                  </Button>
-                ) : (
-                  <Button asChild size="xl">
-                    <Link href="/signup">Get FINDIT — coming soon on iPhone</Link>
-                  </Button>
-                )}
-                {play ? (
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="xl"
-                    className="border-white/25 bg-white/10 text-ink-inverse hover:bg-white/20"
-                  >
-                    <a href={play} rel="noreferrer">
-                      Get it on Google Play
-                    </a>
-                  </Button>
-                ) : null}
+                <Button asChild size="xl">
+                  <Link href="/signup">Try FINDIT</Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="xl"
+                  className="border-white/25 bg-white/10 text-ink-inverse hover:bg-white/20"
+                >
+                  <Link href="/login">Log in</Link>
+                </Button>
                 <Button
                   asChild
                   variant="outline"
@@ -102,21 +83,23 @@ export default function LandingPage() {
                   <Link href="/join">Apply as a store</Link>
                 </Button>
               </div>
-              {!hasStoreListing ? (
+              {ios || play ? (
                 <p className="mt-4 text-sm text-ink-inverse/60">
-                  App Store listing is not live yet. You can{" "}
-                  <Link href="/signup" className="underline underline-offset-2">
-                    preview FINDIT on the web
-                  </Link>{" "}
-                  until the app ships.
+                  {ios ? (
+                    <a href={ios} rel="noreferrer" className="underline underline-offset-2">
+                      iPhone app
+                    </a>
+                  ) : null}
+                  {ios && play ? " · " : null}
+                  {play ? (
+                    <a href={play} rel="noreferrer" className="underline underline-offset-2">
+                      Google Play
+                    </a>
+                  ) : null}
                 </p>
               ) : (
                 <p className="mt-4 text-sm text-ink-inverse/60">
-                  Prefer a browser?{" "}
-                  <Link href="/signup" className="underline underline-offset-2">
-                    Web preview
-                  </Link>{" "}
-                  stays available for QA.
+                  iPhone and Android apps are coming. Use the web app until then.
                 </p>
               )}
             </div>
@@ -262,6 +245,12 @@ export default function LandingPage() {
       <footer className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-12 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} FINDIT</p>
         <div className="flex flex-wrap gap-4">
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            className="transition-colors hover:text-ink"
+          >
+            Support
+          </a>
           <Link href="/privacy" className="transition-colors hover:text-ink">
             Privacy
           </Link>
