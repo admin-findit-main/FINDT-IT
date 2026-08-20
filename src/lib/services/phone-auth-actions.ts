@@ -1,7 +1,8 @@
 "use server";
 
 import { isDemoMode } from "@/lib/config/env";
-import { resolveAppHome, type AppHomePath } from "@/lib/auth/home-path";
+import { coerceSoloAdminProfile, isSoloAdminEmail } from "@/lib/auth/admin";
+import { resolvePostAuthDestination, type AppHomePath } from "@/lib/auth/home-path";
 import {
   customerNeedsFirstName,
   mapPhoneOtpError,
@@ -103,10 +104,12 @@ export async function verifyPhoneOtpAction(input: {
       );
       return {
         needsName: result.needsName,
-        homePath: resolveAppHome({
-          accountType: result.profile.account_type,
+        homePath: resolvePostAuthDestination({
+          profile: result.profile,
+          authEmail: result.profile.email,
           hasActiveStoreMembership: stores.length > 0,
-        }),
+          needsName: result.needsName,
+        }) as AppHomePath,
       };
     } catch (e) {
       return {
@@ -132,14 +135,15 @@ export async function verifyPhoneOtpAction(input: {
       const { createServiceClient } = await import("@/lib/supabase/admin");
       const admin = createServiceClient();
       const phone = parsed.e164;
+      const accountType = isSoloAdminEmail(user.email) ? "admin" : "customer";
       await admin.from("profiles").upsert(
         {
           id: user.id,
           email: user.email || null,
           phone_e164: phone,
           first_name: "",
-          display_name: "Customer",
-          account_type: "customer",
+          display_name: accountType === "admin" ? "FINDIT Admin" : "Customer",
+          account_type: accountType,
         },
         { onConflict: "id" }
       );
@@ -148,6 +152,7 @@ export async function verifyPhoneOtpAction(input: {
 
     if (!profile) return { error: "Account created, but profile is missing. Refresh and try again." };
 
+    const coerced = coerceSoloAdminProfile(profile, user.email) as Profile;
     const { count } = await supabase
       .from("store_members")
       .select("*", { count: "exact", head: true })
@@ -155,11 +160,13 @@ export async function verifyPhoneOtpAction(input: {
       .eq("status", "active");
 
     return {
-      needsName: customerNeedsFirstName(profile),
-      homePath: resolveAppHome({
-        accountType: profile.account_type,
+      needsName: customerNeedsFirstName(coerced),
+      homePath: resolvePostAuthDestination({
+        profile: coerced,
+        authEmail: user.email,
         hasActiveStoreMembership: (count || 0) > 0,
-      }),
+        needsName: customerNeedsFirstName(coerced),
+      }) as AppHomePath,
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : "";
@@ -199,5 +206,5 @@ export async function completeCustomerFirstNameAction(firstName: string): Promis
     .select("*")
     .single();
   if (error) return { error: error.message };
-  return { profile: data as Profile };
+  return { profile: coerceSoloAdminProfile(data as Profile, user.email) as Profile };
 }

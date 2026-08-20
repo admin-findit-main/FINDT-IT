@@ -8,7 +8,7 @@ import "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
-import { customerNeedsFirstName, parseCustomerDeepLink } from "@findit/domain";
+import { customerNeedsFirstName, isSoloAdminEmail, parseCustomerDeepLink } from "@findit/domain";
 import { useAppTheme } from "@findit/theme/native";
 import { AppearanceProvider, useAppearance } from "@/lib/appearance";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -79,11 +79,14 @@ function RootNavigator() {
     const screen = String(segments[1] || "");
     const inAuth = group === "(auth)";
     const inApp = group === "(app)";
-    const isCustomer = Boolean(session && profile?.account_type === "customer");
+    const operator = isSoloAdminEmail(profile?.email) || isSoloAdminEmail(session?.user?.email);
+    const isCustomer = Boolean(
+      session && profile?.account_type === "customer" && !operator
+    );
     const needsName = customerNeedsFirstName(profile || {});
     const onLoginOrSignup = inAuth && (screen === "login" || screen === "signup");
 
-    if (session && profile && profile.account_type !== "customer") {
+    if (session && (operator || (profile && profile.account_type !== "customer"))) {
       if (!onLoginOrSignup) {
         lastTarget.current = "/(auth)/login";
         router.replace("/(auth)/login?reason=customer-only" as Href);
@@ -114,7 +117,13 @@ function RootNavigator() {
   }, [loading, seenOnboarding, session, profile, segments, router, signOut]);
 
   useEffect(() => {
-    if (!session || profile?.account_type !== "customer") return;
+    if (
+      !session ||
+      profile?.account_type !== "customer" ||
+      isSoloAdminEmail(profile?.email) ||
+      isSoloAdminEmail(session.user.email)
+    )
+      return;
     registerForPushNotificationsAsync();
   }, [session, profile?.account_type]);
 

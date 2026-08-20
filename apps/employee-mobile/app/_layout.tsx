@@ -6,7 +6,7 @@ import { Platform } from "react-native";
 import "react-native-reanimated";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
-import { parseEmployeeDeepLink } from "@findit/domain";
+import { parseEmployeeDeepLink, isSoloAdminEmail } from "@findit/domain";
 import { theme } from "@findit/theme";
 import { AppThemeProvider } from "@findit/theme/native";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -58,6 +58,11 @@ function RootNavigator() {
   useEffect(() => {
     if (loading) return;
     const inAuth = segments[0] === "(auth)";
+    if (isSoloAdminEmail(session?.user?.email)) {
+      signOut();
+      if (!inAuth) router.replace("/(auth)/login");
+      return;
+    }
     const allowed = Boolean(session && stores.length > 0);
     if (session && stores.length === 0 && !inAuth) {
       // Signed in but not a store member

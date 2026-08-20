@@ -45,7 +45,7 @@ export default function LoginScreen() {
     if (reason !== "customer-only") return;
     setMode("email");
     setError(
-      "This app is for customers. Business accounts sign in on the website."
+      "This app is for shoppers. The FINDIT operator signs in on the website, then opens /admin."
     );
   }, [reason]);
 

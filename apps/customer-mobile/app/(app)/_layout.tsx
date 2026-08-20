@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import { Stack } from "expo-router";
 import { GlassHeaderBackground, useAppTheme, useNavigationOptions } from "@findit/theme/native";
 import { useAuth } from "@/lib/auth";
-import { customerNeedsFirstName } from "@findit/domain";
+import { customerNeedsFirstName, isSoloAdminEmail } from "@findit/domain";
 import { CustomerMenuProvider } from "@/components/app-menu";
 
 export default function AppLayout() {
@@ -10,7 +10,14 @@ export default function AppLayout() {
   const navigationOptions = useNavigationOptions();
   const { session, profile, loading } = useAuth();
   if (loading) return null;
-  if (!session || profile?.account_type !== "customer") return null;
+  if (
+    !session ||
+    profile?.account_type !== "customer" ||
+    isSoloAdminEmail(profile?.email) ||
+    isSoloAdminEmail(session.user.email)
+  ) {
+    return null;
+  }
   if (customerNeedsFirstName(profile)) return null;
   return (
     <CustomerMenuProvider>

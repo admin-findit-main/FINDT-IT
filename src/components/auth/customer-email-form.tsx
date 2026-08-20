@@ -97,7 +97,9 @@ export function CustomerEmailSignupForm({
         toast.message("Check your inbox, tap the link once, then sign in with this password.");
         return;
       }
-      onFinished({ homePath: "/home" });
+        onFinished({
+          homePath: ("homePath" in result && result.homePath ? result.homePath : "/home") as AppHomePath,
+        });
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Sign up failed. Try again."

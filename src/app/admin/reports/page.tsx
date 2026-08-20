@@ -6,7 +6,7 @@ import { formatRelativeTime } from "@/lib/utils";
 
 export default async function AdminReportsPage() {
   const profile = await getCurrentProfile();
-  if (!isSoloAdmin(profile)) redirect("/home");
+  if (!isSoloAdmin(profile)) redirect("/login/business");
   const reports = await getAdminReportsAction();
 
   return (

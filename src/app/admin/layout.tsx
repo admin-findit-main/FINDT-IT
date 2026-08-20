@@ -12,7 +12,7 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const profile = await getCurrentProfile();
-  if (!profile || !isSoloAdmin(profile)) redirect("/home");
+  if (!profile || !isSoloAdmin(profile)) redirect("/login/business");
 
   return (
     <DashboardShell

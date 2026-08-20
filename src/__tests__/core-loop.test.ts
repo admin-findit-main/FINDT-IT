@@ -271,7 +271,7 @@ describe("store join applications", () => {
   });
 
   it("submits and approves an application into a trial store", () => {
-    const admin = demoLogin("admin@demo.findit.local", "demo1234")!;
+    const admin = demoLogin("admin.findit@gmail.com", "demo1234")!;
     const application = demoSubmitStoreApplication({
       businessName: "Test Hardware Co",
       businessType: "Hardware",
@@ -300,7 +300,7 @@ describe("store join applications", () => {
   });
 
   it("copies the ID requirement from a smoke shop application onto the store", () => {
-    const admin = demoLogin("admin@demo.findit.local", "demo1234")!;
+    const admin = demoLogin("admin.findit@gmail.com", "demo1234")!;
     const application = demoSubmitStoreApplication({
       businessName: "Falls Church Smoke Shop",
       businessType: "Smoke Shop",

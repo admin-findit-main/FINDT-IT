@@ -8,6 +8,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Profile, Store, StoreMemberRole } from "@findit/types";
+import { coerceSoloAdminProfile, isSoloAdminEmail } from "@findit/domain";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { captureException } from "./monitoring";
 
@@ -35,19 +36,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadWorkspace = async (userId: string) => {
+  const loadWorkspace = async (user: { id: string; email?: string | null }) => {
     const { data: prof, error: pErr } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", userId)
+      .eq("id", user.id)
       .maybeSingle();
     if (pErr) captureException(pErr, { where: "loadProfile" });
-    setProfile((prof as Profile) || null);
+    setProfile(
+      prof ? (coerceSoloAdminProfile(prof as Profile, user.email) as Profile) : null
+    );
 
     const { data: members, error: mErr } = await supabase
       .from("store_members")
       .select("role, store:stores(*)")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .eq("status", "active");
     if (mErr) {
       captureException(mErr, { where: "loadMembers" });
@@ -75,12 +78,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(data.session);
       if (data.session?.user) {
-        loadWorkspace(data.session.user.id).finally(() => setLoading(false));
+        loadWorkspace(data.session.user).finally(() => setLoading(false));
       } else setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, next) => {
       setSession(next);
-      if (next?.user) loadWorkspace(next.user.id);
+      if (next?.user) loadWorkspace(next.user);
       else {
         setProfile(null);
         setStores([]);
@@ -105,6 +108,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveStoreId,
       loading,
       signIn: async (email, password) => {
+        if (isSoloAdminEmail(email)) {
+          return {
+            error:
+              "Operator accounts use the FINDIT website at /admin, not the store app.",
+          };
+        }
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         return error ? { error: error.message } : {};
       },
@@ -112,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
       },
       refresh: async () => {
-        if (session?.user) await loadWorkspace(session.user.id);
+        if (session?.user) await loadWorkspace(session.user);
       },
     }),
     [session, profile, stores, activeStore, loading]

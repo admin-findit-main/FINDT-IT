@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Card } from "@/components/ui/primitives";
-import { isSafeNextPath } from "@/lib/auth/home-path";
+import { destinationAfterAuth } from "@/lib/auth/home-path";
 import { PhoneOtpForm } from "@/components/auth/phone-otp-form";
 import { CustomerEmailLoginForm } from "@/components/auth/customer-email-form";
 
@@ -16,7 +16,11 @@ function LoginForm() {
 
   function go(result: { homePath: string; needsName?: boolean }) {
     router.push(
-      result.needsName ? "/welcome" : isSafeNextPath(next) ? next : result.homePath
+      destinationAfterAuth({
+        homePath: result.homePath,
+        next,
+        needsName: result.needsName,
+      })
     );
     router.refresh();
   }

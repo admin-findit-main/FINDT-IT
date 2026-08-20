@@ -1,5 +1,6 @@
 import { CustomerTopBar } from "@/components/customer/app-menu";
 import { CustomerAlertListener } from "@/components/customer/alert-listener";
+import { isSoloAdmin } from "@/lib/auth/admin";
 import { getCurrentProfile } from "@/lib/services/actions";
 import { redirect } from "next/navigation";
 
@@ -13,6 +14,9 @@ export default async function CustomerLayout({
   const profile = await getCurrentProfile();
   if (!profile) {
     redirect("/login?next=/home");
+  }
+  if (isSoloAdmin(profile)) {
+    redirect("/admin");
   }
 
   return (

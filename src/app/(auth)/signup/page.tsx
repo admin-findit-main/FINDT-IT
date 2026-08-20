@@ -6,7 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
-import { isSafeNextPath } from "@/lib/auth/home-path";
+import { destinationAfterAuth, isSafeNextPath } from "@/lib/auth/home-path";
 import { PhoneOtpForm } from "@/components/auth/phone-otp-form";
 import { CustomerEmailSignupForm } from "@/components/auth/customer-email-form";
 import { signUpAction } from "@/lib/services/actions";
@@ -51,7 +51,12 @@ function SignupForm() {
       return;
     }
     toast.success("Account created");
-    router.push(isSafeNextPath(next) ? next : "/home");
+    router.push(
+      destinationAfterAuth({
+        homePath: "homePath" in result && result.homePath ? result.homePath : "/home",
+        next,
+      })
+    );
     router.refresh();
   }
 
@@ -106,9 +111,7 @@ function SignupForm() {
       {mode === "email" ? (
         <CustomerEmailSignupForm
           onFinished={({ homePath, needsName }) => {
-            router.push(
-              needsName ? "/welcome" : isSafeNextPath(next) ? next : homePath
-            );
+            router.push(destinationAfterAuth({ homePath, next, needsName }));
             router.refresh();
           }}
         />
@@ -116,9 +119,7 @@ function SignupForm() {
         <PhoneOtpForm
           createIfMissing
           onFinished={({ homePath, needsName }) => {
-            router.push(
-              needsName ? "/welcome" : isSafeNextPath(next) ? next : homePath
-            );
+            router.push(destinationAfterAuth({ homePath, next, needsName }));
             router.refresh();
           }}
         />

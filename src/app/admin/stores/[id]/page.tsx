@@ -10,7 +10,7 @@ type Props = { params: Promise<{ id: string }> };
 
 export default async function AdminStoreDetailPage({ params }: Props) {
   const profile = await getCurrentProfile();
-  if (!isSoloAdmin(profile)) redirect("/home");
+  if (!isSoloAdmin(profile)) redirect("/login/business");
   const { id } = await params;
   const detail = await getAdminStoreDetailAction(id);
   if (!detail) notFound();

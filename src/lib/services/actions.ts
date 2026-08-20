@@ -1,8 +1,8 @@
 "use server";
 
 import { appUrl, isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
-import { isSoloAdmin, isSoloAdminEmail } from "@/lib/auth/admin";
-import { resolveAppHome, type AppHomePath } from "@/lib/auth/home-path";
+import { coerceSoloAdminProfile, isSoloAdmin } from "@/lib/auth/admin";
+import { resolvePostAuthDestination, type AppHomePath } from "@/lib/auth/home-path";
 import {
   canManageFromRole,
   type StoreWorkspace,
@@ -116,7 +116,9 @@ async function getSupabaseUser() {
 export async function getCurrentProfile(): Promise<Profile | null> {
   if (isDemoMode()) {
     const sessionId = await getDemoSessionId();
-    return demoCurrentUser(sessionId);
+    const profile = demoCurrentUser(sessionId);
+    if (!profile) return null;
+    return coerceSoloAdminProfile(profile, profile.email) as Profile;
   }
   if (!isSupabaseConfigured()) return null;
   const { supabase, user } = await getSupabaseUser();
@@ -124,11 +126,7 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   const profile = data as Profile | null;
   if (!profile) return null;
-  // Belt-and-suspenders: only stirux.invest@gmail.com may appear as admin in-app.
-  if (profile.account_type === "admin" && !isSoloAdminEmail(profile.email)) {
-    return { ...profile, account_type: "customer" };
-  }
-  return profile;
+  return coerceSoloAdminProfile(profile, user.email) as Profile;
 }
 
 type StoreActor =
@@ -187,10 +185,11 @@ export async function signInAction(email: string, password: string) {
     if (!result) return { error: "Invalid email or password" };
     await setDemoSessionCookie(result.sessionId);
     const stores = await getUserStoresAction();
-    const homePath = resolveAppHome({
-      accountType: result.profile.account_type,
+    const homePath = resolvePostAuthDestination({
+      profile: result.profile,
+      authEmail: result.profile.email,
       hasActiveStoreMembership: stores.length > 0,
-    });
+    }) as AppHomePath;
     return { profile: result.profile, homePath };
   }
   const { createClient } = await import("@/lib/supabase/server");
@@ -200,10 +199,11 @@ export async function signInAction(email: string, password: string) {
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Profile not found" };
   const stores = await getUserStoresAction();
-  const homePath = resolveAppHome({
-    accountType: profile.account_type,
+  const homePath = resolvePostAuthDestination({
+    profile,
+    authEmail: profile.email,
     hasActiveStoreMembership: stores.length > 0,
-  });
+  }) as AppHomePath;
   return { profile, homePath };
 }
 
@@ -218,17 +218,18 @@ export async function getAppWorkspaceAction(): Promise<{
   if (!profile) return null;
   const stores = await getUserStoresAction();
   const hasStore = stores.length > 0;
-  const homePath = resolveAppHome({
-    accountType: profile.account_type,
+  const homePath = resolvePostAuthDestination({
+    profile,
+    authEmail: profile.email,
     hasActiveStoreMembership: hasStore,
-  });
+  }) as AppHomePath;
   return {
     homePath,
     accountType: profile.account_type,
     isAdmin: isSoloAdmin(profile),
     hasStore: hasStore || profile.account_type === "business",
     label:
-      profile.account_type === "admin"
+      isSoloAdmin(profile)
         ? "Admin"
         : hasStore || profile.account_type === "business"
           ? "Store"
@@ -249,11 +250,11 @@ export async function getStoreWorkspaceAction(): Promise<StoreWorkspace | null> 
       role,
       canManageStore: canManageFromRole(role),
       canInvite: canManageFromRole(role),
-      isAdminViewer: profile.account_type === "admin",
+      isAdminViewer: isSoloAdmin(profile),
     };
   }
 
-  if (profile.account_type === "admin") {
+  if (isSoloAdmin(profile)) {
     return {
       store: null,
       role: "owner",
@@ -463,7 +464,12 @@ export async function signUpAction(input: {
     });
     if (error) return { error: error.message };
     if (!data.session) return { ok: true, needsEmailConfirm: true };
-    return { ok: true };
+    const profile = await getCurrentProfile();
+    const homePath = resolvePostAuthDestination({
+      profile,
+      authEmail: input.email,
+    }) as AppHomePath;
+    return { ok: true, homePath };
   } catch (e) {
     return {
       error:
@@ -505,6 +511,9 @@ export async function createCustomerRequestAction(raw: unknown) {
   }
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Please sign in to submit a request", needsAuth: true };
+  if (isSoloAdmin(profile)) {
+    return { error: "Operator accounts use Admin, not customer Finds." };
+  }
 
   if (isDemoMode()) {
     const result = demoCreateRequest({
@@ -1951,7 +1960,7 @@ export async function canAccessStoreDashboardAction(): Promise<{
 }> {
   const profile = await getCurrentProfile();
   if (!profile) return { allowed: false, reason: "unauthenticated" };
-  if (profile.account_type === "admin") return { allowed: true };
+  if (isSoloAdmin(profile)) return { allowed: false, reason: "no_store" };
   const stores = await getUserStoresAction();
   if (stores.length > 0) return { allowed: true };
   const pending = await getMyStoreApplicationStatusAction();

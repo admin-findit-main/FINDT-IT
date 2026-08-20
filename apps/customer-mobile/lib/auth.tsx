@@ -2,7 +2,9 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { Session, User } from "@supabase/supabase-js";
 import type { Profile } from "@findit/types";
 import {
+  coerceSoloAdminProfile,
   customerNeedsFirstName,
+  isSoloAdminEmail,
   mapPhoneOtpError,
   maskPhoneE164,
   normalizePhoneToE164,
@@ -41,12 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (userId: string) => {
+  const loadProfile = async (user: { id: string; email?: string | null }) => {
     for (let i = 0; i < 8; i++) {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", userId)
+        .eq("id", user.id)
         .maybeSingle();
       if (error) {
         captureException(error, { where: "loadProfile" });
@@ -54,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (data) {
-        setProfile(data as Profile);
+        setProfile(coerceSoloAdminProfile(data as Profile, user.email) as Profile);
         return;
       }
       await new Promise((r) => setTimeout(r, 200));
@@ -72,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       setSession(data.session);
       if (data.session?.user) {
-        loadProfile(data.session.user.id).finally(() => setLoading(false));
+        loadProfile(data.session.user).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
@@ -80,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       if (next?.user) {
-        loadProfile(next.user.id);
+        loadProfile(next.user);
       } else {
         setProfile(null);
       }
@@ -98,6 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       signIn: async (email, password) => {
+        if (isSoloAdminEmail(email)) {
+          return {
+            error:
+              "This app is for shoppers. Sign in on the FINDIT website, then open /admin.",
+          };
+        }
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (!error) return {};
         const text = error.message.toLowerCase();
@@ -116,6 +124,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error.message };
       },
       signUp: async ({ email, password, firstName }) => {
+        if (isSoloAdminEmail(email)) {
+          return {
+            error:
+              "This app is for shoppers. Sign in on the FINDIT website, then open /admin.",
+          };
+        }
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -166,13 +180,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error) return { error: mapPhoneOtpError(error.message, "verify") };
         const user = data.user;
         if (!user) return { error: "Could not start your session. Try again." };
-        await loadProfile(user.id);
+        await loadProfile(user);
         const { data: row } = await supabase
           .from("profiles")
-          .select("first_name, account_type")
+          .select("first_name, account_type, email")
           .eq("id", user.id)
           .maybeSingle();
-        return { needsName: customerNeedsFirstName(row || {}) };
+        const coerced = coerceSoloAdminProfile(row || { email: user.email }, user.email);
+        return { needsName: customerNeedsFirstName(coerced) };
       },
       completeFirstName: async (firstName) => {
         const name = firstName.trim();
@@ -187,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .update({ first_name: name, display_name: name })
           .eq("id", user.id);
         if (error) return { error: error.message };
-        await loadProfile(user.id);
+        await loadProfile(user);
         return {};
       },
       signOut: async () => {
@@ -195,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
       },
       refreshProfile: async () => {
-        if (session?.user) await loadProfile(session.user.id);
+        if (session?.user) await loadProfile(session.user);
       },
     }),
     [session, profile, loading]

@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isSoloAdminEmail } from "@/lib/auth/admin";
-import { isSafeNextPath, resolveAppHome } from "@/lib/auth/home-path";
+import { coerceSoloAdminProfile, isSoloAdmin } from "@/lib/auth/admin";
+import {
+  isCustomerSurfacePath,
+  resolvePostAuthDestination,
+} from "@/lib/auth/home-path";
 import { isOwnerOnlyStorePath } from "@/lib/auth/store-role";
 import { customerNeedsFirstName } from "@findit/domain";
 import {
@@ -17,30 +20,33 @@ import {
 
 async function resolveHomeForUser(
   supabase: ReturnType<typeof createServerClient>,
-  userId: string
+  user: { id: string; email?: string | null },
+  next?: string | null
 ): Promise<string> {
   const { data: profile } = await supabase
     .from("profiles")
     .select("account_type, email, first_name")
-    .eq("id", userId)
+    .eq("id", user.id)
     .maybeSingle();
 
-  const accountType =
-    profile?.account_type === "admin" && !isSoloAdminEmail(profile.email)
-      ? "customer"
-      : (profile?.account_type as string | undefined);
-  if (accountType === "admin" && isSoloAdminEmail(profile?.email)) return "/admin";
-  if (accountType === "business") return "/store";
-
+  const resolved = coerceSoloAdminProfile(
+    {
+      email: profile?.email,
+      account_type: profile?.account_type,
+    },
+    user.email
+  );
   const { count } = await supabase
     .from("store_members")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", userId)
+    .eq("user_id", user.id)
     .eq("status", "active");
 
-  return resolveAppHome({
-    accountType,
+  return resolvePostAuthDestination({
+    profile: resolved,
+    authEmail: user.email,
     hasActiveStoreMembership: (count || 0) > 0,
+    next,
   });
 }
 
@@ -149,7 +155,27 @@ export async function updateSession(request: NextRequest) {
       .select("account_type, email, first_name")
       .eq("id", user.id)
       .maybeSingle();
-    const needsName = customerNeedsFirstName(profile || {});
+    const resolved = coerceSoloAdminProfile(
+      {
+        email: profile?.email,
+        account_type: profile?.account_type,
+        first_name: profile?.first_name,
+      },
+      user.email
+    );
+    const isOperator = isSoloAdmin(resolved);
+    const onCustomerSurface = isCustomerSurfacePath(path);
+
+    if (isOperator && (onCustomerSurface || path.startsWith("/store"))) {
+      if (!path.startsWith("/store/hub")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/admin";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
+
+    const needsName = customerNeedsFirstName(resolved);
 
     if (needsName && !isWelcome && !isPasswordUpdate) {
       const url = request.nextUrl.clone();
@@ -160,7 +186,7 @@ export async function updateSession(request: NextRequest) {
 
     if (!needsName && isWelcome) {
       const url = request.nextUrl.clone();
-      url.pathname = "/home";
+      url.pathname = isOperator ? "/admin" : "/home";
       url.search = "";
       return NextResponse.redirect(url);
     }
@@ -168,20 +194,15 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthRoute && !isPasswordUpdate) {
     const next = request.nextUrl.searchParams.get("next");
+    const home = await resolveHomeForUser(supabase, user, next);
     const url = request.nextUrl.clone();
-    if (isSafeNextPath(next)) {
-      url.pathname = next;
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
-    const home = await resolveHomeForUser(supabase, user.id);
     url.pathname = home;
     url.search = "";
     return NextResponse.redirect(url);
   }
 
   if (user && isLanding) {
-    const home = await resolveHomeForUser(supabase, user.id);
+    const home = await resolveHomeForUser(supabase, user);
     const url = request.nextUrl.clone();
     url.pathname = home;
     url.search = "";
@@ -194,7 +215,11 @@ export async function updateSession(request: NextRequest) {
       .select("account_type, email")
       .eq("id", user.id)
       .maybeSingle();
-    if (!isSoloAdminEmail(profile?.email) || profile?.account_type !== "admin") {
+    const resolved = coerceSoloAdminProfile(
+      { email: profile?.email, account_type: profile?.account_type },
+      user.email
+    );
+    if (!isSoloAdmin(resolved)) {
       const { data: membership } = await supabase
         .from("store_members")
         .select("role")

@@ -182,7 +182,7 @@ function seedState(): DemoState {
     },
     {
       id: adminId,
-      email: "admin@demo.findit.local",
+      email: "admin.findit@gmail.com",
       first_name: "Admin",
       last_name: "User",
       display_name: "Admin",
@@ -462,7 +462,7 @@ export const DEMO_PASSWORDS: Record<string, string> = {
   "customer@demo.findit.local": "demo1234",
   "owner@demo.findit.local": "demo1234",
   "employee@demo.findit.local": "demo1234",
-  "admin@demo.findit.local": "demo1234",
+  "admin.findit@gmail.com": "demo1234",
 };
 
 export function demoLogin(email: string, password: string): Profile | null {

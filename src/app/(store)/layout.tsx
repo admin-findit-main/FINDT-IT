@@ -9,6 +9,7 @@ import { employeeDashItems, ownerDashItems } from "@/lib/dashboard/nav";
 import { BrandHomeLink } from "@/components/brand/logo";
 import { roleLabel } from "@/lib/auth/store-role";
 import { STORE_TRIAL_DAYS } from "@/lib/config/constants";
+import { isSoloAdmin } from "@/lib/auth/admin";
 import {
   canAccessStoreDashboardAction,
   getCurrentProfile,
@@ -22,6 +23,7 @@ export default async function StoreLayout({
 }) {
   const profile = await getCurrentProfile();
   if (!profile) redirect("/login/business?next=/store");
+  if (isSoloAdmin(profile)) redirect("/admin");
 
   const access = await canAccessStoreDashboardAction();
   if (!access.allowed) {

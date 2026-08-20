@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
 import { BrandHomeLink } from "@/components/brand/logo";
+import { getAppWorkspaceAction } from "@/lib/services/actions";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -34,7 +35,8 @@ export default function UpdatePasswordPage() {
         return;
       }
       toast.success("Password updated");
-      router.push("/home");
+      const workspace = await getAppWorkspaceAction();
+      router.push(workspace?.homePath || "/home");
       router.refresh();
     } catch (err) {
       setLoading(false);

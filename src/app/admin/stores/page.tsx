@@ -5,9 +5,9 @@ import { getAdminStatsAction, getCurrentProfile } from "@/lib/services/actions";
 
 export default async function AdminStoresPage() {
   const profile = await getCurrentProfile();
-  if (!isSoloAdmin(profile)) redirect("/home");
+  if (!isSoloAdmin(profile)) redirect("/login/business");
   const stats = await getAdminStatsAction();
-  if (!stats) redirect("/home");
+  if (!stats) redirect("/login/business");
 
   if (stats.stores.length === 0) {
     return <p className="text-sm text-ink-muted">No stores yet.</p>;

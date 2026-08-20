@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
 import { completeCustomerFirstNameAction } from "@/lib/services/phone-auth-actions";
+import { getAppWorkspaceAction } from "@/lib/services/actions";
 
 export default function WelcomePage() {
   const router = useRouter();
@@ -21,7 +22,8 @@ export default function WelcomePage() {
       toast.error(result.error);
       return;
     }
-    router.push("/home");
+    const workspace = await getAppWorkspaceAction();
+    router.push(workspace?.homePath || "/home");
     router.refresh();
   }
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { isDemoMode } from "@/lib/config/env";
+import { isSoloAdmin } from "@/lib/auth/admin";
 import { getDemoState } from "@/lib/demo/store";
 import { getCurrentProfile, getStoreWorkspaceAction } from "@/lib/services/actions";
 
@@ -9,7 +10,7 @@ export async function getStoreTeamAction(storeId: string) {
   if (!profile) return [];
   const workspace = await getStoreWorkspaceAction();
   if (
-    profile.account_type !== "admin" &&
+    !isSoloAdmin(profile) &&
     (!workspace?.canManageStore || workspace.store?.id !== storeId)
   ) {
     return [];
@@ -60,7 +61,7 @@ export async function getStoreInvitesAction(storeId: string) {
   if (!profile) return [];
   const workspace = await getStoreWorkspaceAction();
   if (
-    profile.account_type !== "admin" &&
+    !isSoloAdmin(profile) &&
     (!workspace?.canManageStore || workspace.store?.id !== storeId)
   ) {
     return [];

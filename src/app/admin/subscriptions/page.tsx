@@ -6,9 +6,9 @@ import { getAdminStatsAction, getCurrentProfile } from "@/lib/services/actions";
 
 export default async function AdminSubscriptionsPage() {
   const profile = await getCurrentProfile();
-  if (!isSoloAdmin(profile)) redirect("/home");
+  if (!isSoloAdmin(profile)) redirect("/login/business");
   const stats = await getAdminStatsAction();
-  if (!stats) redirect("/home");
+  if (!stats) redirect("/login/business");
 
   const now = Date.now();
   const trials = stats.stores.filter(

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
 import { signInAction } from "@/lib/services/actions";
-import { isSafeNextPath } from "@/lib/auth/home-path";
+import { destinationAfterAuth } from "@/lib/auth/home-path";
 
 function BusinessLoginForm() {
   const router = useRouter();
@@ -30,7 +30,12 @@ function BusinessLoginForm() {
     }
     const homePath =
       "homePath" in result && result.homePath ? result.homePath : "/store";
-    router.push(isSafeNextPath(next) ? next : homePath);
+    router.push(
+      destinationAfterAuth({
+        homePath,
+        next,
+      })
+    );
     router.refresh();
   }
 

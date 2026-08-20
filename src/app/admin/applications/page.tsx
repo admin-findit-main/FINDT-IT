@@ -5,7 +5,7 @@ import { AdminStoreApplications } from "../store-applications";
 
 export default async function AdminApplicationsPage() {
   const profile = await getCurrentProfile();
-  if (!isSoloAdmin(profile)) redirect("/home");
+  if (!isSoloAdmin(profile)) redirect("/login/business");
   const applications = await getStoreApplicationsAction();
   return <AdminStoreApplications applications={applications} />;
 }
