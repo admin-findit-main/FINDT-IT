@@ -67,6 +67,12 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
+  // Skip Auth refresh on Server Actions. Calling getUser() here has left
+  // signup/login stuck on "Creating…" because the POST never finished.
+  if (isServerActionRequest(request)) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     getSupabasePublishableKey()!,
@@ -92,13 +98,6 @@ export async function updateSession(request: NextRequest) {
     user = result.data.user;
   } catch (err) {
     console.error("[FINDIT] session refresh failed", err);
-  }
-
-  // Redirecting a Server Action POST to an HTML page makes Next.js throw
-  // "An unexpected response was received from the server." Actions already
-  // return auth errors themselves.
-  if (isServerActionRequest(request)) {
-    return supabaseResponse;
   }
 
   const isAuthRoute =

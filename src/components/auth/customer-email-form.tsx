@@ -79,25 +79,32 @@ export function CustomerEmailSignupForm({
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    const result = await signUpAction({
-      firstName: String(fd.get("firstName") || "Friend"),
-      email: String(fd.get("email")),
-      password: String(fd.get("password")),
-      accountType: "customer",
-      city: place.city,
-      state: place.state || "VA",
-      postalCode: place.postalCode,
-    });
-    setLoading(false);
-    if (result.error) {
-      toast.error(result.error);
-      return;
+    try {
+      const result = await signUpAction({
+        firstName: String(fd.get("firstName") || "Friend"),
+        email: String(fd.get("email")),
+        password: String(fd.get("password")),
+        accountType: "customer",
+        city: place.city,
+        state: place.state || "VA",
+        postalCode: place.postalCode,
+      });
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      if ("needsEmailConfirm" in result && result.needsEmailConfirm) {
+        toast.message("Check your inbox, tap the link once, then sign in with this password.");
+        return;
+      }
+      onFinished({ homePath: "/home" });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Sign up failed. Try again."
+      );
+    } finally {
+      setLoading(false);
     }
-    if ("needsEmailConfirm" in result && result.needsEmailConfirm) {
-      toast.message("Check your inbox, tap the link once, then sign in with this password.");
-      return;
-    }
-    onFinished({ homePath: "/home" });
   }
 
   return (

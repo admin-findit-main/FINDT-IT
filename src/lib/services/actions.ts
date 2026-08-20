@@ -1,6 +1,6 @@
 "use server";
 
-import { isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
+import { appUrl, isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
 import { isSoloAdmin, isSoloAdminEmail } from "@/lib/auth/admin";
 import { resolveAppHome, type AppHomePath } from "@/lib/auth/home-path";
 import {
@@ -442,26 +442,34 @@ export async function signUpAction(input: {
       return { error: e instanceof Error ? e.message : "Sign up failed" };
     }
   }
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email: input.email,
-    password: input.password,
-    options: {
-      data: {
-        first_name: input.firstName,
-        last_name: input.lastName || "",
-        display_name: input.firstName,
-        account_type: accountType,
-        default_city: input.city,
-        default_state: input.state || "VA",
-        default_postal_code: input.postalCode,
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email: input.email,
+      password: input.password,
+      options: {
+        emailRedirectTo: `${appUrl()}/auth/callback`,
+        data: {
+          first_name: input.firstName,
+          last_name: input.lastName || "",
+          display_name: input.firstName,
+          account_type: accountType,
+          default_city: input.city,
+          default_state: input.state || "VA",
+          default_postal_code: input.postalCode,
+        },
       },
-    },
-  });
-  if (error) return { error: error.message };
-  if (!data.session) return { ok: true, needsEmailConfirm: true };
-  return { ok: true };
+    });
+    if (error) return { error: error.message };
+    if (!data.session) return { ok: true, needsEmailConfirm: true };
+    return { ok: true };
+  } catch (e) {
+    return {
+      error:
+        e instanceof Error ? e.message : "Sign up failed. Try again in a moment.",
+    };
+  }
 }
 
 export async function signOutAction() {
