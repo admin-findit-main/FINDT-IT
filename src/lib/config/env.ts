@@ -14,6 +14,17 @@ const envSchema = z.object({
   FINDIT_DEMO_MODE: z.string().optional().or(z.literal("")),
   FINDIT_BYPASS_PLAN_LIMITS: z.string().optional().or(z.literal("")),
   FINDIT_PILOT_MODE: z.string().optional().or(z.literal("")),
+  /**
+   * Optional dedicated hosts on the SAME Vercel Next.js app. Leave empty.
+   * When set (e.g. business.findit.app), middleware sends `/` to that shell.
+   * Do not add DNS until you are ready — unset means no host routing.
+   */
+  FINDIT_BUSINESS_HOST: z.string().optional().or(z.literal("")),
+  FINDIT_HUB_HOST: z.string().optional().or(z.literal("")),
+  FINDIT_ADMIN_HOST: z.string().optional().or(z.literal("")),
+  /** Public App Store listing URL when it exists. Empty = coming soon. */
+  NEXT_PUBLIC_IOS_APP_STORE_URL: z.string().optional().or(z.literal("")),
+  NEXT_PUBLIC_PLAY_STORE_URL: z.string().optional().or(z.literal("")),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -33,6 +44,11 @@ export function getEnv(): AppEnv {
     FINDIT_DEMO_MODE: process.env.FINDIT_DEMO_MODE,
     FINDIT_BYPASS_PLAN_LIMITS: process.env.FINDIT_BYPASS_PLAN_LIMITS,
     FINDIT_PILOT_MODE: process.env.FINDIT_PILOT_MODE,
+    FINDIT_BUSINESS_HOST: process.env.FINDIT_BUSINESS_HOST,
+    FINDIT_HUB_HOST: process.env.FINDIT_HUB_HOST,
+    FINDIT_ADMIN_HOST: process.env.FINDIT_ADMIN_HOST,
+    NEXT_PUBLIC_IOS_APP_STORE_URL: process.env.NEXT_PUBLIC_IOS_APP_STORE_URL,
+    NEXT_PUBLIC_PLAY_STORE_URL: process.env.NEXT_PUBLIC_PLAY_STORE_URL,
   });
 }
 
@@ -53,14 +69,19 @@ export function isDemoMode(): boolean {
 }
 
 /**
- * Soft plan limits (customer free tier, store free caps).
- * Opt out with FINDIT_BYPASS_PLAN_LIMITS=true OR FINDIT_PILOT_MODE=true.
+ * Store free-tier routing caps (not consumer Finds).
+ * Pilot still relaxes store caps. Consumer Finds use bypassConsumerPlanLimits().
  */
 export function bypassPlanLimits(): boolean {
   const env = getEnv();
   if (env.FINDIT_BYPASS_PLAN_LIMITS === "true") return true;
   if (isPilotMode()) return true;
   return false;
+}
+
+/** Consumer monthly Finds. Pilot mode does NOT skip this. */
+export function bypassConsumerPlanLimits(): boolean {
+  return getEnv().FINDIT_BYPASS_PLAN_LIMITS === "true";
 }
 
 /** Closed pilot: relax usage limits, show Beta, no Stripe. */
@@ -70,4 +91,22 @@ export function isPilotMode(): boolean {
 
 export function appUrl(): string {
   return getEnv().NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+}
+
+/** Dedicated Business/Hub/Admin hostnames. Empty until DNS is ready. */
+export function dedicatedHosts() {
+  const env = getEnv();
+  return {
+    business: env.FINDIT_BUSINESS_HOST || "",
+    hub: env.FINDIT_HUB_HOST || "",
+    admin: env.FINDIT_ADMIN_HOST || "",
+  };
+}
+
+export function iosAppStoreUrl(): string {
+  return getEnv().NEXT_PUBLIC_IOS_APP_STORE_URL || "";
+}
+
+export function playStoreUrl(): string {
+  return getEnv().NEXT_PUBLIC_PLAY_STORE_URL || "";
 }

@@ -13,17 +13,23 @@ import type {
   RequestTarget,
   Store,
   StoreApplication,
+  StoreDevice,
   StoreMetrics,
   StoreResponse,
   StoreMember,
+  DevicePairingCode,
 } from "@/types/database";
 import { normalizeProductName, slugify } from "@/lib/utils";
+import { STORE_PLANS, STORE_TRIAL_DAYS } from "@/lib/config/constants";
+import { bypassConsumerPlanLimits, bypassPlanLimits } from "@/lib/config/env";
 import {
-  CUSTOMER_PLANS,
-  STORE_PLANS,
-  STORE_TRIAL_DAYS,
-} from "@/lib/config/constants";
-import { bypassPlanLimits } from "@/lib/config/env";
+  AGE_RESTRICTED_ID_REQUIRED,
+  DEMO_PHONE_OTP,
+  createdInMonthlyFindWindow,
+  customerNeedsFirstName,
+  getConsumerEntitlements,
+  isAgeRestrictedFind,
+} from "@findit/domain";
 import { selectEligibleStores } from "@/lib/services/routing";
 import {
   canRebroadcastStillLooking,
@@ -34,9 +40,16 @@ import {
   median,
 } from "@/lib/services/request-lifecycle";
 import { isStoreOpenAt } from "@/lib/services/store-hours";
+import {
+  generatePairingCode,
+  generateSecret,
+  hashPairingCode,
+  sha256Hex,
+} from "@/lib/hub/crypto";
+import { HUB_PAIRING_TTL_MS } from "@/lib/hub/constants";
 import type { PilotAdminStats } from "@/types/database";
 
-type SessionUser = { id: string; email: string };
+type SessionUser = { id: string; email: string | null };
 
 interface DemoState {
   profiles: Profile[];
@@ -64,6 +77,7 @@ interface DemoState {
     token: string;
     expires_at: string;
     accepted_at: string | null;
+    invitee_name?: string | null;
   }[];
   prohibitedTerms: string[];
   locationDemand: {
@@ -76,8 +90,11 @@ interface DemoState {
   }[];
   events: { event_name: string; user_id?: string; store_id?: string; request_id?: string; created_at: string }[];
   storeApplications: StoreApplication[];
+  storeDevices: StoreDevice[];
+  devicePairings: DevicePairingCode[];
   sessions: Record<string, SessionUser>;
   currentSessionId: string | null;
+  phoneOtps: Record<string, { sentAt: number }>;
 }
 
 const g = globalThis as typeof globalThis & { __finditDemo?: DemoState };
@@ -115,6 +132,7 @@ function seedState(): DemoState {
       notify_new_request: true,
       notify_demand_alerts: true,
       is_suspended: false,
+      phone_e164: null,
       created_at: now(),
       updated_at: now(),
     },
@@ -136,6 +154,7 @@ function seedState(): DemoState {
       notify_new_request: true,
       notify_demand_alerts: true,
       is_suspended: false,
+      phone_e164: null,
       created_at: now(),
       updated_at: now(),
     },
@@ -157,6 +176,7 @@ function seedState(): DemoState {
       notify_new_request: true,
       notify_demand_alerts: false,
       is_suspended: false,
+      phone_e164: null,
       created_at: now(),
       updated_at: now(),
     },
@@ -178,6 +198,7 @@ function seedState(): DemoState {
       notify_new_request: true,
       notify_demand_alerts: true,
       is_suspended: false,
+      phone_e164: null,
       created_at: now(),
       updated_at: now(),
     },
@@ -406,6 +427,7 @@ function seedState(): DemoState {
           "We are a licensed convenience store in Falls Church serving the neighborhood for 8 years. Want to answer local product asks during the pilot.",
         confirmed_legitimate: true,
         request_categories: ["Grocery", "Convenience"],
+        requires_customer_id: false,
         status: "pending",
         applicant_user_id: null,
         admin_notes: null,
@@ -416,8 +438,11 @@ function seedState(): DemoState {
         updated_at: now(),
       },
     ],
+    storeDevices: [],
+    devicePairings: [],
     sessions: {},
     currentSessionId: null,
+    phoneOtps: {},
   };
 }
 
@@ -443,7 +468,9 @@ export const DEMO_PASSWORDS: Record<string, string> = {
 export function demoLogin(email: string, password: string): Profile | null {
   const state = getDemoState();
   if (DEMO_PASSWORDS[email.toLowerCase()] !== password) return null;
-  const profile = state.profiles.find((p) => p.email.toLowerCase() === email.toLowerCase());
+  const profile = state.profiles.find(
+    (p) => p.email && p.email.toLowerCase() === email.toLowerCase()
+  );
   if (!profile || profile.is_suspended) return null;
   const sessionId = randomUUID();
   state.sessions[sessionId] = { id: profile.id, email: profile.email };
@@ -472,7 +499,11 @@ export function demoSignup(input: {
   postalCode?: string;
 }): Profile {
   const state = getDemoState();
-  if (state.profiles.some((p) => p.email.toLowerCase() === input.email.toLowerCase())) {
+  if (
+    state.profiles.some(
+      (p) => p.email && p.email.toLowerCase() === input.email.toLowerCase()
+    )
+  ) {
     throw new Error("An account with this email already exists.");
   }
   const profile: Profile = {
@@ -493,11 +524,12 @@ export function demoSignup(input: {
     notify_new_request: true,
     notify_demand_alerts: true,
     is_suspended: false,
+    phone_e164: null,
     created_at: now(),
     updated_at: now(),
   };
   state.profiles.push(profile);
-  DEMO_PASSWORDS[profile.email] = input.password;
+  DEMO_PASSWORDS[profile.email!] = input.password;
   const sessionId = randomUUID();
   state.sessions[sessionId] = { id: profile.id, email: profile.email };
   state.currentSessionId = sessionId;
@@ -518,6 +550,71 @@ export function demoSignupWithSession(input: {
   const profile = demoSignup(input);
   const state = getDemoState();
   return { profile, sessionId: state.currentSessionId! };
+}
+
+export function demoSendPhoneOtp(phoneE164: string): { phone: string } {
+  const state = getDemoState();
+  state.phoneOtps[phoneE164] = { sentAt: Date.now() };
+  return { phone: phoneE164 };
+}
+
+export function demoVerifyPhoneOtp(
+  phoneE164: string,
+  token: string,
+  createIfMissing: boolean
+): { profile: Profile; sessionId: string; needsName: boolean } {
+  if (token !== DEMO_PHONE_OTP) {
+    throw new Error("That code is incorrect.");
+  }
+  const state = getDemoState();
+  let profile = state.profiles.find((p) => p.phone_e164 === phoneE164) || null;
+  if (!profile) {
+    if (!createIfMissing) {
+      throw new Error("No FINDIT account for this number yet. Sign up to continue.");
+    }
+    profile = {
+      id: randomUUID(),
+      email: null,
+      phone_e164: phoneE164,
+      first_name: "",
+      last_name: null,
+      display_name: "Customer",
+      avatar_url: null,
+      account_type: "customer",
+      subscription_plan: "free",
+      default_city: null,
+      default_state: "VA",
+      default_postal_code: null,
+      notify_in_stock: true,
+      notify_can_order: true,
+      notify_request_expired: true,
+      notify_new_request: true,
+      notify_demand_alerts: true,
+      is_suspended: false,
+      created_at: now(),
+      updated_at: now(),
+    };
+    state.profiles.push(profile);
+    track("account_created", { user_id: profile.id });
+  }
+  const sessionId = randomUUID();
+  state.sessions[sessionId] = { id: profile.id, email: profile.email };
+  state.currentSessionId = sessionId;
+  return {
+    profile,
+    sessionId,
+    needsName: customerNeedsFirstName(profile),
+  };
+}
+
+export function demoSetFirstName(userId: string, firstName: string): Profile {
+  const state = getDemoState();
+  const profile = state.profiles.find((p) => p.id === userId);
+  if (!profile) throw new Error("Profile not found");
+  profile.first_name = firstName;
+  profile.display_name = firstName;
+  profile.updated_at = now();
+  return profile;
 }
 
 export function demoCurrentUser(sessionId?: string | null): Profile | null {
@@ -673,6 +770,7 @@ export function demoCreateRequest(input: {
   forceDuplicate?: boolean;
   latitude?: number | null;
   longitude?: number | null;
+  ageRestrictedConfirmed?: boolean;
 }): {
   request: CustomerRequest;
   storesTargeted: number;
@@ -681,6 +779,20 @@ export function demoCreateRequest(input: {
 } {
   const state = getDemoState();
   const normalized = normalizeProductName(input.productName);
+  if (
+    isAgeRestrictedFind({
+      category: input.category,
+      productName: input.productName,
+      description: input.description,
+    }) &&
+    !input.ageRestrictedConfirmed
+  ) {
+    return {
+      request: null as unknown as CustomerRequest,
+      storesTargeted: 0,
+      blocked: AGE_RESTRICTED_ID_REQUIRED,
+    };
+  }
   for (const term of state.prohibitedTerms) {
     if (normalized.includes(term)) {
       return {
@@ -729,32 +841,33 @@ export function demoCreateRequest(input: {
   }
 
   const customer = state.profiles.find((p) => p.id === input.customerId);
-  const planId = customer?.subscription_plan === "plus" ? "plus" : "free";
-  const plan = CUSTOMER_PLANS[planId];
-  if (plan.monthlyRequests != null && !bypassPlanLimits()) {
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+  const entitlements = getConsumerEntitlements(customer?.subscription_plan);
+  if (!bypassConsumerPlanLimits()) {
     const monthCount = state.requests.filter(
       (r) =>
         r.customer_id === input.customerId &&
-        new Date(r.created_at) >= monthStart &&
-        r.status !== "cancelled"
+        createdInMonthlyFindWindow(r.created_at)
     ).length;
-    if (monthCount >= plan.monthlyRequests) {
+    if (monthCount >= entitlements.monthlyRequestLimit) {
       return {
         request: null as unknown as CustomerRequest,
         storesTargeted: 0,
-        blocked: `${CUSTOMER_PLANS.free.name} includes ${plan.monthlyRequests} requests per month. Upgrade to ${CUSTOMER_PLANS.plus.name} for unlimited.`,
+        blocked:
+          entitlements.planId === "free"
+            ? `You've used your ${entitlements.monthlyRequestLimit} free Finds this month.`
+            : `FINDIT+ includes ${entitlements.monthlyRequestLimit} Finds per month.`,
       };
     }
   }
 
-  if (plan.maxRadiusMiles && input.radiusMiles > plan.maxRadiusMiles && !bypassPlanLimits()) {
+  if (
+    input.radiusMiles > entitlements.maxSearchRadiusMiles &&
+    !bypassConsumerPlanLimits()
+  ) {
     return {
       request: null as unknown as CustomerRequest,
       storesTargeted: 0,
-      blocked: `${plan.name} searches up to ${plan.maxRadiusMiles} miles. Upgrade to ${CUSTOMER_PLANS.plus.name} for a larger radius.`,
+      blocked: `${entitlements.brandName} searches up to ${entitlements.maxSearchRadiusMiles} miles.`,
     };
   }
 
@@ -887,7 +1000,7 @@ export function demoRespondToRequest(input: {
         id: randomUUID(),
         user_id: customer.id,
         type: "in_stock",
-        title: `${store.name} says your item is IN STOCK`,
+        title: `${store.name} has it in stock`,
         body: `${request.product_name}`,
         related_request_id: request.id,
         related_store_id: store.id,
@@ -1162,6 +1275,8 @@ export function demoGetStoreMetrics(storeId: string): StoreMetrics {
   return {
     requests_today: targetIdsToday.length,
     answered_today: responsesToday.length,
+    requests_yesterday: 0,
+    answered_yesterday: 0,
     waiting_today: targetIdsToday.length - responsesToday.length,
     in_stock_today: responsesToday.filter((r) => r.response_type === "in_stock").length,
     total_received: allTargets.length,
@@ -1275,14 +1390,9 @@ export function demoCreateStore(input: {
 
 export function demoCountCustomerRequestsThisMonth(customerId: string): number {
   const state = getDemoState();
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
   return state.requests.filter(
     (r) =>
-      r.customer_id === customerId &&
-      new Date(r.created_at) >= monthStart &&
-      r.status !== "cancelled"
+      r.customer_id === customerId && createdInMonthlyFindWindow(r.created_at)
   ).length;
 }
 
@@ -1301,6 +1411,7 @@ export function demoSubmitStoreApplication(input: {
   whyLegit: string;
   confirmedLegitimate: boolean;
   requestCategories?: string[];
+  requiresCustomerId?: boolean;
   applicantUserId?: string | null;
 }): StoreApplication {
   const state = getDemoState();
@@ -1323,6 +1434,7 @@ export function demoSubmitStoreApplication(input: {
       input.requestCategories && input.requestCategories.length
         ? input.requestCategories
         : [input.businessType],
+    requires_customer_id: Boolean(input.requiresCustomerId),
     status: "pending",
     applicant_user_id: input.applicantUserId || null,
     admin_notes: null,
@@ -1347,7 +1459,8 @@ export function demoListStoreApplications(status?: StoreApplication["status"]) {
   );
 }
 
-export function demoGetPendingApplicationForEmail(email: string) {
+export function demoGetPendingApplicationForEmail(email: string | null | undefined) {
+  if (!email) return undefined;
   return getDemoState().storeApplications.find(
     (a) =>
       a.owner_email.toLowerCase() === email.toLowerCase() && a.status === "pending"
@@ -1366,7 +1479,9 @@ export function demoApproveStoreApplication(
   }
 
   let owner = state.profiles.find(
-    (p) => p.email.toLowerCase() === application.owner_email.toLowerCase()
+    (p) =>
+      Boolean(p.email) &&
+      p.email!.toLowerCase() === application.owner_email.toLowerCase()
   );
   if (!owner && application.applicant_user_id) {
     owner = state.profiles.find((p) => p.id === application.applicant_user_id);
@@ -1390,6 +1505,7 @@ export function demoApproveStoreApplication(
       notify_new_request: true,
       notify_demand_alerts: true,
       is_suspended: false,
+      phone_e164: null,
       created_at: now(),
       updated_at: now(),
     };
@@ -1414,6 +1530,7 @@ export function demoApproveStoreApplication(
       application.request_categories?.length
         ? application.request_categories
         : [application.business_type],
+    ageRestricted: Boolean(application.requires_customer_id),
   });
   store.is_verified = true;
   store.subscription_plan = "free";
@@ -1647,4 +1764,151 @@ export function demoUpdateStoreSettings(
   }
   store.updated_at = now();
   return store;
+}
+
+export function demoCreateHubPairing(): {
+  pairingId: string;
+  code: string;
+  secret: string;
+  expiresAt: string;
+} {
+  const state = getDemoState();
+  let code = generatePairingCode();
+  let hash = hashPairingCode(code);
+  for (let i = 0; i < 8; i++) {
+    const clash = state.devicePairings.some(
+      (row) => row.code_hash === hash && !row.used_at && new Date(row.expires_at) > new Date()
+    );
+    if (!clash) break;
+    code = generatePairingCode();
+    hash = hashPairingCode(code);
+  }
+  const secret = generateSecret();
+  const pairing: DevicePairingCode = {
+    id: randomUUID(),
+    code_hash: hash,
+    requester_secret_hash: sha256Hex(secret),
+    expires_at: new Date(Date.now() + HUB_PAIRING_TTL_MS).toISOString(),
+    used_at: null,
+    store_id: null,
+    device_id: null,
+    issued_token: null,
+    created_at: now(),
+  };
+  state.devicePairings.push(pairing);
+  return { pairingId: pairing.id, code, secret, expiresAt: pairing.expires_at };
+}
+
+export function demoLookupHubPairing(code: string): DevicePairingCode | null {
+  const hash = hashPairingCode(code);
+  const row = getDemoState().devicePairings.find(
+    (p) =>
+      p.code_hash === hash &&
+      !p.used_at &&
+      new Date(p.expires_at).getTime() > Date.now()
+  );
+  return row || null;
+}
+
+export function demoClaimHubPairing(input: {
+  code: string;
+  storeId: string;
+  deviceName: string;
+  pairedBy: string;
+}): { device: StoreDevice; pairing: DevicePairingCode } | { error: string } {
+  const state = getDemoState();
+  const pairing = demoLookupHubPairing(input.code);
+  if (!pairing) return { error: "That code is invalid or expired." };
+  const token = generateSecret();
+  const device: StoreDevice = {
+    id: randomUUID(),
+    store_id: input.storeId,
+    device_name: input.deviceName.trim().slice(0, 80) || "Store device",
+    token_hash: sha256Hex(token),
+    paired_by: input.pairedBy,
+    paired_at: now(),
+    last_seen_at: now(),
+    revoked_at: null,
+    created_at: now(),
+    updated_at: now(),
+  };
+  state.storeDevices.push(device);
+  pairing.used_at = now();
+  pairing.store_id = input.storeId;
+  pairing.device_id = device.id;
+  pairing.issued_token = token;
+  return { device, pairing };
+}
+
+export function demoRedeemHubPairing(input: {
+  pairingId: string;
+  secret: string;
+}): { deviceId: string; token: string; storeId: string } | { error: string; pending?: boolean } {
+  const pairing = getDemoState().devicePairings.find((p) => p.id === input.pairingId);
+  if (!pairing) return { error: "Pairing expired. Generate a new code." };
+  if (pairing.requester_secret_hash !== sha256Hex(input.secret)) {
+    return { error: "This screen is not the one that started pairing." };
+  }
+  if (new Date(pairing.expires_at).getTime() <= Date.now() && !pairing.issued_token) {
+    return { error: "That code expired. Generate a new one." };
+  }
+  if (!pairing.used_at || !pairing.device_id || !pairing.store_id) {
+    return { error: "Waiting for the owner to connect this device.", pending: true };
+  }
+  if (!pairing.issued_token) {
+    return { error: "This pairing was already used." };
+  }
+  const token = pairing.issued_token;
+  pairing.issued_token = null;
+  return { deviceId: pairing.device_id, token, storeId: pairing.store_id };
+}
+
+export function demoGetStoreDeviceBySession(
+  deviceId: string,
+  token: string
+): StoreDevice | null {
+  const device = getDemoState().storeDevices.find((d) => d.id === deviceId);
+  if (!device || device.revoked_at) return null;
+  if (device.token_hash !== sha256Hex(token)) return null;
+  return device;
+}
+
+export function demoListStoreDevices(storeId: string): StoreDevice[] {
+  return getDemoState()
+    .storeDevices.filter((d) => d.store_id === storeId)
+    .sort((a, b) => new Date(b.paired_at).getTime() - new Date(a.paired_at).getTime());
+}
+
+export function demoRenameStoreDevice(
+  storeId: string,
+  deviceId: string,
+  name: string
+): StoreDevice | { error: string } {
+  const device = getDemoState().storeDevices.find(
+    (d) => d.id === deviceId && d.store_id === storeId
+  );
+  if (!device || device.revoked_at) return { error: "Device not found." };
+  device.device_name = name.trim().slice(0, 80) || device.device_name;
+  device.updated_at = now();
+  return device;
+}
+
+export function demoRevokeStoreDevice(
+  storeId: string,
+  deviceId: string
+): StoreDevice | { error: string } {
+  const device = getDemoState().storeDevices.find(
+    (d) => d.id === deviceId && d.store_id === storeId
+  );
+  if (!device) return { error: "Device not found." };
+  device.revoked_at = now();
+  device.updated_at = now();
+  return device;
+}
+
+export function demoTouchStoreDevice(deviceId: string): void {
+  const device = getDemoState().storeDevices.find((d) => d.id === deviceId);
+  if (!device || device.revoked_at) return;
+  device.last_seen_at = now();
+  device.updated_at = now();
 }
