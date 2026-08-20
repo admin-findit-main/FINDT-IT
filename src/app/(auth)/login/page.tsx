@@ -1,31 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { Card } from "@/components/ui/primitives";
-import { destinationAfterAuth } from "@/lib/auth/home-path";
-import { PhoneOtpForm } from "@/components/auth/phone-otp-form";
 import { CustomerEmailLoginForm } from "@/components/auth/customer-email-form";
 import { GlassNotice } from "@/components/ui/glass";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next");
   const error = params.get("error");
-  const [mode, setMode] = useState<"email" | "phone">("email");
-
-  function go(result: { homePath: string; needsName?: boolean }) {
-    router.push(
-      destinationAfterAuth({
-        homePath: result.homePath,
-        next,
-        needsName: result.needsName,
-      })
-    );
-    router.refresh();
-  }
 
   return (
     <Card className="p-6 sm:p-8">
@@ -42,28 +27,15 @@ function LoginForm() {
           </GlassNotice>
         </div>
       ) : null}
-      {mode === "email" ? (
-        <CustomerEmailLoginForm next={next} />
-      ) : (
-        <PhoneOtpForm createIfMissing={false} onFinished={go} />
-      )}
-      {mode === "email" ? (
-        <p className="mt-4 text-center text-sm text-ink-muted">
-          <Link
-            href="/forgot-password"
-            className="underline underline-offset-2 transition-colors hover:text-ink"
-          >
-            Forgot password?
-          </Link>
-        </p>
-      ) : null}
-      <button
-        type="button"
-        className="mt-4 w-full text-center text-sm font-medium text-ink-muted underline-offset-2 hover:text-ink hover:underline"
-        onClick={() => setMode(mode === "email" ? "phone" : "email")}
-      >
-        {mode === "email" ? "Use phone instead" : "Use email instead"}
-      </button>
+      <CustomerEmailLoginForm next={next} />
+      <p className="mt-4 text-center text-sm text-ink-muted">
+        <Link
+          href="/forgot-password"
+          className="underline underline-offset-2 transition-colors hover:text-ink"
+        >
+          Forgot password?
+        </Link>
+      </p>
       <div className="mt-6 border-t border-hairline-strong pt-5">
         <p className="text-center text-sm text-ink-muted">
           No account?{" "}

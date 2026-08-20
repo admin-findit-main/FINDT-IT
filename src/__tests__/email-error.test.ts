@@ -7,6 +7,11 @@ describe("authEmailErrorMessage", () => {
     expect(authEmailErrorMessage("over_email_send_rate_limit")).toMatch(/sign in with your password/i);
   });
 
+  it("explains mailer timeouts", () => {
+    expect(authEmailErrorMessage("context deadline exceeded")).toMatch(/timed out/i);
+    expect(authEmailErrorMessage("504")).toMatch(/timed out/i);
+  });
+
   it("passes through other auth errors", () => {
     expect(authEmailErrorMessage("User already registered")).toBe("User already registered");
   });

@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
 import { destinationAfterAuth, isSafeNextPath } from "@/lib/auth/home-path";
-import { PhoneOtpForm } from "@/components/auth/phone-otp-form";
 import { CustomerEmailSignupForm } from "@/components/auth/customer-email-form";
 import { signUpAction } from "@/lib/services/actions";
 
@@ -15,7 +14,6 @@ function SignupForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"email" | "phone">("email");
 
   useEffect(() => {
     if (params.get("type") === "business") {
@@ -107,29 +105,12 @@ function SignupForm() {
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
         Customer accounts only. Stores apply separately.
       </p>
-      {mode === "email" ? (
-        <CustomerEmailSignupForm
-          onFinished={({ homePath, needsName }) => {
-            router.push(destinationAfterAuth({ homePath, next, needsName }));
-            router.refresh();
-          }}
-        />
-      ) : (
-        <PhoneOtpForm
-          createIfMissing
-          onFinished={({ homePath, needsName }) => {
-            router.push(destinationAfterAuth({ homePath, next, needsName }));
-            router.refresh();
-          }}
-        />
-      )}
-      <button
-        type="button"
-        className="mt-4 w-full text-center text-sm font-medium text-ink-muted underline-offset-2 hover:text-ink hover:underline"
-        onClick={() => setMode(mode === "email" ? "phone" : "email")}
-      >
-        {mode === "email" ? "Use phone instead" : "Use email instead"}
-      </button>
+      <CustomerEmailSignupForm
+        onFinished={({ homePath, needsName }) => {
+          router.push(destinationAfterAuth({ homePath, next, needsName }));
+          router.refresh();
+        }}
+      />
       <div className="mt-6 border-t border-hairline-strong pt-5">
         <p className="text-center text-sm text-ink-muted">
           Already have an account?{" "}

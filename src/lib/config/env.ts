@@ -90,7 +90,16 @@ export function isPilotMode(): boolean {
 }
 
 export function appUrl(): string {
-  return getEnv().NEXT_PUBLIC_APP_URL || "http://localhost:3002";
+  const explicit = getEnv().NEXT_PUBLIC_APP_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+  const vercel =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  if (vercel) {
+    const host = vercel.replace(/^https?:\/\//, "");
+    return `https://${host}`;
+  }
+  if (process.env.NODE_ENV === "development") return "http://localhost:3002";
+  return "https://askfindit.com";
 }
 
 /** Dedicated Business/Hub/Admin hostnames. Empty until DNS is ready. */

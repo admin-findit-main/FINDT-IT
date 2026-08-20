@@ -1,6 +1,6 @@
 "use server";
 
-import { appUrl, isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
+import { isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
 import { coerceSoloAdminProfile, isSoloAdmin, isSoloAdminEmail } from "@/lib/auth/admin";
 import { authEmailErrorMessage } from "@/lib/auth/email-error";
 import { resolvePostAuthDestination, type AppHomePath } from "@/lib/auth/home-path";
@@ -435,6 +435,67 @@ export async function acceptStoreInviteAction(token: string) {
   return { ok: true as const };
 }
 
+function alreadyHasAccount(message: string): boolean {
+  const text = message.toLowerCase();
+  return (
+    text.includes("already registered") ||
+    text.includes("already been registered") ||
+    text.includes("user already exists") ||
+    text.includes("email address is already")
+  );
+}
+
+async function recoverExistingSignup(
+  admin: ReturnType<typeof import("@/lib/supabase/admin").createServiceClient>,
+  email: string,
+  password: string
+) {
+  const existing = await signInCreatedUser(email, password);
+  if (!("error" in existing) || !existing.error) return existing;
+
+  const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
+  const match = data?.users.find((user) => user.email?.toLowerCase() === email);
+  if (!match || match.email_confirmed_at) return null;
+
+  await admin.auth.admin.updateUserById(match.id, {
+    password,
+    email_confirm: true,
+  });
+  return signInCreatedUser(email, password);
+}
+
+async function signInCreatedUser(email: string, password: string) {
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return { error: error.message };
+  let profile = await getCurrentProfile();
+  if (!profile) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      for (let i = 0; i < 10; i++) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (data) {
+          profile = coerceSoloAdminProfile(data as Profile, email) as Profile;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+  }
+  const homePath = resolvePostAuthDestination({
+    profile,
+    authEmail: email,
+  }) as AppHomePath;
+  return { ok: true as const, homePath };
+}
+
 export async function signUpAction(input: {
   email: string;
   password: string;
@@ -448,9 +509,10 @@ export async function signUpAction(input: {
 }) {
   // Main product signup is customer-first; ignore business toggle from old clients
   const accountType = "customer";
+  const email = input.email.trim().toLowerCase();
   if (isDemoMode()) {
     try {
-      const result = demoSignupWithSession({ ...input, accountType });
+      const result = demoSignupWithSession({ ...input, email, accountType });
       await setDemoSessionCookie(result.sessionId);
       return { profile: result.profile };
     } catch (e) {
@@ -458,36 +520,40 @@ export async function signUpAction(input: {
     }
   }
   try {
-    const { createClient } = await import("@/lib/supabase/server");
-    const supabase = await createClient();
-    const { data, error } = await supabase.auth.signUp({
-      email: input.email,
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const admin = createServiceClient();
+    const { error } = await admin.auth.admin.createUser({
+      email,
       password: input.password,
-      options: {
-        emailRedirectTo: `${appUrl()}/auth/callback`,
-        data: {
-          first_name: input.firstName,
-          last_name: input.lastName || "",
-          display_name: input.firstName,
-          account_type: accountType,
-          default_city: input.city,
-          default_state: input.state || "VA",
-          default_postal_code: input.postalCode,
-        },
+      email_confirm: true,
+      user_metadata: {
+        first_name: input.firstName,
+        last_name: input.lastName || "",
+        display_name: input.firstName,
+        account_type: accountType,
+        default_city: input.city,
+        default_state: input.state || "VA",
+        default_postal_code: input.postalCode,
       },
     });
-    if (error) return { error: authEmailErrorMessage(error.message) };
-    if (!data.session) return { ok: true, needsEmailConfirm: true };
-    const profile = await getCurrentProfile();
-    const homePath = resolvePostAuthDestination({
-      profile,
-      authEmail: input.email,
-    }) as AppHomePath;
-    return { ok: true, homePath };
+    if (error) {
+      if (alreadyHasAccount(error.message)) {
+        const recovered = await recoverExistingSignup(admin, email, input.password);
+        if (recovered && !("error" in recovered && recovered.error)) return recovered;
+        return { error: "That email already has an account. Sign in instead." };
+      }
+      return { error: authEmailErrorMessage(error.message) };
+    }
+    return signInCreatedUser(email, input.password);
   } catch (e) {
+    const message = e instanceof Error ? e.message : "";
+    if (message.toLowerCase().includes("service role")) {
+      return {
+        error: "Account setup is missing a server key. Ask FINDIT to finish configuring signup.",
+      };
+    }
     return {
-      error:
-        e instanceof Error ? e.message : "Sign up failed. Try again in a moment.",
+      error: message || "Sign up failed. Try again in a moment.",
     };
   }
 }

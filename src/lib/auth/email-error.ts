@@ -8,5 +8,13 @@ export function authEmailErrorMessage(error: string | null | undefined): string 
   ) {
     return "Too many emails were just sent. Wait a few minutes, then request another link. You can still sign in with your password.";
   }
+  if (
+    text.includes("timeout") ||
+    text.includes("deadline") ||
+    text.includes("504") ||
+    text.includes("context deadline exceeded")
+  ) {
+    return "Email delivery timed out. Try signing in with your password, or create the account again in a minute.";
+  }
   return error?.trim() || "Could not send email. Try again in a moment.";
 }
