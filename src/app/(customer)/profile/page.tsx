@@ -1,18 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { GlassBadge, Overline } from "@/components/ui/glass";
 import { Card, Input, Label } from "@/components/ui/primitives";
-import { CUSTOMER_PLANS } from "@/lib/config/constants";
+import { IosSwitch } from "@/components/ui/ios-switch";
+import { PlaceFields } from "@/components/customer/place-fields";
 import {
   getCurrentProfile,
-  getCustomerPlanUsageAction,
-  getAppWorkspaceAction,
-  getUserStoresAction,
   signOutAction,
   updateProfileAction,
 } from "@/lib/services/actions";
@@ -21,132 +17,22 @@ import type { Profile } from "@/types/database";
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [hasStore, setHasStore] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [usage, setUsage] = useState<Awaited<
-    ReturnType<typeof getCustomerPlanUsageAction>
-  > | null>(null);
 
   useEffect(() => {
     getCurrentProfile().then(setProfile);
-    getUserStoresAction().then((stores) => setHasStore(stores.length > 0));
-    getAppWorkspaceAction().then((ws) => {
-      if (!ws) return;
-      setHasStore(ws.hasStore);
-      setIsAdmin(ws.isAdmin);
-    });
-    getCustomerPlanUsageAction().then(setUsage);
   }, []);
 
   if (!profile) {
     return <div className="px-5 pt-8 text-sm text-ink-muted">Loading profile…</div>;
   }
 
-  const currentPlan =
-    CUSTOMER_PLANS[profile.subscription_plan === "plus" ? "plus" : "free"];
-
   return (
-    <div className="px-5 pt-6 pb-10 md:px-8">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold tracking-tight text-ink">Profile</h1>
-        {hasStore || profile.account_type === "business" ? (
-          <GlassBadge>Also on a store team</GlassBadge>
-        ) : null}
-        {isAdmin ? <GlassBadge tone="ink">Admin</GlassBadge> : null}
-      </div>
-
-      <Card level="subtle" className="mt-4 space-y-3 p-5">
-        <p className="text-sm font-semibold text-ink">Shortcuts</p>
-        {hasStore || profile.account_type === "business" ? (
-          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-            <Link href="/store">Open store inbox</Link>
-          </Button>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-xs leading-relaxed text-ink-muted">
-              Own a business? Apply separately — floor staff join via an invite
-              from their owner.
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/join">Apply your business</Link>
-            </Button>
-          </div>
-        )}
-        {isAdmin ? (
-          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-            <Link href="/admin">Admin overview</Link>
-          </Button>
-        ) : null}
-      </Card>
-
-      <Card level="strong" sheen className="mt-6 space-y-4 p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <Overline>Your plan</Overline>
-            <h2 className="mt-1 text-xl font-bold text-ink">{currentPlan.name}</h2>
-            <p className="mt-1 text-sm text-ink-muted">{currentPlan.tagline}</p>
-            {usage && usage.limit != null && !usage.bypassed ? (
-              <p className="mt-2 text-sm text-ink-muted">
-                {usage.used} / {usage.limit} requests used this month
-              </p>
-            ) : usage?.bypassed ? (
-              <p className="mt-2 text-xs font-medium text-stock-ink">
-                Pilot: request limits are off for testing.
-              </p>
-            ) : (
-              <p className="mt-2 text-sm text-ink-muted">Unlimited requests</p>
-            )}
-          </div>
-          <p className="shrink-0 text-lg font-semibold tabular-nums text-ink">
-            {currentPlan.priceMonthly
-              ? `$${currentPlan.priceMonthly}/mo`
-              : "$0"}
-          </p>
-        </div>
-
-        <div className="grid gap-3 border-t border-hairline-strong pt-4 sm:grid-cols-2">
-          {Object.values(CUSTOMER_PLANS).map((plan) => {
-            const active = plan.id === currentPlan.id;
-            return (
-              <div
-                key={plan.id}
-                className={`rounded-glass-lg border p-4 ${
-                  active
-                    ? "border-accent-ring bg-accent-soft"
-                    : "border-hairline-strong bg-glass-1"
-                }`}
-              >
-                <p className="font-semibold text-ink">{plan.name}</p>
-                <p className="mt-1 text-sm text-ink-muted">
-                  {plan.priceMonthly ? `$${plan.priceMonthly}/month` : "Free"}
-                </p>
-                <ul className="mt-3 space-y-1 text-xs text-ink-muted">
-                  <li>
-                    {plan.monthlyRequests == null
-                      ? "Unlimited requests"
-                      : `${plan.monthlyRequests} requests / month`}
-                  </li>
-                  <li>Up to {plan.maxRadiusMiles} mile radius</li>
-                  {plan.savedSearches ? <li>Saved searches</li> : null}
-                  {plan.requestHistory ? <li>Request history</li> : null}
-                  {plan.futureAlerts ? <li>Future alerts</li> : null}
-                </ul>
-                {!active && plan.id === "plus" ? (
-                  <p className="mt-4 text-xs font-medium text-stock-ink">
-                    Included in the pilot — no upgrade needed yet.
-                  </p>
-                ) : null}
-                {active ? (
-                  <p className="mt-4 text-xs font-semibold text-accent-ink">
-                    Current plan
-                  </p>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-      </Card>
+    <div className="mx-auto max-w-xl px-5 py-8 pb-12 sm:px-8">
+      <h1 className="text-2xl font-bold tracking-tight text-ink">Profile</h1>
+      <p className="mt-2 text-sm text-ink-muted">
+        Your name, place, and alerts. Plans live on the Plan page.
+      </p>
 
       <Card className="mt-6 space-y-4 p-5">
         <div>
@@ -159,31 +45,35 @@ export default function ProfilePage() {
           />
         </div>
         <div>
-          <Label>Email</Label>
-          <Input value={profile.email} disabled />
+          <Label>{profile.email ? "Email" : "Phone"}</Label>
+          <Input
+            value={profile.email || profile.phone_e164 || ""}
+            disabled
+          />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label>Default city</Label>
-            <Input
-              value={profile.default_city || ""}
-              onChange={(e) =>
-                setProfile({ ...profile, default_city: e.target.value })
-              }
-            />
-          </div>
-          <div>
-            <Label>Default ZIP</Label>
-            <Input
-              value={profile.default_postal_code || ""}
-              onChange={(e) =>
-                setProfile({ ...profile, default_postal_code: e.target.value })
-              }
-            />
-          </div>
+        <div>
+          <Label>Place</Label>
+          <p className="mb-2 text-xs text-ink-subtle">
+            City, state, ZIP — the short form FINDIT uses to ask nearby stores.
+          </p>
+          <PlaceFields
+            value={{
+              city: profile.default_city || "",
+              state: profile.default_state || "VA",
+              postalCode: profile.default_postal_code || "",
+            }}
+            onChange={(place) =>
+              setProfile({
+                ...profile,
+                default_city: place.city,
+                default_state: place.state,
+                default_postal_code: place.postalCode,
+              })
+            }
+          />
         </div>
         <div className="space-y-3 border-t border-hairline-strong pt-4">
-          <p className="text-sm font-semibold text-ink">Notification preferences</p>
+          <p className="text-sm font-semibold text-ink">Alerts</p>
           {(
             [
               ["notify_in_stock", "In Stock replies"],
@@ -191,20 +81,23 @@ export default function ProfilePage() {
               ["notify_request_expired", "Request expiration"],
             ] as const
           ).map(([key, label]) => (
-            <label
+            <button
               key={key}
-              className="flex items-center justify-between rounded-glass-md bg-glass-1 px-3 py-2.5 text-sm text-ink"
+              type="button"
+              role="switch"
+              aria-checked={Boolean(profile[key])}
+              onClick={() =>
+                setProfile({ ...profile, [key]: !profile[key] })
+              }
+              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-2 text-left text-sm text-ink"
             >
               <span>{label}</span>
-              <input
-                type="checkbox"
+              <IosSwitch
+                decorative
+                label={label}
                 checked={Boolean(profile[key])}
-                onChange={(e) =>
-                  setProfile({ ...profile, [key]: e.target.checked })
-                }
-                className="h-4 w-4 accent-[var(--accent)]"
               />
-            </label>
+            </button>
           ))}
         </div>
         <Button
