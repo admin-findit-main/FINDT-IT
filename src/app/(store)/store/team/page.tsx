@@ -9,8 +9,9 @@ import { BackLink } from "@/components/shared/app-header";
 import {
   getUserStoresAction,
   inviteEmployeeAction,
+  setMemberStatusAction,
 } from "@/lib/services/actions";
-import { getStoreTeamAction } from "@/lib/services/team";
+import { getStoreInvitesAction, getStoreTeamAction } from "@/lib/services/team";
 import type { Store } from "@/types/database";
 
 type MemberRow = {
@@ -21,16 +22,30 @@ type MemberRow = {
   name: string | null;
 };
 
+type InviteRow = {
+  id: string;
+  email: string;
+  role: string;
+  name: string | null;
+  expires_at: string;
+};
+
 export default function TeamPage() {
   const [store, setStore] = useState<(Store & { role: string }) | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
+  const [invites, setInvites] = useState<InviteRow[]>([]);
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"manager" | "employee">("employee");
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
 
   async function refresh(storeId: string) {
-    const rows = await getStoreTeamAction(storeId);
+    const [rows, pending] = await Promise.all([
+      getStoreTeamAction(storeId),
+      getStoreInvitesAction(storeId),
+    ]);
     setMembers(rows as MemberRow[]);
+    setInvites(pending as InviteRow[]);
   }
 
   useEffect(() => {
@@ -58,11 +73,19 @@ export default function TeamPage() {
       <BackLink href="/store" label="Store home" className="mb-2" />
       <h1 className="text-2xl font-bold tracking-tight text-ink">Team</h1>
       <p className="mt-1 text-sm text-ink-muted">
-        Invite staff by email. They open the invite link, create an account with
-        that email, and land in the store app — not the customer app.
+        Invite staff by name and email. They open the invite link, create an account
+        with that email, and join this store automatically — they never pick a store.
       </p>
 
       <Card sheen className="mt-6 space-y-4 p-5 sm:p-6">
+        <div>
+          <Label>Name</Label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Alex Rivera"
+          />
+        </div>
         <div>
           <Label>Email</Label>
           <Input
@@ -91,7 +114,7 @@ export default function TeamPage() {
           className="w-full"
           onClick={async () => {
             if (!store) return;
-            const result = await inviteEmployeeAction(store.id, email, role);
+            const result = await inviteEmployeeAction(store.id, email, role, name);
             if (result.error) toast.error(result.error);
             else {
               const token = "token" in result ? result.token : null;
@@ -100,6 +123,7 @@ export default function TeamPage() {
               }
               toast.success("Invite created — copy the link below");
               setEmail("");
+              setName("");
               await refresh(store.id);
             }
           }}
@@ -142,10 +166,45 @@ export default function TeamPage() {
               <GlassBadge className="shrink-0 text-[11px] capitalize">
                 {m.role} · {m.status}
               </GlassBadge>
+              {m.role !== "owner" ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    if (!store) return;
+                    const next = m.status === "active" ? "disabled" : "active";
+                    const result = await setMemberStatusAction(store.id, m.id, next);
+                    if (result.error) toast.error(result.error);
+                    else {
+                      toast.success(next === "disabled" ? "Deactivated" : "Reactivated");
+                      await refresh(store.id);
+                    }
+                  }}
+                >
+                  {m.status === "active" ? "Remove access" : "Restore access"}
+                </Button>
+              ) : null}
             </Card>
           ))
         )}
       </div>
+
+      {invites.length ? (
+        <div className="mt-8 space-y-3">
+          <h2 className="font-semibold text-ink">Pending invites</h2>
+          {invites.map((invite) => (
+            <Card key={invite.id} className="flex items-center justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="font-medium text-ink">{invite.name || invite.email}</p>
+                <p className="truncate text-xs text-ink-muted">
+                  {invite.email} · {invite.role}
+                </p>
+              </div>
+              <GlassBadge className="shrink-0 text-[11px]">Invited</GlassBadge>
+            </Card>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -7,21 +7,29 @@ import {
   StatusPill,
   StatusRail,
 } from "@/components/ui/glass";
-import { APP_NAME } from "@/lib/config/constants";
+import { APP_NAME, STORE_TRIAL_DAYS } from "@/lib/config/constants";
+import { iosAppStoreUrl, playStoreUrl } from "@/lib/config/env";
+import { BrandHomeLink } from "@/components/brand/logo";
 
 export default function LandingPage() {
+  const ios = iosAppStoreUrl();
+  const play = playStoreUrl();
+  const hasStoreListing = Boolean(ios || play);
+
   return (
     <div className="app-canvas min-h-screen">
       <header className="absolute inset-x-0 top-0 z-20">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-2xl font-bold tracking-tight text-ink-inverse"
-          >
-            {APP_NAME}
-            <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />
-          </Link>
+          <BrandHomeLink href="/" tone="dark" />
           <div className="flex items-center gap-2">
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="hidden text-ink-inverse/80 hover:bg-white/10 hover:text-ink-inverse sm:inline-flex"
+            >
+              <Link href="/login/business">Business</Link>
+            </Button>
             <Button
               asChild
               variant="ghost"
@@ -30,9 +38,17 @@ export default function LandingPage() {
             >
               <Link href="/login">Log in</Link>
             </Button>
-            <Button asChild size="sm">
-              <Link href="/signup">Sign up</Link>
-            </Button>
+            {ios ? (
+              <Button asChild size="sm">
+                <a href={ios} rel="noreferrer">
+                  Get the app
+                </a>
+              </Button>
+            ) : (
+              <Button asChild size="sm">
+                <Link href="/signup">Web preview</Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -50,12 +66,33 @@ export default function LandingPage() {
               </p>
               <p className="mt-5 max-w-md text-base leading-relaxed text-ink-inverse/70">
                 Who has it? {APP_NAME}. Not delivery. Not shipping. Just which
-                local store actually has the product you want.
+                local store actually has the product you want. The FINDIT app is
+                how customers ask — this site is for stores and a web preview.
               </p>
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <Button asChild size="xl">
-                  <Link href="/signup">Sign up to ask</Link>
-                </Button>
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                {ios ? (
+                  <Button asChild size="xl">
+                    <a href={ios} rel="noreferrer">
+                      Download FINDIT
+                    </a>
+                  </Button>
+                ) : (
+                  <Button asChild size="xl">
+                    <Link href="/signup">Get FINDIT — coming soon on iPhone</Link>
+                  </Button>
+                )}
+                {play ? (
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="xl"
+                    className="border-white/25 bg-white/10 text-ink-inverse hover:bg-white/20"
+                  >
+                    <a href={play} rel="noreferrer">
+                      Get it on Google Play
+                    </a>
+                  </Button>
+                ) : null}
                 <Button
                   asChild
                   variant="outline"
@@ -65,13 +102,29 @@ export default function LandingPage() {
                   <Link href="/join">Apply as a store</Link>
                 </Button>
               </div>
+              {!hasStoreListing ? (
+                <p className="mt-4 text-sm text-ink-inverse/60">
+                  App Store listing is not live yet. You can{" "}
+                  <Link href="/signup" className="underline underline-offset-2">
+                    preview FINDIT on the web
+                  </Link>{" "}
+                  until the app ships.
+                </p>
+              ) : (
+                <p className="mt-4 text-sm text-ink-inverse/60">
+                  Prefer a browser?{" "}
+                  <Link href="/signup" className="underline underline-offset-2">
+                    Web preview
+                  </Link>{" "}
+                  stays available for QA.
+                </p>
+              )}
             </div>
 
             <div className="relative">
               <GlassCard
                 level="strong"
-                sheen
-                className="rounded-glass-2xl p-6 shadow-glass-lg"
+                className="rounded-glass-2xl p-6"
               >
                 <Overline>What are you looking for?</Overline>
                 <div className="mt-3 rounded-glass-lg border border-hairline-strong bg-glass-1 px-4 py-4 text-lg text-ink">
@@ -82,7 +135,7 @@ export default function LandingPage() {
                     <StatusRail tone="stock" />
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-semibold text-ink">ABC Market</p>
-                      <StatusPill tone="stock">IN STOCK</StatusPill>
+                      <StatusPill tone="stock">In stock</StatusPill>
                     </div>
                     <p className="mt-1 text-sm text-ink-muted">
                       $12.99 · Falls Church
@@ -92,7 +145,7 @@ export default function LandingPage() {
                     <StatusRail tone="order" />
                     <div className="flex items-center justify-between gap-3">
                       <p className="font-semibold text-ink">Local Market</p>
-                      <StatusPill tone="order">CAN ORDER</StatusPill>
+                      <StatusPill tone="order">Can order</StatusPill>
                     </div>
                     <p className="mt-1 text-sm text-ink-muted">
                       Available tomorrow
@@ -173,7 +226,6 @@ export default function LandingPage() {
         <section className="mx-auto max-w-6xl px-6 py-8 md:py-12">
           <GlassCard
             level="strong"
-            sheen
             className="rounded-glass-2xl px-6 py-12 md:px-10 md:py-16"
           >
             <div className="grid gap-10 md:grid-cols-2 md:items-center">
@@ -183,8 +235,8 @@ export default function LandingPage() {
                 </h2>
                 <p className="mt-4 max-w-md leading-relaxed text-ink-muted">
                   Approved stores answer nearby product asks and see demand —
-                  including products you don&apos;t currently carry. Apply for a
-                  60-day free trial.
+                  including products you don&apos;t currently carry. Apply for a{" "}
+                  {STORE_TRIAL_DAYS}-day free trial.
                 </p>
                 <Button asChild size="lg" className="mt-8">
                   <Link href="/join">Apply as a store</Link>

@@ -22,27 +22,33 @@ export default function RequestsPage() {
   }, [tab]);
 
   return (
-    <div className="px-5 pt-6">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">Your Requests</h1>
-      <div className="glass-subtle mt-5 grid grid-cols-3 gap-1 rounded-glass-lg p-1">
-        {(["active", "past", "saved"] as const).map((t) => (
+    <div className="mx-auto max-w-xl px-5 py-8 sm:px-8">
+      <h1 className="text-2xl font-bold tracking-tight text-ink">Requests</h1>
+      <div className="mt-5 grid grid-cols-3 gap-1 rounded-xl bg-[var(--solid-3)] p-1">
+        {(
+          [
+            ["active", "Active"],
+            ["past", "Completed"],
+            ["saved", "Saved"],
+          ] as const
+        ).map(([t, label]) => (
           <button
             key={t}
             type="button"
             aria-pressed={tab === t}
             onClick={() => setTab(t)}
-            className={`glass-press rounded-glass-md py-2 text-sm font-semibold capitalize transition-colors ${
+            className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
               tab === t
-                ? "bg-glass-3 text-ink shadow-glass"
+                ? "bg-white text-ink shadow-sm"
                 : "text-ink-muted hover:text-ink"
             }`}
           >
-            {t}
+            {label}
           </button>
         ))}
       </div>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6">
         {loading ? (
           <>
             <Skeleton className="h-28 w-full" />
@@ -52,40 +58,43 @@ export default function RequestsPage() {
           <EmptyState
             title={
               tab === "saved"
-                ? "No saved requests"
+                ? "Nothing saved yet."
                 : tab === "past"
-                  ? "No past requests"
-                  : "No active requests"
+                  ? "Nothing completed yet."
+                  : "No Finds yet."
             }
             description={
               tab === "saved"
                 ? "Open a request and save it to find it here later."
                 : tab === "past"
-                  ? "Fulfilled and expired asks show up here."
-                  : "When you ask nearby stores for a product, it shows up here."
+                  ? "Finished and expired Finds show up here."
+                  : "Ask nearby stores from Find."
             }
           />
         ) : (
-          items.map((item) => (
-            <Link key={item.id} href={`/requests/${item.id}`} className="block">
-              <Card interactive className="p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="font-semibold text-ink">{item.product_name}</h2>
-                    <p className="mt-1 text-sm text-ink-muted">
-                      {item.city} · {formatRelativeTime(item.created_at)}
-                    </p>
-                  </div>
-                  <GlassBadge className="shrink-0 capitalize">
-                    {item.status.replace("_", " ")}
-                  </GlassBadge>
-                </div>
-                <p className="mt-3 text-sm text-ink-muted">
-                  Sent to {item.stores_targeted} stores
-                </p>
-              </Card>
-            </Link>
-          ))
+          <Card padded={false} className="overflow-hidden">
+            {items.map((item, i) => (
+              <Link
+                key={item.id}
+                href={`/requests/${item.id}`}
+                className={`flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-black/[0.03] ${
+                  i < items.length - 1 ? "border-b border-hairline-strong" : ""
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold text-ink">
+                    {item.product_name}
+                  </span>
+                  <span className="mt-0.5 block truncate text-sm capitalize text-ink-muted">
+                    {item.status.replaceAll("_", " ")} · {formatRelativeTime(item.created_at)}
+                  </span>
+                </span>
+                <GlassBadge className="shrink-0 capitalize">
+                  {item.stores_targeted} asked
+                </GlassBadge>
+              </Link>
+            ))}
+          </Card>
         )}
       </div>
     </div>

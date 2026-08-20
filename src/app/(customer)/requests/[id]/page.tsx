@@ -100,7 +100,7 @@ export default function RequestDetailPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4 px-5 pt-4">
+      <div className="mx-auto max-w-xl space-y-4 px-5 py-8 sm:px-8">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-28 w-full" />
@@ -110,7 +110,7 @@ export default function RequestDetailPage() {
 
   if (!data) {
     return (
-      <div className="px-5 pt-4">
+      <div className="mx-auto max-w-xl px-5 py-8 sm:px-8">
         <BackLink href="/requests" label="Back to requests" />
         <div className="mt-4">
           <EmptyState
@@ -131,7 +131,7 @@ export default function RequestDetailPage() {
   }
 
   return (
-    <div className="px-5 pt-4 pb-10">
+    <div className="mx-auto max-w-xl px-5 py-6 pb-12 sm:px-8">
       <div className="mb-2">
         <BackLink href="/requests" label="Back to requests" />
       </div>
@@ -146,7 +146,7 @@ export default function RequestDetailPage() {
                 ? "Stores responded"
                 : "Searching nearby stores…"}
       </p>
-      <Card level="strong" sheen className="mt-4 overflow-hidden p-5 sm:p-6">
+      <Card className="mt-4 overflow-hidden p-5 sm:p-6">
         {data.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -220,11 +220,19 @@ export default function RequestDetailPage() {
         {responses.length === 0 ? (
           <div className="mt-4">
             <EmptyState
-              title={stillLooking ? "Waiting for responses…" : "No stores have responded yet."}
+              title={
+                storesContacted === 0
+                  ? "No participating stores nearby yet."
+                  : stillLooking
+                    ? "Waiting for responses…"
+                    : "No replies yet."
+              }
               description={
-                stillLooking
-                  ? `FINDIT sent your request to ${storesContacted} nearby stores.`
-                  : "We'll show replies here as soon as stores answer."
+                storesContacted === 0
+                  ? "We saved this ask. Try another ZIP, or check back as more stores join."
+                  : stillLooking
+                    ? `Sent to ${storesContacted} nearby store${storesContacted === 1 ? "" : "s"}.`
+                    : "Replies show up here as stores answer."
               }
             />
           </div>
@@ -300,7 +308,7 @@ export default function RequestDetailPage() {
                             trackDirectionsClickAction(data.id, store.id)
                           }
                         >
-                          Get Directions
+                          Directions
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       </Button>
@@ -427,7 +435,7 @@ export default function RequestDetailPage() {
             className="flex-1 text-accent-ink hover:text-accent"
             onClick={async () => {
               await cancelRequestAction(data.id);
-              toast.success("Request cancelled");
+              toast.success("Cancelled. This still counts as one of your Finds this month.");
               load();
             }}
           >

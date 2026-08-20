@@ -1,86 +1,181 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Camera, MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Camera, ChevronLeft, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input, Label, Textarea } from "@/components/ui/primitives";
+import { Input, Textarea } from "@/components/ui/primitives";
+import { GlassChip, GlassNotice } from "@/components/ui/glass";
+import { PlusUpgradeCard } from "@/components/customer/plus-upgrade";
+import { PlaceFields } from "@/components/customer/place-fields";
 import {
-  GlassBadge,
-  GlassChip,
-  GlassNotice,
-  Overline,
-} from "@/components/ui/glass";
-import { BottomSheet } from "@/components/ui/dialog";
-import {
+  AGE_RESTRICTED_FIND_HINT,
+  AGE_RESTRICTED_ID_BODY,
+  AGE_RESTRICTED_ID_CONFIRM,
+  AGE_RESTRICTED_ID_TITLE,
   CUSTOMER_PLANS,
-  EXPIRATION_OPTIONS,
   PRODUCT_CATEGORIES,
-  RADIUS_OPTIONS,
+  findPlaceholderForCategory,
+  getConsumerEntitlements,
+  isAgeRestrictedFind,
+  planLimitReachedMessage,
+  radiusLimitMessage,
+  radiusOptionsForPlan,
 } from "@/lib/config/constants";
 import {
   createCustomerRequestAction,
   getCurrentProfile,
   getCustomerPlanUsageAction,
-  isPilotModeAction,
+  updateProfileAction,
 } from "@/lib/services/actions";
 import {
   compressImageFile,
   uploadRequestImage,
   validateImageFile,
 } from "@/lib/services/storage";
+import { cn } from "@/lib/utils";
 import type { Profile } from "@/types/database";
+import {
+  formatShortPlace,
+  isCompleteShortPlace,
+  lookupUsZip,
+  reverseGeocodeUs,
+  shortPlaceFromProfile,
+  type ShortPlace,
+} from "@findit/domain";
+
+type Step = "query" | "id" | "radius";
 
 export default function CustomerHomePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<Step>("query");
   const [loading, setLoading] = useState(false);
-  const [pilot, setPilot] = useState(false);
   const [usageLabel, setUsageLabel] = useState<string | null>(null);
+  const [upgrade, setUpgrade] = useState<{ used: number; limit: number } | null>(
+    null
+  );
   const [locating, setLocating] = useState(false);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
+  const [editPlace, setEditPlace] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [idFrom, setIdFrom] = useState<Step>("query");
+  const [uploading, setUploading] = useState(false);
 
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
-  const [city, setCity] = useState("Falls Church");
-  const [postalCode, setPostalCode] = useState("22044");
+  const [idConfirmed, setIdConfirmed] = useState(false);
+  const [place, setPlace] = useState<ShortPlace>({
+    city: "",
+    state: "VA",
+    postalCode: "",
+  });
   const [radiusMiles, setRadiusMiles] = useState(10);
-  const [expirationHours, setExpirationHours] = useState(24);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageStoragePath, setImageStoragePath] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const autoLocated = useRef(false);
 
   useEffect(() => {
     getCurrentProfile().then((p) => {
       setProfile(p);
-      if (p?.default_city) setCity(p.default_city);
-      if (p?.default_postal_code) setPostalCode(p.default_postal_code);
+      setPlace(shortPlaceFromProfile(p));
     });
-    isPilotModeAction().then(setPilot);
     getCustomerPlanUsageAction().then((u) => {
-      if (!u || u.bypassed || u.limit == null) return;
-      setUsageLabel(`${u.remaining} of ${u.limit} free requests left this month`);
+      if (!u || u.bypassed) return;
+      const word = u.entitlements.planId === "plus" ? "FINDIT+ Finds" : "free Finds";
+      setUsageLabel(`${u.remaining} of ${u.limit} ${word} left this month`);
+      if (u.remaining === 0) {
+        setUpgrade({ used: u.used, limit: u.limit });
+        setStep("query");
+      }
     });
   }, []);
 
-  function startRequest(name?: string) {
-    const value = (name ?? query).trim();
-    if (!value) {
-      toast.error("Tell us what you're looking for");
+  const entitlements = getConsumerEntitlements(profile?.subscription_plan);
+  const radiusChoices = radiusOptionsForPlan(entitlements.maxSearchRadiusMiles);
+  const plus = CUSTOMER_PLANS.plus;
+  const placeLabel = formatShortPlace(place) || "Add city, state & ZIP";
+  const restricted = isAgeRestrictedFind({
+    category,
+    productName,
+    description,
+  });
+
+  function goNextFromQuery() {
+    if (upgrade) {
+      toast.error(planLimitReachedMessage(entitlements));
+      return;
+    }
+    const value = productName.trim();
+    if (!value && !imagePreview) {
+      toast.error("Type a product name or add a photo");
       return;
     }
     if (!profile) {
       router.push(`/login?next=/home`);
       return;
     }
-    setProductName(value);
     setDuplicateId(null);
-    setOpen(true);
+    setEditPlace(!place.postalCode.trim() || !place.city.trim() || !place.state.trim());
+    if (restricted && !idConfirmed) {
+      setIdFrom("query");
+      setStep("id");
+      return;
+    }
+    if (restricted) setShowDetails(true);
+    setStep("radius");
+  }
+
+  useEffect(() => {
+    if (step !== "radius" || autoLocated.current) return;
+    if (isCompleteShortPlace(place)) return;
+    autoLocated.current = true;
+    void fillFromLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot when the radius step opens
+  }, [step]);
+
+  function useMyLocation() {
+    void fillFromLocation();
+  }
+
+  async function fillFromLocation() {
+    if (!navigator.geolocation) {
+      toast.error("Location isn’t available on this device. Enter a ZIP instead.");
+      setEditPlace(true);
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setCoords({ lat, lng });
+        const found = await reverseGeocodeUs(lat, lng);
+        setLocating(false);
+        if (found && (found.postalCode || found.city)) {
+          setPlace(found);
+          setEditPlace(!isCompleteShortPlace(found));
+          toast.success(
+            found.postalCode
+              ? `Using ${found.city ? `${found.city}, ` : ""}${found.state} ${found.postalCode}`
+              : "Location added — confirm your ZIP below"
+          );
+          return;
+        }
+        setEditPlace(true);
+        toast.message("Confirm or enter your ZIP so we can ask nearby stores.");
+      },
+      () => {
+        setLocating(false);
+        toast.error("Couldn’t get location. Enter a ZIP code instead.");
+        setEditPlace(true);
+      },
+      { enableHighAccuracy: false, timeout: 10000 }
+    );
   }
 
   async function onImageChange(file: File | null) {
@@ -97,6 +192,7 @@ export default function CustomerHomePage() {
     const compressed = await compressImageFile(file);
     const previewUrl = URL.createObjectURL(compressed);
     setImagePreview(previewUrl);
+    setUploading(true);
 
     const uploaded = await uploadRequestImage({
       userId: profile.id,
@@ -104,6 +200,7 @@ export default function CustomerHomePage() {
       contentType: file.type === "image/png" ? "image/png" : "image/jpeg",
       fileNameHint: file.name,
     });
+    setUploading(false);
     if ("error" in uploaded) {
       setImagePreview(null);
       setImageUrl(null);
@@ -119,42 +216,47 @@ export default function CustomerHomePage() {
     setImageStoragePath(uploaded.path);
   }
 
-  function useMyLocation() {
-    if (!navigator.geolocation) {
-      toast.error("Location isn’t available on this device. Enter a ZIP instead.");
+  async function submitRequest(forceDuplicate = false) {
+    if (upgrade) {
+      setStep("query");
+      toast.error(planLimitReachedMessage(entitlements));
       return;
     }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocating(false);
-        toast.success("Location added — confirm or edit your ZIP below");
-      },
-      () => {
-        setLocating(false);
-        toast.error("Couldn’t get location. Enter a ZIP code instead.");
-      },
-      { enableHighAccuracy: false, timeout: 10000 }
-    );
-  }
-
-  async function submitRequest(forceDuplicate = false) {
+    if (restricted && !idConfirmed) {
+      setIdFrom("radius");
+      setStep("id");
+      return;
+    }
     setLoading(true);
+    let nextPlace = place;
+    if (!nextPlace.city.trim() && nextPlace.postalCode.trim()) {
+      const found = await lookupUsZip(nextPlace.postalCode);
+      if (found) {
+        nextPlace = found;
+        setPlace(found);
+      }
+    }
+    if (!isCompleteShortPlace(nextPlace)) {
+      setLoading(false);
+      setEditPlace(true);
+      toast.error("Add your city, state, and ZIP so we can ask nearby stores.");
+      return;
+    }
     const result = await createCustomerRequestAction({
-      productName,
+      productName: productName.trim() || "Item in photo",
       description,
-      category: category || undefined,
-      city,
-      state: "VA",
-      postalCode,
+      category,
+      city: nextPlace.city,
+      state: nextPlace.state || "VA",
+      postalCode: nextPlace.postalCode,
       radiusMiles,
-      expirationHours,
+      expirationHours: 24,
       imageUrl,
       imageStoragePath,
       forceDuplicate,
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
+      ageRestrictedConfirmed: !restricted || idConfirmed,
     });
     setLoading(false);
     if (result.duplicateOf && !forceDuplicate) {
@@ -167,256 +269,370 @@ export default function CustomerHomePage() {
         router.push("/login?next=/home");
         return;
       }
+      if ("code" in result && result.code === "plan_limit") {
+        setStep("query");
+        setUpgrade({
+          used: entitlements.monthlyRequestLimit,
+          limit: entitlements.monthlyRequestLimit,
+        });
+        getCustomerPlanUsageAction().then((u) => {
+          if (u && !u.bypassed) setUpgrade({ used: u.used, limit: u.limit });
+        });
+        toast.error(result.error);
+        return;
+      }
       toast.error(result.error);
       return;
     }
-    setOpen(false);
     router.push(`/requests/${result.request!.id}`);
+    if (profile) {
+      void updateProfileAction({
+        firstName: profile.first_name || "",
+        lastName: profile.last_name || "",
+        city: nextPlace.city,
+        state: nextPlace.state || "VA",
+        postalCode: nextPlace.postalCode,
+        notifyInStock: profile.notify_in_stock,
+        notifyCanOrder: profile.notify_can_order,
+        notifyRequestExpired: profile.notify_request_expired,
+      });
+    }
   }
 
-  const plan = CUSTOMER_PLANS[profile?.subscription_plan === "plus" ? "plus" : "free"];
-  const radiusChoices = RADIUS_OPTIONS.filter(
-    (r) => r.miles <= plan.maxRadiusMiles || profile?.subscription_plan === "plus"
-  );
-
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem-5rem)] flex-col px-5 pt-6 md:min-h-[calc(100vh-3.5rem)] md:px-8 md:pt-10 lg:px-10">
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center md:max-w-3xl">
-        {pilot ? (
-          <GlassBadge tone="accent" className="mb-4 self-start">
-            Beta
-          </GlassBadge>
-        ) : null}
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col px-5 py-8 sm:px-8 md:py-12">
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col">
+        {step === "query" ? (
+          <div className="flex flex-1 flex-col justify-center pb-16">
+            <p className="text-[12px] font-semibold tracking-[0.14em] text-ink-muted">
+              FINDIT
+            </p>
+            <h1 className="mt-3 text-[2.15rem] font-bold leading-[1.12] tracking-tight text-ink sm:text-5xl">
+              What are you looking for?
+            </h1>
+            <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted sm:text-lg">
+              Ask nearby stores at once. They tell you if they have it.
+            </p>
 
-        <h1 className="text-3xl font-bold tracking-tight text-ink md:text-5xl lg:text-6xl">
-          What are you looking for?
-        </h1>
-        <p className="mt-3 max-w-xl text-base text-ink-muted md:text-lg">
-          Ask nearby stores at once. Who has it? FINDIT.
-        </p>
-
-        <div className="mt-8 space-y-4 md:mt-10">
-          <Input
-            className="h-14 rounded-glass-xl text-base shadow-glass md:h-16 md:text-lg"
-            placeholder="Search or describe…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") startRequest();
-            }}
-          />
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <label className="sm:w-44">
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => onImageChange(e.target.files?.[0] || null)}
-              />
-              <span className="glass glass-press inline-flex h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-glass-xl text-sm font-semibold text-ink md:h-16">
-                <Camera className="h-4 w-4" aria-hidden />
-                Add Photo
-              </span>
-            </label>
-            <button
-              type="button"
-              className="glass-subtle glass-press flex flex-1 items-center gap-3 rounded-glass-xl px-4 py-3 text-left sm:px-5"
-              onClick={() => {
-                if (!productName.trim() && !query.trim()) {
-                  toast.message("Enter a product first", {
-                    description: "Then you can set where to search.",
-                  });
-                  return;
-                }
-                startRequest(productName.trim() || query.trim());
+            <form
+              className="mt-10 space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                goNextFromQuery();
               }}
             >
-              <MapPin className="h-5 w-5 shrink-0 text-accent" aria-hidden />
-              <div className="min-w-0">
-                <Overline>Searching near</Overline>
-                <p className="truncate font-semibold text-ink">{city}, VA</p>
-              </div>
-            </button>
-          </div>
-
-          {imagePreview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imagePreview}
-              alt="Product preview"
-              className="h-28 w-full rounded-glass-xl border border-hairline-strong object-cover md:h-36"
-            />
-          ) : null}
-
-          <Button
-            className="w-full"
-            size="xl"
-            onClick={() => startRequest()}
-          >
-            FIND IT
-          </Button>
-
-          {usageLabel ? (
-            <p className="text-center text-xs text-ink-muted">{usageLabel}</p>
-          ) : null}
-        </div>
-      </div>
-
-      <BottomSheet
-        open={open}
-        onOpenChange={setOpen}
-        title="Ask nearby stores"
-        description="Stores will see what you're looking for, but your personal contact information stays private."
-      >
-        <div className="space-y-4 pb-6">
-          <div>
-            <Label htmlFor="productName">Product name</Label>
-            <Input
-              id="productName"
-              value={productName}
-              onChange={(e) => setProductName(e.target.value)}
-              placeholder="Cherry Coke Zero 12 Pack"
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="description">Product description (optional)</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Looking specifically for the 12-pack cans."
-            />
-          </div>
-          {imagePreview ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imagePreview}
-              alt="Product preview"
-              className="h-32 w-full rounded-glass-lg border border-hairline-strong object-cover"
-            />
-          ) : (
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-glass-lg border border-dashed border-hairline-strong bg-glass-1 py-8 text-sm text-ink-muted transition-colors hover:bg-glass-2 hover:text-ink">
-              <Camera className="h-4 w-4" aria-hidden />
-              Take photo or upload
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => onImageChange(e.target.files?.[0] || null)}
-              />
-            </label>
-          )}
-          <div>
-            <Label>Category (optional)</Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {PRODUCT_CATEGORIES.map((c) => (
-                <GlassChip
-                  key={c}
-                  selected={category === c}
-                  onClick={() => setCategory(category === c ? "" : c)}
-                >
-                  {c}
-                </GlassChip>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
-            </div>
-            <div>
-              <Label htmlFor="zip">ZIP code</Label>
               <Input
-                id="zip"
-                value={postalCode}
-                onChange={(e) => setPostalCode(e.target.value)}
+                autoFocus={!upgrade}
+                disabled={Boolean(upgrade)}
+                className="h-16 rounded-2xl border-hairline-strong bg-white px-5 text-lg shadow-[0_4px_16px_rgba(0,0,0,0.04)]"
+                placeholder={findPlaceholderForCategory(null)}
+                value={productName}
+                onChange={(e) => {
+                  setProductName(e.target.value);
+                  setIdConfirmed(false);
+                }}
               />
-            </div>
+              <label className="flex min-h-[140px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-hairline-strong bg-white text-center">
+                {imagePreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imagePreview}
+                    alt="Product preview"
+                    className="h-44 w-full object-cover"
+                  />
+                ) : (
+                  <span className="px-5 py-8">
+                    <Camera className="mx-auto h-5 w-5 text-ink-muted" />
+                    <span className="mt-2 block text-sm font-semibold text-ink">
+                      Add a photo
+                    </span>
+                    <span className="mt-1 block text-xs text-ink-muted">
+                      Optional — or just type the name above
+                    </span>
+                  </span>
+                )}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  className="hidden"
+                  disabled={Boolean(upgrade)}
+                  onChange={(e) => onImageChange(e.target.files?.[0] || null)}
+                />
+              </label>
+              {imagePreview ? (
+                <button
+                  type="button"
+                  className="text-sm font-medium text-ink-muted hover:text-ink"
+                  onClick={() => {
+                    setImagePreview(null);
+                    setImageUrl(null);
+                    setImageStoragePath(null);
+                  }}
+                >
+                  Remove photo
+                </button>
+              ) : null}
+              {upgrade ? (
+                <PlusUpgradeCard used={upgrade.used} limit={upgrade.limit} />
+              ) : null}
+              {upgrade ? null : (
+                <Button
+                  className="w-full"
+                  size="xl"
+                  type="submit"
+                  disabled={uploading || (!productName.trim() && !imagePreview)}
+                >
+                  {uploading ? "Uploading photo…" : "Continue"}
+                </Button>
+              )}
+              {usageLabel ? (
+                <p className="text-center text-xs text-ink-muted">{usageLabel}</p>
+              ) : null}
+            </form>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            disabled={locating}
-            onClick={useMyLocation}
-          >
-            {locating ? "Getting location…" : "Use my location"}
-          </Button>
-          {coords ? (
-            <p className="text-xs text-ink-muted">
-              Location attached. ZIP stays the primary search area.
+        ) : step === "id" ? (
+          <div className="flex flex-1 flex-col justify-center pb-16">
+            <button
+              type="button"
+              onClick={() => setStep(idFrom)}
+              className="mb-6 inline-flex min-h-11 items-center gap-1 self-start text-sm font-semibold text-ink-muted hover:text-ink"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </button>
+            <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-ink">
+              {AGE_RESTRICTED_ID_TITLE}
+            </h1>
+            <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted">
+              {AGE_RESTRICTED_ID_BODY}
             </p>
-          ) : null}
-          {duplicateId ? (
-            <GlassNotice tone="order">
-              <p className="font-semibold">
-                You already have an active request for this.
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-ink">
+              {AGE_RESTRICTED_FIND_HINT}
+            </p>
+            <Button
+              className="mt-8 w-full"
+              size="xl"
+              onClick={() => {
+                setIdConfirmed(true);
+                setShowDetails(true);
+                setStep("radius");
+              }}
+            >
+              {AGE_RESTRICTED_ID_CONFIRM}
+            </Button>
+          </div>
+        ) : (
+          <div className="pb-10">
+            <button
+              type="button"
+              onClick={() => setStep("query")}
+              className="mb-6 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-ink-muted hover:text-ink"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStep("query")}
+              className="w-full rounded-2xl border border-hairline-strong bg-white px-5 py-4 text-left"
+            >
+              <p className="text-[12px] font-semibold tracking-wide text-ink-muted">
+                Looking for
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => router.push(`/requests/${duplicateId}`)}
+              <p className="mt-1 text-xl font-semibold tracking-tight text-ink">
+                {productName.trim() || "Item in photo"}
+              </p>
+              {imagePreview ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imagePreview}
+                  alt=""
+                  className="mt-3 h-16 w-16 rounded-xl object-cover"
+                />
+              ) : null}
+              <p className="mt-2 text-sm font-semibold text-accent-ink">Edit</p>
+            </button>
+            {restricted ? (
+              <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+                {AGE_RESTRICTED_FIND_HINT}
+              </p>
+            ) : null}
+
+            <h2 className="mt-8 text-2xl font-bold tracking-tight text-ink">
+              Category
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Optional — helps us ask the right stores. Tobacco & vape asks for ID first.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {PRODUCT_CATEGORIES.map((item) => (
+                <GlassChip
+                  key={item}
+                  selected={category === item}
+                  onClick={() => {
+                    const next = category === item ? "" : item;
+                    setCategory(next);
+                    setIdConfirmed(false);
+                    if (
+                      isAgeRestrictedFind({
+                        category: next,
+                        productName,
+                        description,
+                      })
+                    ) {
+                      setIdFrom("radius");
+                      setStep("id");
+                    }
+                  }}
                 >
-                  View existing request
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => submitRequest(true)}
-                  disabled={loading}
-                >
-                  Create another anyway
-                </Button>
+                  {item}
+                </GlassChip>
+              ))}
+            </div>
+
+            <h2 className="mt-8 text-2xl font-bold tracking-tight text-ink">
+              How far should we look?
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              {radiusLimitMessage(entitlements)}
+            </p>
+
+            <div className="mt-4 overflow-hidden rounded-2xl border border-hairline-strong bg-white">
+              {radiusChoices.map((r, i) => {
+                const selected = radiusMiles === r.miles;
+                return (
+                  <button
+                    key={r.miles}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setRadiusMiles(r.miles)}
+                    className={cn(
+                      "flex min-h-14 w-full items-center justify-between px-5 text-left text-sm transition-colors",
+                      i < radiusChoices.length - 1 ? "border-b border-hairline-strong" : "",
+                      selected ? "font-bold text-ink" : "font-medium text-ink-muted hover:bg-black/[0.02] hover:text-ink"
+                    )}
+                  >
+                    {r.label}
+                    <span
+                      className={cn(
+                        "grid h-[22px] w-[22px] place-items-center rounded-full border-2",
+                        selected ? "border-accent" : "border-hairline"
+                      )}
+                    >
+                      {selected ? (
+                        <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {entitlements.planId !== "plus" ? (
+              <p className="mt-2 px-1 text-xs text-ink-subtle">
+                FINDIT+ searches up to {plus.maxRadiusMiles} miles.
+              </p>
+            ) : null}
+
+            <h2 className="mt-8 text-2xl font-bold tracking-tight text-ink">Near</h2>
+            <div className="mt-4 overflow-hidden rounded-2xl border border-hairline-strong bg-white">
+              <button
+                type="button"
+                onClick={() => setEditPlace((v) => !v)}
+                className="flex min-h-14 w-full items-center gap-3 px-5 py-3 text-left"
+              >
+                <MapPin className="h-4 w-4 shrink-0 text-ink-muted" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-ink">{placeLabel}</span>
+                  {coords ? (
+                    <span className="mt-0.5 block text-xs text-ink-subtle">
+                      Location attached
+                    </span>
+                  ) : null}
+                </span>
+                <span className="text-sm font-semibold text-accent-ink">
+                  {editPlace ? "Done" : "Change"}
+                </span>
+              </button>
+              {editPlace ? (
+                <div className="space-y-3 border-t border-hairline-strong px-5 py-4">
+                  <PlaceFields value={place} onChange={setPlace} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={locating}
+                    onClick={useMyLocation}
+                  >
+                    {locating ? "Getting ZIP…" : "Use my location"}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="mt-5 min-h-11 text-sm font-medium text-ink-muted hover:text-ink"
+            >
+              {showDetails ? "Hide details" : "Add details (optional)"}
+            </button>
+            {showDetails ? (
+              <div className="mt-2 space-y-3 rounded-2xl border border-hairline-strong bg-white p-4">
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={
+                    restricted
+                      ? AGE_RESTRICTED_FIND_HINT
+                      : "Details stores should know (optional)"
+                  }
+                />
               </div>
-            </GlassNotice>
-          ) : null}
-          <div>
-            <Label>Search area</Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {radiusChoices.map((r) => (
-                <GlassChip
-                  key={r.label}
-                  selected={radiusMiles === r.miles}
-                  onClick={() => setRadiusMiles(r.miles)}
-                >
-                  {r.label}
-                </GlassChip>
-              ))}
-            </div>
+            ) : null}
+
+            {upgrade ? (
+              <div className="mt-6">
+                <PlusUpgradeCard used={upgrade.used} limit={upgrade.limit} />
+              </div>
+            ) : null}
+            {duplicateId ? (
+              <GlassNotice tone="order" className="mt-6">
+                <p className="font-semibold">You already have an active request for this.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => router.push(`/requests/${duplicateId}`)}
+                  >
+                    View existing request
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => submitRequest(true)}
+                    disabled={loading || Boolean(upgrade)}
+                  >
+                    Create another anyway
+                  </Button>
+                </div>
+              </GlassNotice>
+            ) : null}
+
+            <Button
+              className="mt-8 w-full"
+              size="xl"
+              disabled={loading || Boolean(upgrade)}
+              onClick={() => submitRequest()}
+            >
+              {loading ? "Sending…" : "Find it"}
+            </Button>
+            <p className="mt-3 text-center text-xs leading-relaxed text-ink-subtle">
+              We’ll ask participating stores near your ZIP. Your contact stays private.
+            </p>
           </div>
-          <div>
-            <Label>Request expiration</Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {EXPIRATION_OPTIONS.map((o) => (
-                <GlassChip
-                  key={o.hours}
-                  selected={expirationHours === o.hours}
-                  onClick={() => setExpirationHours(o.hours)}
-                >
-                  {o.label}
-                </GlassChip>
-              ))}
-            </div>
-          </div>
-          <p className="text-xs leading-relaxed text-ink-muted">
-            Stores will see what you&apos;re looking for, but your personal contact
-            information stays private.
-          </p>
-          <Button
-            className="w-full"
-            size="xl"
-            disabled={loading}
-            onClick={() => submitRequest()}
-          >
-            {loading ? "Sending…" : "Ask Nearby Stores"}
-          </Button>
-        </div>
-      </BottomSheet>
+        )}
+      </div>
     </div>
   );
 }

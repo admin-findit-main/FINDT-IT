@@ -4,6 +4,7 @@ import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
 import { GlassBadge, GlassNav } from "@/components/ui/glass";
+import { BrandHomeLink } from "@/components/brand/logo";
 import { getStoreBySlugAction } from "@/lib/services/actions";
 import { DAYS_OF_WEEK } from "@/lib/config/constants";
 import { mapsDirectionsUrl } from "@/lib/utils";
@@ -33,13 +34,7 @@ export default async function PublicStorePage({ params }: Props) {
     <div className="app-canvas min-h-screen">
       <GlassNav>
         <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xl font-bold tracking-tight text-ink"
-          >
-            FINDIT
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
-          </Link>
+          <BrandHomeLink href="/" />
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
               <Link href="/">Home</Link>

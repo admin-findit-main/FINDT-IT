@@ -4,26 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
-  Home,
   PackageSearch,
   User,
   Store,
   ChartNoAxesCombined,
   Settings,
+  Tablet,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppHeader } from "@/components/shared/app-header";
+import { BrandLogo } from "@/components/brand/logo";
 import { GlassTabBar } from "@/components/ui/glass";
 import { roleLabel } from "@/lib/auth/store-role";
 import type { StoreMemberRole } from "@/types/database";
-
-const customerItems = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/requests", label: "Requests", icon: PackageSearch },
-  { href: "/notifications", label: "Alerts", icon: Bell },
-  { href: "/profile", label: "Profile", icon: User },
-];
 
 type StoreNavItem = {
   href: string;
@@ -34,6 +28,7 @@ type StoreNavItem = {
 function ownerStoreItems(): StoreNavItem[] {
   return [
     { href: "/store", label: "Requests", icon: PackageSearch },
+    { href: "/store/hub", label: "Hub", icon: Tablet },
     { href: "/store/demand", label: "Demand", icon: ChartNoAxesCombined },
     { href: "/store/notifications", label: "Alerts", icon: Bell },
     { href: "/store/settings", label: "Store", icon: Store },
@@ -45,6 +40,7 @@ function ownerStoreItems(): StoreNavItem[] {
 function employeeStoreItems(): StoreNavItem[] {
   return [
     { href: "/store", label: "Requests", icon: PackageSearch },
+    { href: "/store/hub", label: "Hub", icon: Tablet },
     { href: "/store/notifications", label: "Alerts", icon: Bell },
     { href: "/store/account", label: "Account", icon: User },
   ];
@@ -53,16 +49,11 @@ function employeeStoreItems(): StoreNavItem[] {
 /** Mobile: keep primary actions; Account always reachable for logout. */
 function ownerMobileItems(): StoreNavItem[] {
   return [
+    { href: "/store/hub", label: "Hub", icon: Tablet },
     { href: "/store", label: "Requests", icon: PackageSearch },
-    { href: "/store/demand", label: "Demand", icon: ChartNoAxesCombined },
     { href: "/store/team", label: "Team", icon: Users },
     { href: "/store/account", label: "Account", icon: User },
   ];
-}
-
-function isCustomerActive(pathname: string, href: string) {
-  if (href === "/home") return pathname === "/home";
-  return pathname === href || pathname.startsWith(href + "/");
 }
 
 function isStoreActive(pathname: string, href: string) {
@@ -102,51 +93,6 @@ function TabBarItem({
   );
 }
 
-export function CustomerTopBar() {
-  const pathname = usePathname();
-  return (
-    <AppHeader brandHref="/home" className="z-40">
-      <nav className="hidden items-center gap-1 md:flex" aria-label="Customer">
-        {customerItems.map((item) => {
-          const active = isCustomerActive(pathname, item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "glass-press rounded-glass-md px-3 py-2 text-sm font-semibold transition-colors",
-                active
-                  ? "bg-accent text-ink-inverse shadow-accent"
-                  : "text-ink-muted hover:bg-glass-2 hover:text-ink"
-              )}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </AppHeader>
-  );
-}
-
-export function CustomerNav() {
-  const pathname = usePathname();
-  return (
-    <GlassTabBar className="md:hidden" aria-label="Customer">
-      <ul className="mx-auto flex max-w-lg items-stretch justify-around px-2 pb-[env(safe-area-inset-bottom)]">
-        {customerItems.map((item) => (
-          <TabBarItem
-            key={item.href}
-            {...item}
-            active={isCustomerActive(pathname, item.href)}
-          />
-        ))}
-      </ul>
-    </GlassTabBar>
-  );
-}
-
 type StoreChromeProps = {
   storeName: string | null;
   role: StoreMemberRole;
@@ -178,11 +124,10 @@ export function StoreNav({ storeName, role, canManageStore }: StoreChromeProps) 
       <aside className="glass-chrome hidden border-r border-hairline-strong md:sticky md:top-0 md:flex md:h-screen md:w-60 md:flex-col md:px-4 md:py-6">
         <Link
           href="/store"
-          className="mb-2 flex items-center gap-1.5 px-3 text-xl font-bold tracking-tight text-ink"
-          aria-label="Store home"
+          className="mb-3 flex items-center px-3"
+          aria-label="FINDIT Business"
         >
-          FINDIT
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" />
+          <BrandLogo kind="business" className="h-6 w-auto" />
         </Link>
         <p className="mb-6 px-3 text-xs leading-snug text-ink-muted">
           Working as{" "}
@@ -203,8 +148,8 @@ export function StoreNav({ storeName, role, canManageStore }: StoreChromeProps) 
                 className={cn(
                   "glass-press flex min-h-11 items-center gap-3 rounded-glass-lg px-3 py-2.5 text-sm font-semibold transition-colors",
                   active
-                    ? "bg-accent text-ink-inverse shadow-accent"
-                    : "text-ink-muted hover:bg-glass-2 hover:text-ink"
+                    ? "bg-black/[0.06] text-ink"
+                    : "text-ink-muted hover:bg-black/[0.04] hover:text-ink"
                 )}
               >
                 <Icon className="h-4 w-4" />

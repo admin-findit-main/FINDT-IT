@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useTransition, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, Textarea } from "@/components/ui/primitives";
+import { Panel } from "@/components/dashboard/shell";
+import { Textarea } from "@/components/ui/primitives";
 import { GlassBadge, GlassNotice } from "@/components/ui/glass";
 import { reviewStoreApplicationAction } from "@/lib/services/actions";
 import { STORE_TRIAL_DAYS } from "@/lib/config/constants";
@@ -45,19 +46,18 @@ export function AdminStoreApplications({
   }
 
   return (
-    <Card sheen className="p-5 sm:p-6 lg:col-span-2">
-      <h2 className="font-semibold text-ink">Store join requests</h2>
-      <p className="mt-1 text-sm text-ink-muted">
+    <Panel title="Store join requests">
+      <p className="-mt-2 mb-4 text-sm text-ink-muted">
         Approve legitimate businesses for a {STORE_TRIAL_DAYS}-day free trial.
       </p>
-      <div className="mt-4 max-h-96 space-y-3 overflow-y-auto">
+      <div className="space-y-3">
         {applications.length === 0 ? (
           <p className="text-sm text-ink-muted">No applications yet.</p>
         ) : (
           applications.map((app) => (
             <div
               key={app.id}
-              className="glass-subtle rounded-glass-lg p-4 text-sm"
+              className="rounded-lg border border-hairline-strong p-4 text-sm"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -73,6 +73,12 @@ export function AdminStoreApplications({
                       Categories: {app.request_categories.join(", ")}
                     </p>
                   ) : null}
+                  <p className="mt-1 text-xs text-ink-muted">
+                    Customer ID:{" "}
+                    {app.requires_customer_id
+                      ? "Required at the store"
+                      : "Not required"}
+                  </p>
                 </div>
                 <GlassBadge
                   tone={
@@ -143,6 +149,6 @@ export function AdminStoreApplications({
           ))
         )}
       </div>
-    </Card>
+    </Panel>
   );
 }

@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
 import { GlassBadge, GlassChip, GlassNotice } from "@/components/ui/glass";
-import { BackLink } from "@/components/shared/app-header";
 import {
   DAYS_OF_WEEK,
   PILOT_STORE_BANNER,
@@ -17,8 +16,10 @@ import {
   getStoreSettingsAction,
   getUserStoresAction,
   updateStoreCoverageAction,
+  updateStoreProfileAction,
 } from "@/lib/services/actions";
 import { JOIN_REQUEST_CATEGORIES as CATS } from "@/lib/services/category-routing";
+import { IosSwitch } from "@/components/ui/ios-switch";
 import type { Store } from "@/types/database";
 
 export default function StoreSettingsPage() {
@@ -35,35 +36,57 @@ export default function StoreSettingsPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [serviceZips, setServiceZips] = useState("");
   const [radius, setRadius] = useState(10);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [phone, setPhone] = useState("");
+  const [website, setWebsite] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("");
+  const [region, setRegion] = useState("");
+  const [postal, setPostal] = useState("");
   const [pilotBanner, setPilotBanner] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [requiresCustomerId, setRequiresCustomerId] = useState(false);
 
   const canManage = role === "owner" || role === "manager";
 
   useEffect(() => {
-    getUserStoresAction().then(async (s) => {
-      const first = s[0] || null;
-      setStore(first);
-      if (!first) return;
-      const settings = await getStoreSettingsAction(first.id);
-      if (!settings) return;
-      setRole(settings.role);
-      setHours(
-        settings.hours.length
-          ? settings.hours
-          : Array.from({ length: 7 }, (_, day) => ({
-              day_of_week: day,
-              open_time: day === 0 ? null : "09:00",
-              close_time: day === 0 ? null : "21:00",
-              is_closed: day === 0,
-            }))
-      );
-      setCategories(settings.categories);
-      setServiceZips(settings.serviceZips.join(", "));
-      setRadius(settings.store.service_radius_miles || 10);
-      setPilotBanner(settings.pilotMode);
-      setStore({ ...settings.store, role: settings.role });
-    });
+    getUserStoresAction()
+      .then(async (s) => {
+        const first = s[0] || null;
+        setStore(first);
+        if (!first) return;
+        const settings = await getStoreSettingsAction(first.id);
+        if (!settings) return;
+        setRole(settings.role);
+        setHours(
+          settings.hours.length
+            ? settings.hours
+            : Array.from({ length: 7 }, (_, day) => ({
+                day_of_week: day,
+                open_time: day === 0 ? null : "09:00",
+                close_time: day === 0 ? null : "21:00",
+                is_closed: day === 0,
+              }))
+        );
+        setCategories(settings.categories);
+        setServiceZips(settings.serviceZips.join(", "));
+        setRadius(settings.store.service_radius_miles || 10);
+        setPilotBanner(settings.pilotMode);
+        setName(settings.store.name || "");
+        setDescription(settings.store.description || "");
+        setPhone(settings.store.phone || "");
+        setWebsite(settings.store.website || "");
+        setStreet(settings.store.street_address || "");
+        setCity(settings.store.city || "");
+        setRegion(settings.store.state || "");
+        setPostal(settings.store.postal_code || "");
+        setRequiresCustomerId(Boolean(settings.store.age_restricted));
+        setStore({ ...settings.store, role: settings.role });
+      })
+      .catch((err) => {
+        console.error("[FINDIT] store settings load failed", err);
+      });
   }, []);
 
   async function saveCoverage() {
@@ -84,7 +107,29 @@ export default function StoreSettingsPage() {
       toast.error(result.error);
       return;
     }
+    await updateStoreProfileAction(store.id, {
+      ageRestricted: requiresCustomerId,
+    });
     toast.success("Store coverage saved");
+  }
+
+  async function saveProfile() {
+    if (!store || !canManage) return;
+    setSaving(true);
+    const result = await updateStoreProfileAction(store.id, {
+      name,
+      description,
+      phone,
+      website,
+      streetAddress: street,
+      city,
+      state: region,
+      postalCode: postal,
+      ageRestricted: requiresCustomerId,
+    });
+    setSaving(false);
+    if (result.error) toast.error(result.error);
+    else toast.success("Store profile saved");
   }
 
   const plan = STORE_PLANS[(store?.subscription_plan as keyof typeof STORE_PLANS) || "free"];
@@ -105,10 +150,8 @@ export default function StoreSettingsPage() {
   ];
 
   return (
-    <div className="px-5 pt-6 md:px-8 md:pt-8">
-      <BackLink href="/store" label="Store home" className="mb-2 md:hidden" />
-      <h1 className="text-2xl font-bold tracking-tight text-ink">Store settings</h1>
-      <p className="mt-1 text-sm text-ink-muted">{store?.name}</p>
+    <div>
+      <p className="text-sm text-ink-muted">{store?.name}</p>
       {pilotBanner ? (
         <GlassNotice tone="stock" className="mt-3">
           {PILOT_STORE_BANNER}
@@ -120,6 +163,49 @@ export default function StoreSettingsPage() {
           You’re signed in as an employee. Ask an owner or manager to change store settings.
         </GlassNotice>
       ) : null}
+
+      <Card sheen id="profile" className="mt-6 space-y-4 p-5 sm:p-6">
+        <h2 className="font-semibold text-ink">Business profile</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <Label>Store name</Label>
+            <Input value={name} disabled={!canManage} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <Label>Description</Label>
+            <Input value={description} disabled={!canManage} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+          <div>
+            <Label>Phone</Label>
+            <Input value={phone} disabled={!canManage} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <div>
+            <Label>Website</Label>
+            <Input value={website} disabled={!canManage} onChange={(e) => setWebsite(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <Label>Street</Label>
+            <Input value={street} disabled={!canManage} onChange={(e) => setStreet(e.target.value)} />
+          </div>
+          <div>
+            <Label>City</Label>
+            <Input value={city} disabled={!canManage} onChange={(e) => setCity(e.target.value)} />
+          </div>
+          <div>
+            <Label>State</Label>
+            <Input value={region} disabled={!canManage} onChange={(e) => setRegion(e.target.value)} />
+          </div>
+          <div>
+            <Label>ZIP</Label>
+            <Input value={postal} disabled={!canManage} onChange={(e) => setPostal(e.target.value)} />
+          </div>
+        </div>
+        {canManage ? (
+          <Button onClick={saveProfile} disabled={saving}>
+            Save profile
+          </Button>
+        ) : null}
+      </Card>
 
       <div className="mt-6 space-y-3">
         {sections.map((s) => (
@@ -252,6 +338,21 @@ export default function StoreSettingsPage() {
               {c}
             </GlassChip>
           ))}
+        </div>
+        <div className="mt-5 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink">Require a government ID</p>
+            <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+              Tobacco, vape, and similar products. Customers confirm they are 21+
+              before FINDIT sends the ask. You still check ID in the store.
+            </p>
+          </div>
+          <IosSwitch
+            label="Require a government ID"
+            checked={requiresCustomerId}
+            disabled={!canManage}
+            onCheckedChange={setRequiresCustomerId}
+          />
         </div>
       </Card>
 
