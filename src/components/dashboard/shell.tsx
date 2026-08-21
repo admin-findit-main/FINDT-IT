@@ -26,6 +26,8 @@ import {
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/lib/services/actions";
 import { BrandLogo } from "@/components/brand/logo";
+import { useHostSurface } from "@/components/host/host-surface";
+import { toPublicPath, toInternalPath, matchProductSurface } from "@/lib/config/product-hosts";
 import {
   dashItemActive,
   dashTitle,
@@ -72,15 +74,23 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const contextSurface = useHostSurface();
+  const surface =
+    typeof window !== "undefined"
+      ? matchProductSurface(window.location.host)
+      : contextSurface;
+  const internalPath = toInternalPath(surface, pathname);
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
-  const { title, subtitle } = dashTitle(pathname);
+  const { title, subtitle } = dashTitle(internalPath);
   const isAdmin = tone === "admin";
+  const publicAccountHref = toPublicPath(surface, accountHref);
+  const publicLogoutHref = toPublicPath(surface, logoutHref);
 
   async function logout() {
     await signOutAction();
-    router.push(logoutHref);
+    router.push(publicLogoutHref);
     router.refresh();
   }
 
@@ -88,11 +98,11 @@ export function DashboardShell({
     <nav className="flex flex-1 flex-col gap-0.5 px-2">
       {items.map((item) => {
         const Icon = ICONS[item.icon];
-        const active = dashItemActive(pathname, item.href);
+        const active = dashItemActive(internalPath, item.href);
         return (
           <Link
             key={item.href}
-            href={item.href}
+            href={toPublicPath(surface, item.href)}
             onClick={() => setDrawer(false)}
             aria-current={active ? "page" : undefined}
             className={cn(
@@ -132,7 +142,7 @@ export function DashboardShell({
       >
         <div className={cn("flex h-14 items-center gap-2 px-4", collapsed && "justify-center px-0")}>
           <Link
-            href={items[0]?.href || "/"}
+            href={toPublicPath(surface, items[0]?.href || "/")}
             className={cn("flex min-w-0 items-center", collapsed && "justify-center")}
             aria-label={isAdmin ? "FINDIT Admin" : "FINDIT Business"}
           >
@@ -173,7 +183,7 @@ export function DashboardShell({
           )}
         >
           <Link
-            href={accountHref}
+            href={publicAccountHref}
             className={cn(
               "flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-black/[0.04]",
               collapsed && "justify-center px-0"

@@ -22,6 +22,10 @@ const envSchema = z.object({
   FINDIT_BUSINESS_HOST: z.string().optional().or(z.literal("")),
   FINDIT_HUB_HOST: z.string().optional().or(z.literal("")),
   FINDIT_ADMIN_HOST: z.string().optional().or(z.literal("")),
+  FINDIT_WWW_HOST: z.string().optional().or(z.literal("")),
+  FINDIT_DASHBOARD_HOST: z.string().optional().or(z.literal("")),
+  FINDIT_STORE_HOST: z.string().optional().or(z.literal("")),
+  FINDIT_APP_HOST: z.string().optional().or(z.literal("")),
   /** Public App Store listing URL when it exists. Empty = coming soon. */
   NEXT_PUBLIC_IOS_APP_STORE_URL: z.string().optional().or(z.literal("")),
   NEXT_PUBLIC_PLAY_STORE_URL: z.string().optional().or(z.literal("")),
@@ -47,6 +51,10 @@ export function getEnv(): AppEnv {
     FINDIT_BUSINESS_HOST: process.env.FINDIT_BUSINESS_HOST,
     FINDIT_HUB_HOST: process.env.FINDIT_HUB_HOST,
     FINDIT_ADMIN_HOST: process.env.FINDIT_ADMIN_HOST,
+    FINDIT_WWW_HOST: process.env.FINDIT_WWW_HOST,
+    FINDIT_DASHBOARD_HOST: process.env.FINDIT_DASHBOARD_HOST,
+    FINDIT_STORE_HOST: process.env.FINDIT_STORE_HOST,
+    FINDIT_APP_HOST: process.env.FINDIT_APP_HOST,
     NEXT_PUBLIC_IOS_APP_STORE_URL: process.env.NEXT_PUBLIC_IOS_APP_STORE_URL,
     NEXT_PUBLIC_PLAY_STORE_URL: process.env.NEXT_PUBLIC_PLAY_STORE_URL,
   });
@@ -91,7 +99,11 @@ export function isPilotMode(): boolean {
 
 export function appUrl(): string {
   const explicit = getEnv().NEXT_PUBLIC_APP_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, "");
+  if (explicit) {
+    const trimmed = explicit.replace(/\/$/, "");
+    if (trimmed === "https://askfindit.com") return "https://www.askfindit.com";
+    return trimmed;
+  }
   const vercel =
     process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
   if (vercel) {
@@ -99,7 +111,7 @@ export function appUrl(): string {
     return `https://${host}`;
   }
   if (process.env.NODE_ENV === "development") return "http://localhost:3002";
-  return "https://askfindit.com";
+  return "https://www.askfindit.com";
 }
 
 /** Dedicated Business/Hub/Admin hostnames. Empty until DNS is ready. */

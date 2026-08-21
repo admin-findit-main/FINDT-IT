@@ -17,6 +17,12 @@ import { AppHeader } from "@/components/shared/app-header";
 import { BrandLogo } from "@/components/brand/logo";
 import { GlassTabBar } from "@/components/ui/glass";
 import { roleLabel } from "@/lib/auth/store-role";
+import { useHostSurface } from "@/components/host/host-surface";
+import {
+  matchProductSurface,
+  toInternalPath,
+  toPublicPath,
+} from "@/lib/config/product-hosts";
 import type { StoreMemberRole } from "@/types/database";
 
 type StoreNavItem = {
@@ -116,6 +122,12 @@ export function StoreTopBar({ storeName, role }: StoreChromeProps) {
 
 export function StoreNav({ storeName, role, canManageStore }: StoreChromeProps) {
   const pathname = usePathname();
+  const contextSurface = useHostSurface();
+  const surface =
+    typeof window !== "undefined"
+      ? matchProductSurface(window.location.host)
+      : contextSurface;
+  const internalPath = toInternalPath(surface, pathname);
   const items = canManageStore ? ownerStoreItems() : employeeStoreItems();
   const mobileItems = canManageStore ? ownerMobileItems() : employeeStoreItems();
 
@@ -123,7 +135,7 @@ export function StoreNav({ storeName, role, canManageStore }: StoreChromeProps) 
     <>
       <aside className="glass-chrome hidden border-r border-hairline-strong md:sticky md:top-0 md:flex md:h-screen md:w-60 md:flex-col md:px-4 md:py-6">
         <Link
-          href="/store"
+          href={toPublicPath(surface, "/store")}
           className="mb-3 flex items-center px-3"
           aria-label="FINDIT Business"
         >
@@ -138,12 +150,12 @@ export function StoreNav({ storeName, role, canManageStore }: StoreChromeProps) 
         </p>
         <nav className="flex flex-col gap-1" aria-label="Store">
           {items.map((item) => {
-            const active = isStoreActive(pathname, item.href);
+            const active = isStoreActive(internalPath, item.href);
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={toPublicPath(surface, item.href)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "glass-press flex min-h-11 items-center gap-3 rounded-glass-lg px-3 py-2.5 text-sm font-semibold transition-colors",
@@ -165,7 +177,8 @@ export function StoreNav({ storeName, role, canManageStore }: StoreChromeProps) 
             <TabBarItem
               key={item.href}
               {...item}
-              active={isStoreActive(pathname, item.href)}
+              active={isStoreActive(internalPath, item.href)}
+              href={toPublicPath(surface, item.href)}
             />
           ))}
         </ul>

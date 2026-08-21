@@ -3,10 +3,11 @@
 import { isSoloAdminEmail } from "@findit/domain";
 import { createClient } from "@/lib/supabase/client";
 import { destinationAfterAuth, type AppHomePath } from "@/lib/auth/home-path";
+import { postAuthLocation } from "@/lib/config/product-hosts";
 import { getAppWorkspaceAction, signInAction } from "@/lib/services/actions";
 
 function go(href: string) {
-  window.location.assign(href);
+  window.location.assign(postAuthLocation(href, window.location.host));
 }
 
 export async function loginEmailPassword(

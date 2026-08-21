@@ -12,6 +12,7 @@ import {
   getConsumerEntitlements,
 } from "@findit/domain";
 import { BrandLogo } from "@/components/brand/logo";
+import { usePublicHref } from "@/components/host/host-surface";
 import { getCurrentProfile } from "@/lib/services/actions";
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types/database";
@@ -35,6 +36,7 @@ export function CustomerMenuButton({ className }: { className?: string }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const homeHref = usePublicHref("/home");
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
   const plus = entitlements.planId === "plus";
   const name = displayName(profile || {});
@@ -89,15 +91,16 @@ export function CustomerMenuButton({ className }: { className?: string }) {
           <nav className="mt-8 flex flex-col gap-1" aria-label="Customer">
             {ITEMS.map((item) => {
               const Icon = item.icon;
+              const href = item.href === "/home" ? homeHref : item.href;
               const active = isActive(pathname, item.href);
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   onClick={(event) => {
                     event.preventDefault();
                     setOpen(false);
-                    router.push(item.href);
+                    router.push(href);
                   }}
                   aria-current={active ? "page" : undefined}
                   className={cn(
@@ -154,12 +157,13 @@ export function CustomerMenuButton({ className }: { className?: string }) {
 }
 
 export function CustomerTopBar() {
+  const homeHref = usePublicHref("/home");
   return (
     <header className="glass-chrome sticky top-0 z-40 border-b border-hairline-strong">
       <div className="mx-auto flex h-14 max-w-3xl items-center px-2 sm:px-4">
         <CustomerMenuButton />
         <Link
-          href="/home"
+          href={homeHref}
           className="mx-auto inline-flex items-center"
           aria-label="FINDIT home"
         >

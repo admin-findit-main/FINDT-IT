@@ -1,13 +1,10 @@
 /**
- * Optional host-based shells on the existing Vercel Next.js app.
- * Unset FINDIT_*_HOST env vars (the default) and this is a no-op.
- * Do not add DNS or extra Vercel projects until these hosts are set.
+ * Legacy optional-host helpers. Production routing lives in product-hosts.ts.
  */
 export type HostSurface = "business" | "hub" | "admin";
 
-export function hostnameOf(hostHeader: string): string {
-  return hostHeader.split(":")[0].trim().toLowerCase();
-}
+export { hostnameOf } from "@/lib/config/product-hosts";
+import { hostnameOf } from "@/lib/config/product-hosts";
 
 export function matchHostSurface(
   hostHeader: string,

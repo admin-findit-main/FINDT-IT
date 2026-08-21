@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { Button } from "@/components/ui/button";
 import {
   GlassBadge,
@@ -9,12 +10,32 @@ import {
 } from "@/components/ui/glass";
 import { APP_NAME, STORE_TRIAL_DAYS } from "@/lib/config/constants";
 import { iosAppStoreUrl, playStoreUrl } from "@/lib/config/env";
-import { SUPPORT_EMAIL } from "@/lib/auth/admin";
 import { BrandHomeLink, BrandLogo } from "@/components/brand/logo";
+import {
+  matchProductSurface,
+  productUrl,
+} from "@/lib/config/product-hosts";
 
-export default function LandingPage() {
+function siteHref(
+  host: string,
+  surface: "dashboard" | "store" | "www",
+  path: string
+) {
+  if (matchProductSurface(host) === "local") {
+    if (surface === "store" && path === "/login") return "/login/business";
+    return path;
+  }
+  return productUrl(surface, path, host);
+}
+
+export default async function LandingPage() {
+  const host = (await headers()).get("host") || "";
   const ios = iosAppStoreUrl();
   const play = playStoreUrl();
+  const signupHref = siteHref(host, "dashboard", "/signup");
+  const loginHref = siteHref(host, "dashboard", "/login");
+  const storeLoginHref = siteHref(host, "store", "/login");
+  const joinHref = siteHref(host, "www", "/join");
 
   return (
     <div className="app-canvas min-h-screen">
@@ -28,7 +49,7 @@ export default function LandingPage() {
               size="sm"
               className="hidden text-ink-inverse/80 hover:bg-white/10 hover:text-ink-inverse sm:inline-flex"
             >
-              <Link href="/login/business">Business</Link>
+              <Link href={storeLoginHref}>Business</Link>
             </Button>
             <Button
               asChild
@@ -36,10 +57,10 @@ export default function LandingPage() {
               size="sm"
               className="text-ink-inverse/80 hover:bg-white/10 hover:text-ink-inverse"
             >
-              <Link href="/login">Log in</Link>
+              <Link href={loginHref}>Log in</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/signup">Sign up</Link>
+              <Link href={signupHref}>Sign up</Link>
             </Button>
           </div>
         </div>
@@ -64,7 +85,7 @@ export default function LandingPage() {
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Button asChild size="xl">
-                  <Link href="/signup">Try FINDIT</Link>
+                  <Link href={signupHref}>Try FINDIT</Link>
                 </Button>
                 <Button
                   asChild
@@ -72,7 +93,7 @@ export default function LandingPage() {
                   size="xl"
                   className="border-white/25 bg-white/10 text-ink-inverse hover:bg-white/20"
                 >
-                  <Link href="/login">Log in</Link>
+                  <Link href={loginHref}>Log in</Link>
                 </Button>
                 <Button
                   asChild
@@ -80,7 +101,7 @@ export default function LandingPage() {
                   size="xl"
                   className="border-white/25 bg-white/10 text-ink-inverse hover:bg-white/20"
                 >
-                  <Link href="/join">Apply as a store</Link>
+                  <Link href={joinHref}>Apply as a store</Link>
                 </Button>
               </div>
               {ios || play ? (
@@ -222,7 +243,7 @@ export default function LandingPage() {
                   {STORE_TRIAL_DAYS}-day free trial.
                 </p>
                 <Button asChild size="lg" className="mt-8">
-                  <Link href="/join">Apply as a store</Link>
+                  <Link href={joinHref}>Apply as a store</Link>
                 </Button>
               </div>
               <GlassCard level="subtle" padded className="rounded-glass-xl">
@@ -245,12 +266,12 @@ export default function LandingPage() {
       <footer className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-12 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} FINDIT</p>
         <div className="flex flex-wrap gap-4">
-          <a
-            href={`mailto:${SUPPORT_EMAIL}`}
-            className="transition-colors hover:text-ink"
-          >
+          <Link href="/contact" className="transition-colors hover:text-ink">
             Support
-          </a>
+          </Link>
+          <Link href="/pricing" className="transition-colors hover:text-ink">
+            Pricing
+          </Link>
           <Link href="/privacy" className="transition-colors hover:text-ink">
             Privacy
           </Link>

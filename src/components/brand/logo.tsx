@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { matchProductSurface } from "@/lib/config/product-hosts";
+import { useHostSurface } from "@/components/host/host-surface";
 
 const ASSETS = {
   mark: {
@@ -109,10 +111,17 @@ export function BrandHomeLink({
 /** Customer FINDIT lockup, or FINDIT Business on `/login/business`. */
 export function AuthBrandLink({ className }: { className?: string }) {
   const pathname = usePathname();
-  const business = pathname.startsWith("/login/business");
+  const contextSurface = useHostSurface();
+  const surface =
+    typeof window !== "undefined"
+      ? matchProductSurface(window.location.host)
+      : contextSurface;
+  const business =
+    pathname.startsWith("/login/business") ||
+    (surface === "store" && pathname.startsWith("/login"));
   return (
     <BrandHomeLink
-      href={business ? "/login/business" : "/"}
+      href={business ? (surface === "store" ? "/login" : "/login/business") : "/"}
       kind={business ? "business" : "findit"}
       className={className}
     />

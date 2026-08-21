@@ -9,6 +9,7 @@ import {
   type AppHomePath,
 } from "@/lib/auth/home-path";
 import { getAppWorkspaceAction } from "@/lib/services/actions";
+import { postAuthLocation } from "@/lib/config/product-hosts";
 
 const EMAIL_OTP_TYPES = new Set<EmailOtpType>([
   "signup",
@@ -99,18 +100,23 @@ export async function completeEmailAuthLink(): Promise<{ error?: string }> {
     (isSafeNextPath(next) && isPasswordUpdatePath(next)) ||
     recentlyRequestedPasswordReset(user.recovery_sent_at)
   ) {
-    window.location.replace(PASSWORD_UPDATE_PATH);
+    window.location.replace(
+      postAuthLocation(PASSWORD_UPDATE_PATH, window.location.host)
+    );
     return {};
   }
 
   const workspace = await getAppWorkspaceAction();
   window.location.replace(
-    destinationAfterEmailLink({
-      type,
-      next,
-      email: user.email,
-      homePath: (workspace?.homePath || "/home") as AppHomePath,
-    })
+    postAuthLocation(
+      destinationAfterEmailLink({
+        type,
+        next,
+        email: user.email,
+        homePath: (workspace?.homePath || "/home") as AppHomePath,
+      }),
+      window.location.host
+    )
   );
   return {};
 }

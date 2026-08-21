@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { AuthLinkCatcher } from "@/components/auth/auth-link-catcher";
+import { HostSurfaceProvider } from "@/components/host/host-surface";
+import { matchProductSurface } from "@/lib/config/product-hosts";
 import { RegisterSW } from "@/components/shared/register-sw";
 import "./globals.css";
 
@@ -55,14 +58,18 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const host = (await headers()).get("host") || "";
+  const matched = matchProductSurface(host);
+  const surface = matched === "apex" ? "www" : matched;
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-canvas text-ink">
-        {children}
+        <HostSurfaceProvider surface={surface}>{children}</HostSurfaceProvider>
         <AuthLinkCatcher />
         <RegisterSW />
         <Toaster
