@@ -514,7 +514,7 @@ export async function signUpAction(input: {
     try {
       const result = demoSignupWithSession({ ...input, email, accountType });
       await setDemoSessionCookie(result.sessionId);
-      return { profile: result.profile };
+      return { ok: true as const, homePath: "/home" as const };
     } catch (e) {
       return { error: e instanceof Error ? e.message : "Sign up failed" };
     }

@@ -91,7 +91,7 @@ export function CustomerEmailSignupForm({
         state: place.state || "VA",
         postalCode: place.postalCode,
       });
-      if (result.error) {
+      if ("error" in result && result.error) {
         toast.error(result.error);
         return;
       }
