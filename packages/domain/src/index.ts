@@ -16,3 +16,4 @@ export * from "./place";
 export * from "./notify";
 export * from "./age-restricted";
 export * from "./auth-email";
+export * from "./account-deletion";

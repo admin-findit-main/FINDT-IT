@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <LegalShell title="Contact FINDIT">
+    <LegalShell title="Contact FINDIT" lastUpdated={null}>
       <p>
         Shoppers, stores, and the FINDIT operator can reach support at{" "}
         <a className="font-semibold text-ink underline" href={`mailto:${SUPPORT_EMAIL}`}>

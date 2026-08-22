@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
 import { Overline } from "@/components/ui/glass";
+import { DeleteAccountCard } from "@/components/account/delete-account-card";
 import { BackLink } from "@/components/shared/app-header";
 import { roleLabel } from "@/lib/auth/store-role";
 import {
@@ -79,6 +80,10 @@ export default function StoreAccountPage() {
           Log out
         </Button>
       </Card>
+
+      <div className="mt-4">
+        <DeleteAccountCard />
+      </div>
     </div>
   );
 }

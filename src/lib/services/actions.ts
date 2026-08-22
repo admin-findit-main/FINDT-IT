@@ -14,6 +14,7 @@ import {
   demoCreateRequest,
   demoCreateStore,
   demoCurrentUser,
+  demoDeleteAccount,
   demoFulfillRequest,
   demoGetPendingApplicationForEmail,
   demoGetPilotAdminStats,
@@ -60,7 +61,9 @@ import { bypassConsumerPlanLimits, bypassPlanLimits, isPilotMode } from "@/lib/c
 import {
   accountContactLabel,
   AGE_RESTRICTED_ID_REQUIRED,
+  accountDeletionBlockReason,
   getConsumerEntitlements,
+  isAccountDeletionConfirmed,
   isAgeRestrictedFind,
   isMonthlyFindCapError,
   monthlyFindWindowStart,
@@ -1737,6 +1740,96 @@ export async function updateProfileAction(input: {
     .single();
   if (error) return { error: error.message };
   return { profile: data as Profile };
+}
+
+export async function deleteAccountAction(confirmation: string) {
+  if (!isAccountDeletionConfirmed(confirmation)) {
+    return { error: "Type DELETE to confirm." };
+  }
+
+  const profile = await getCurrentProfile();
+  if (!profile) return { error: "Unauthorized" };
+
+  if (isDemoMode()) {
+    const sessionId = await getDemoSessionId();
+    const result = demoDeleteAccount(sessionId);
+    if ("error" in result && result.error) return result;
+    await setDemoSessionCookie(null);
+    return { ok: true as const };
+  }
+
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Unauthorized" };
+
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const admin = createServiceClient();
+    const { data: ownedStores } = await admin
+      .from("stores")
+      .select("name")
+      .eq("owner_id", user.id);
+    const blocked = accountDeletionBlockReason({
+      isOperator: isSoloAdmin(profile),
+      ownedStoreNames: (ownedStores || []).map((store) => store.name),
+    });
+    if (blocked) return { error: blocked };
+
+    const { data: responses } = await admin
+      .from("store_responses")
+      .select("id, store_id")
+      .eq("responded_by", user.id);
+    if (responses?.length) {
+      const storeIds = [...new Set(responses.map((row) => row.store_id))];
+      const { data: stores } = await admin
+        .from("stores")
+        .select("id, owner_id")
+        .in("id", storeIds);
+      const ownerByStore = new Map(
+        (stores || []).map((store) => [store.id, store.owner_id])
+      );
+      for (const row of responses) {
+        const ownerId = ownerByStore.get(row.store_id);
+        if (ownerId && ownerId !== user.id) {
+          await admin
+            .from("store_responses")
+            .update({ responded_by: ownerId })
+            .eq("id", row.id);
+        }
+      }
+    }
+
+    const { REQUEST_IMAGES_BUCKET } = await import("@/lib/services/storage");
+    const { data: files } = await admin.storage
+      .from(REQUEST_IMAGES_BUCKET)
+      .list(user.id, { limit: 1000 });
+    if (files?.length) {
+      await admin.storage
+        .from(REQUEST_IMAGES_BUCKET)
+        .remove(files.map((file) => `${user.id}/${file.name}`));
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (accessToken) {
+      await admin.auth.admin.signOut(accessToken, "global");
+    }
+    const { error } = await admin.auth.admin.deleteUser(user.id);
+    if (error) return { error: error.message };
+    await supabase.auth.signOut();
+    return { ok: true as const };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.toLowerCase().includes("service role")) {
+      return {
+        error: "Account deletion is not configured. Email FINDIT support instead.",
+      };
+    }
+    return { error: message || "Could not delete this account. Try again or email support." };
+  }
 }
 
 export async function saveRequestAction(requestId: string) {

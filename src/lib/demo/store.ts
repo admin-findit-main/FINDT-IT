@@ -25,10 +25,12 @@ import { bypassConsumerPlanLimits, bypassPlanLimits } from "@/lib/config/env";
 import {
   AGE_RESTRICTED_ID_REQUIRED,
   DEMO_PHONE_OTP,
+  accountDeletionBlockReason,
   createdInMonthlyFindWindow,
   customerNeedsFirstName,
   getConsumerEntitlements,
   isAgeRestrictedFind,
+  isSoloAdmin,
 } from "@findit/domain";
 import { selectEligibleStores } from "@/lib/services/routing";
 import {
@@ -631,6 +633,43 @@ export function demoLogout(sessionId?: string | null) {
   const sid = sessionId ?? state.currentSessionId;
   if (sid) delete state.sessions[sid];
   if (state.currentSessionId === sid) state.currentSessionId = null;
+}
+
+export function demoDeleteAccount(
+  sessionId?: string | null
+): { ok: true } | { error: string } {
+  const profile = demoCurrentUser(sessionId);
+  if (!profile) return { error: "Unauthorized" };
+  const state = getDemoState();
+  const ownedStoreNames = state.stores
+    .filter((store) => store.owner_id === profile.id)
+    .map((store) => store.name);
+  const blocked = accountDeletionBlockReason({
+    isOperator: isSoloAdmin(profile),
+    ownedStoreNames,
+  });
+  if (blocked) return { error: blocked };
+
+  for (const response of state.responses) {
+    if (response.responded_by !== profile.id) continue;
+    const store = state.stores.find((item) => item.id === response.store_id);
+    if (store && store.owner_id !== profile.id) {
+      response.responded_by = store.owner_id;
+    }
+  }
+
+  const userId = profile.id;
+  state.requests = state.requests.filter((request) => request.customer_id !== userId);
+  state.notifications = state.notifications.filter(
+    (notification) => notification.user_id !== userId
+  );
+  state.savedRequests = state.savedRequests.filter(
+    (saved) => saved.customer_id !== userId
+  );
+  state.storeMembers = state.storeMembers.filter((member) => member.user_id !== userId);
+  state.profiles = state.profiles.filter((item) => item.id !== userId);
+  demoLogout(sessionId);
+  return { ok: true };
 }
 
 export const DEMO_SESSION_COOKIE = "findit_demo_session";
