@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
     try {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/update-password`;
+      const redirectTo = "https://www.askfindit.com/auth/update-password";
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo,
       });

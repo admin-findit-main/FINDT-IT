@@ -79,6 +79,17 @@ describe("decideHostRouting", () => {
     }
   });
 
+  it("keeps magic-link and reset callbacks on the dashboard even for the operator", () => {
+    const decision = decideHostRouting(
+      req("dashboard.askfindit.com", "/auth/callback"),
+      "admin"
+    );
+    expect(decision.kind).toBe("continue");
+    if (decision.kind === "continue") {
+      expect(decision.internalPath).toBe("/auth/callback");
+    }
+  });
+
   it("sends the app host home to the public website", () => {
     const decision = decideHostRouting(req("app.askfindit.com", "/"), "anonymous");
     expect(decision.kind).toBe("redirect");

@@ -11,8 +11,16 @@ export type AuthEmailContent = {
   footnote: string;
 };
 
-const APP_URL_FALLBACK = "https://askfindit.com";
-const MARK_URL = "https://askfindit.com/brand/findit-mark-light.png";
+const APP_URL_FALLBACK = "https://www.askfindit.com";
+const MARK_URL = "https://www.askfindit.com/brand/findit-mark-light.png";
+
+function canonicalAppUrl(appUrl: string): string {
+  const base = (appUrl || APP_URL_FALLBACK).replace(/\/$/, "");
+  if (base === "https://askfindit.com" || base === "http://askfindit.com") {
+    return APP_URL_FALLBACK;
+  }
+  return base || APP_URL_FALLBACK;
+}
 
 export function escapeHtml(value: string): string {
   return value
@@ -35,7 +43,7 @@ export function authEmailConfirmationUrl(input: {
   tokenHash: string;
   action: AuthEmailAction;
 }): string {
-  const base = (input.appUrl || APP_URL_FALLBACK).replace(/\/$/, "");
+  const base = canonicalAppUrl(input.appUrl);
   const type = otpTypeForAuthEmail(input.action);
   return `${base}/auth/callback?token_hash=${encodeURIComponent(input.tokenHash)}&type=${encodeURIComponent(type)}`;
 }

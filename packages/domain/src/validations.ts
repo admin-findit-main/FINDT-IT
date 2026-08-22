@@ -93,6 +93,8 @@ export const storeJoinApplicationSchema = z.object({
   ownerName: z.string().min(2).max(100),
   ownerEmail: z.string().email(),
   ownerPhone: z.string().max(30).optional().or(z.literal("")),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string().min(8, "Confirm your password"),
   whyLegit: z
     .string()
     .min(20, "Tell us a bit about your business (at least 20 characters)")
@@ -104,6 +106,9 @@ export const storeJoinApplicationSchema = z.object({
   confirmedLegitimate: z.boolean().refine((v) => v === true, {
     message: "Confirm you are a legitimate business",
   }),
+}).refine((value) => value.password === value.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 export const inviteEmployeeSchema = z.object({

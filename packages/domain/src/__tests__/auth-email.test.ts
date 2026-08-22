@@ -16,7 +16,14 @@ describe("auth email", () => {
         tokenHash: "abc",
         action: "signup",
       })
-    ).toBe("https://askfindit.com/auth/callback?token_hash=abc&type=email");
+    ).toBe("https://www.askfindit.com/auth/callback?token_hash=abc&type=email");
+    expect(
+      authEmailConfirmationUrl({
+        appUrl: "https://www.askfindit.com",
+        tokenHash: "abc",
+        action: "magiclink",
+      })
+    ).toBe("https://www.askfindit.com/auth/callback?token_hash=abc&type=magiclink");
   });
 
   it("uses a confirm subject customers can trust", () => {

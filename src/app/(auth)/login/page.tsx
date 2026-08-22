@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { Card } from "@/components/ui/primitives";
 import { CustomerEmailLoginForm } from "@/components/auth/customer-email-form";
+import { MagicLinkForm } from "@/components/auth/magic-link-form";
 import { GlassNotice } from "@/components/ui/glass";
 
 function LoginForm() {
@@ -28,6 +29,10 @@ function LoginForm() {
         </div>
       ) : null}
       <CustomerEmailLoginForm next={next} />
+      <div className="mt-6 border-t border-hairline-strong pt-5">
+        <p className="mb-3 text-sm font-semibold text-ink">Or use a magic link</p>
+        <MagicLinkForm emailId="customer-magic-email" />
+      </div>
       <p className="mt-4 text-center text-sm text-ink-muted">
         <Link
           href="/forgot-password"

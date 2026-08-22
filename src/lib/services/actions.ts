@@ -39,8 +39,12 @@ import { createRequestSchema, storeJoinApplicationSchema, storeOnboardingSchema 
 import { normalizeProductName } from "@/lib/utils";
 import { notifyCustomerDevices } from "@/lib/services/expo-push";
 import {
+  authEmailConfirmationUrl,
+  authEmailCopy,
   customerReplyAlertCopy,
   customerReplyPushCopy,
+  renderFinditEmailHtml,
+  renderFinditEmailText,
   shouldNotifyCustomerOfReply,
 } from "@findit/domain";
 import type {
@@ -222,6 +226,89 @@ export async function signInAction(email: string, password: string) {
     hasActiveStoreMembership: stores.length > 0,
   }) as AppHomePath;
   return { profile, homePath };
+}
+
+const MAGIC_LINK_REDIRECT = "https://www.askfindit.com/auth/callback";
+
+export async function sendMagicLinkAction(emailRaw: string) {
+  const email = emailRaw.trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    return { error: "Enter a valid email." };
+  }
+  if (isDemoMode()) {
+    return {
+      ok: true as const,
+      message: "Demo mode does not send email. Use the password on this screen.",
+    };
+  }
+
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const admin = createServiceClient();
+    const { data, error } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+      options: { redirectTo: MAGIC_LINK_REDIRECT },
+    });
+    if (error) return { error: authEmailErrorMessage(error.message) };
+
+    const tokenHash = data.properties.hashed_token;
+    if (!tokenHash) {
+      return { error: "Could not create a sign-in link. Try your password." };
+    }
+
+    const buttonUrl = authEmailConfirmationUrl({
+      appUrl: "https://www.askfindit.com",
+      tokenHash,
+      action: "magiclink",
+    });
+    const copy = authEmailCopy("magiclink");
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM || "FINDIT <hello@askfindit.com>";
+    if (!apiKey) {
+      return { error: "Email sending is not configured. Use your password for now." };
+    }
+
+    const sent = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: copy.subject,
+        html: renderFinditEmailHtml({
+          heading: copy.heading,
+          body: copy.body,
+          buttonLabel: copy.button,
+          buttonUrl,
+          footnote: copy.footnote,
+        }),
+        text: renderFinditEmailText({
+          heading: copy.heading,
+          body: copy.body,
+          buttonUrl,
+          footnote: copy.footnote,
+        }),
+      }),
+    });
+    if (!sent.ok) {
+      const detail = await sent.text();
+      return { error: authEmailErrorMessage(detail || "Could not send the sign-in link.") };
+    }
+    return {
+      ok: true as const,
+      message: "Check your email for a FINDIT sign-in link. It expires in about an hour.",
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.toLowerCase().includes("service role")) {
+      return { error: "Magic link is not configured. Use your password." };
+    }
+    return { error: authEmailErrorMessage(message) };
+  }
 }
 
 export async function getAppWorkspaceAction(): Promise<{
@@ -1926,6 +2013,7 @@ export async function submitStoreApplicationAction(raw: unknown) {
     return { error: parsed.error.issues[0]?.message || "Invalid application" };
   }
   const profile = await getCurrentProfile();
+  const ownerEmail = parsed.data.ownerEmail.toLowerCase();
 
   if (isDemoMode()) {
     const application = demoSubmitStoreApplication({
@@ -1938,7 +2026,7 @@ export async function submitStoreApplicationAction(raw: unknown) {
       phone: parsed.data.phone,
       website: parsed.data.website || undefined,
       ownerName: parsed.data.ownerName,
-      ownerEmail: parsed.data.ownerEmail,
+      ownerEmail,
       ownerPhone: parsed.data.ownerPhone || undefined,
       whyLegit: parsed.data.whyLegit,
       confirmedLegitimate: parsed.data.confirmedLegitimate === true,
@@ -1953,6 +2041,60 @@ export async function submitStoreApplicationAction(raw: unknown) {
   // fails SELECT RLS for anon even when the insert policy allows the row.
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
+  let applicantUserId = profile?.id || null;
+  if (!isSoloAdminEmail(ownerEmail)) {
+    const ownerName = parsed.data.ownerName.trim();
+    const firstName = ownerName.split(" ")[0] || ownerName;
+    const lastName = ownerName.split(" ").slice(1).join(" ");
+    const { data: existing } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("email", ownerEmail)
+      .maybeSingle();
+    if (existing?.id) {
+      const { error: updateError } = await admin.auth.admin.updateUserById(existing.id, {
+        password: parsed.data.password,
+        email_confirm: true,
+        user_metadata: {
+          first_name: firstName,
+          last_name: lastName,
+          account_type: "business",
+          default_city: parsed.data.city,
+          default_state: parsed.data.state,
+          default_postal_code: parsed.data.postalCode,
+        },
+      });
+      if (updateError) return { error: updateError.message };
+      await admin
+        .from("profiles")
+        .update({
+          account_type: "business",
+          default_city: parsed.data.city,
+          default_state: parsed.data.state,
+          default_postal_code: parsed.data.postalCode,
+        })
+        .eq("id", existing.id);
+      applicantUserId = existing.id;
+    } else {
+      const { data: created, error: createError } = await admin.auth.admin.createUser({
+        email: ownerEmail,
+        password: parsed.data.password,
+        email_confirm: true,
+        user_metadata: {
+          first_name: firstName,
+          last_name: lastName,
+          account_type: "business",
+          default_city: parsed.data.city,
+          default_state: parsed.data.state,
+          default_postal_code: parsed.data.postalCode,
+        },
+      });
+      if (createError || !created.user) {
+        return { error: createError?.message || "Could not create the store login." };
+      }
+      applicantUserId = created.user.id;
+    }
+  }
   const { data, error } = await admin
     .from("store_applications")
     .insert({
@@ -1965,13 +2107,13 @@ export async function submitStoreApplicationAction(raw: unknown) {
       phone: parsed.data.phone,
       website: parsed.data.website || null,
       owner_name: parsed.data.ownerName,
-      owner_email: parsed.data.ownerEmail.toLowerCase(),
+      owner_email: ownerEmail,
       owner_phone: parsed.data.ownerPhone || null,
       why_legit: parsed.data.whyLegit,
       confirmed_legitimate: true,
       request_categories: parsed.data.requestCategories,
       requires_customer_id: parsed.data.requiresCustomerId,
-      applicant_user_id: profile?.id || null,
+      applicant_user_id: applicantUserId,
       status: "pending",
     })
     .select("*")

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
 import { loginEmailPassword } from "@/lib/auth/client-login";
+import { MagicLinkForm } from "@/components/auth/magic-link-form";
 
 function BusinessLoginForm() {
   const params = useSearchParams();
@@ -61,6 +62,10 @@ function BusinessLoginForm() {
           {loading ? "Signing in…" : "Log in"}
         </Button>
       </form>
+      <div className="mt-6 border-t border-hairline-strong pt-5">
+        <p className="mb-3 text-sm font-semibold text-ink">Or use a magic link</p>
+        <MagicLinkForm emailId="store-magic-email" />
+      </div>
       <p className="mt-5 text-center text-sm text-ink-muted">
         <Link
           href="/forgot-password"

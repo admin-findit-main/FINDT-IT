@@ -156,12 +156,16 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "https://askfindit.com"
+site_url = "https://www.askfindit.com"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # URLs Auth may redirect to after email/OAuth. Wildcards cover query strings
 # such as /auth/callback?next=/auth/update-password.
 additional_redirect_urls = [
+  "https://www.askfindit.com/**",
+  "https://dashboard.askfindit.com/**",
+  "https://store.askfindit.com/**",
+  "https://app.askfindit.com/**",
   "https://askfindit.com/**",
   "http://localhost:3002/**",
   "http://127.0.0.1:3002/**",

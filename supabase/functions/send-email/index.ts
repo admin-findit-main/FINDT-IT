@@ -7,7 +7,7 @@ import {
   renderFinditEmailText,
 } from "./auth-email.ts";
 
-const APP_URL = Deno.env.get("FINDIT_APP_URL") || "https://askfindit.com";
+const APP_URL = Deno.env.get("FINDIT_APP_URL") || "https://www.askfindit.com";
 const FROM = Deno.env.get("RESEND_FROM") || "FINDIT <hello@askfindit.com>";
 
 type HookPayload = {

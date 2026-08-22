@@ -73,6 +73,8 @@ export default function JoinAsStorePage() {
       ownerName: String(fd.get("ownerName")),
       ownerEmail: String(fd.get("ownerEmail")),
       ownerPhone: String(fd.get("ownerPhone") || ""),
+      password: String(fd.get("password") || ""),
+      confirmPassword: String(fd.get("confirmPassword") || ""),
       whyLegit: String(fd.get("whyLegit")),
       requestCategories,
       requiresCustomerId: requiresCustomerId,
@@ -106,10 +108,11 @@ export default function JoinAsStorePage() {
               see local demand.
             </p>
             <p className="mt-3 text-sm text-ink-muted">
-              You won&apos;t get store dashboard access until you&apos;re approved.
+              Use the password you just chose on the store login after you&apos;re
+              approved. You can also email yourself a sign-in link from that page.
             </p>
             <Button asChild className="mt-8" size="lg">
-              <Link href="/login">Log in after approval</Link>
+              <Link href="/login/business">Store login</Link>
             </Button>
             <Button asChild variant="ghost" className="mt-3" size="lg">
               <Link href="/">Back to FINDIT</Link>
@@ -247,12 +250,38 @@ export default function JoinAsStorePage() {
                     <Label htmlFor="ownerEmail">Email</Label>
                     <Input id="ownerEmail" name="ownerEmail" type="email" required />
                     <p className="mt-1 text-xs text-ink-muted">
-                      Use the email you&apos;ll sign in with after approval.
+                      This is the login you&apos;ll use after approval. We create
+                      the password now — FINDIT does not wait on a magic-link
+                      email to finish signup.
                     </p>
                   </div>
                   <div>
                     <Label htmlFor="ownerPhone">Phone (optional)</Label>
                     <Input id="ownerPhone" name="ownerPhone" type="tel" />
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      minLength={8}
+                      required
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirmPassword">Confirm password</Label>
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type="password"
+                      minLength={8}
+                      required
+                      autoComplete="new-password"
+                    />
                   </div>
                 </div>
               </div>

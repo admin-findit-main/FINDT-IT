@@ -123,6 +123,15 @@ export function decideHostRouting(
     if (publicPath.startsWith("/forgot-password")) {
       return { kind: "redirect", url: absolute(request, "dashboard", publicPath) };
     }
+    if (publicPath.startsWith("/auth")) {
+      return {
+        kind: "continue",
+        surface,
+        publicPath,
+        internalPath: publicPath,
+        rewrite: false,
+      };
+    }
     return {
       kind: "continue",
       surface,
@@ -143,6 +152,15 @@ export function decideHostRouting(
       publicPath.startsWith("/invite")
     ) {
       return { kind: "redirect", url: absolute(request, "store", publicPath) };
+    }
+    if (publicPath.startsWith("/auth")) {
+      return {
+        kind: "continue",
+        surface,
+        publicPath,
+        internalPath: publicPath,
+        rewrite: false,
+      };
     }
     if (actor === "admin") {
       return { kind: "redirect", url: absolute(request, "store", "/admin") };
@@ -166,6 +184,18 @@ export function decideHostRouting(
       if (publicPath !== "/") {
         return { kind: "redirect", url: absolute(request, "www", publicPath) };
       }
+    }
+    if (publicPath.startsWith("/auth")) {
+      return {
+        kind: "continue",
+        surface,
+        publicPath,
+        internalPath: publicPath,
+        rewrite: false,
+      };
+    }
+    if (publicPath.startsWith("/forgot-password")) {
+      return { kind: "redirect", url: absolute(request, "dashboard", publicPath) };
     }
     if (
       publicPath.startsWith("/home") ||
