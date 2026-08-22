@@ -333,11 +333,6 @@ function applyHostDecision(
     const response = NextResponse.redirect(decision.url, decision.permanent ? 308 : 307);
     return copyCookies(supabaseResponse, response);
   }
-  if (decision.kind === "json") {
-    return NextResponse.json(decision.body, {
-      headers: { "cache-control": "no-store" },
-    });
-  }
   if (decision.kind === "continue" && !decision.rewrite) {
     supabaseResponse.headers.set("x-findit-surface", requestHeaders.get("x-findit-surface") || "");
     return null;

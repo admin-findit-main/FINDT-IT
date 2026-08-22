@@ -79,9 +79,14 @@ describe("decideHostRouting", () => {
     }
   });
 
-  it("returns a safe JSON payload on the app host", () => {
+  it("sends the app host home to the public website", () => {
     const decision = decideHostRouting(req("app.askfindit.com", "/"), "anonymous");
-    expect(decision.kind).toBe("json");
+    expect(decision.kind).toBe("redirect");
+    if (decision.kind === "redirect") {
+      expect(decision.permanent).toBe(true);
+      expect(decision.url.hostname).toBe("www.askfindit.com");
+      expect(decision.url.pathname).toBe("/");
+    }
   });
 
   it("leaves localhost paths unchanged", () => {

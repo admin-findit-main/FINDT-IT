@@ -19,7 +19,6 @@ export type StoreActor =
 
 export type HostDecision =
   | { kind: "redirect"; url: URL; permanent?: boolean }
-  | { kind: "json"; body: Record<string, string> }
   | {
       kind: "continue";
       surface: ProductSurface;
@@ -77,14 +76,7 @@ export function decideHostRouting(
 
   if (surface === "app") {
     if (publicPath === "/" || publicPath === "") {
-      return {
-        kind: "json",
-        body: {
-          name: "FINDIT",
-          service: "app",
-          website: "https://www.askfindit.com",
-        },
-      };
+      return { kind: "redirect", url: absolute(request, "www", "/"), permanent: true };
     }
     if (publicPath.startsWith("/auth")) {
       return {
