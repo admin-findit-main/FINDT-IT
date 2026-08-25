@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Panel } from "@/components/dashboard/shell";
+import { formatShortPlace } from "@findit/domain";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getAdminStatsAction, getCurrentProfile } from "@/lib/services/actions";
 
@@ -40,7 +41,11 @@ export default async function AdminAnalyticsPage() {
               <li key={store.id} className="flex justify-between gap-3">
                 <span>{store.name}</span>
                 <span className="text-ink-muted">
-                  {store.city}, {store.state}
+                  {formatShortPlace({
+                    city: store.city,
+                    state: store.state,
+                    postalCode: store.postal_code,
+                  })}
                 </span>
               </li>
             ))}

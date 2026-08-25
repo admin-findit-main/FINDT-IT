@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MetricCard, Panel } from "@/components/dashboard/shell";
+import { formatShortPlace } from "@findit/domain";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getAdminStatsAction, getCurrentProfile } from "@/lib/services/actions";
 import { redirect } from "next/navigation";
@@ -40,7 +41,11 @@ export default async function AdminOverviewPage() {
                   >
                     <span className="font-medium">{store.name}</span>
                     <span className="text-ink-muted">
-                      {store.city}, {store.state}
+                      {formatShortPlace({
+                        city: store.city,
+                        state: store.state,
+                        postalCode: store.postal_code,
+                      })}
                     </span>
                   </Link>
                 </li>

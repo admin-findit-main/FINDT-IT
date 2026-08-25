@@ -6,6 +6,7 @@ import { GlassBadge } from "@/components/ui/glass";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { getCustomerRequestsAction } from "@/lib/services/actions";
 import { formatRelativeTime } from "@/lib/utils";
+import { formatShortPlace } from "@findit/domain";
 import type { CustomerRequest } from "@/types/database";
 
 export default function RequestsPage() {
@@ -86,7 +87,14 @@ export default function RequestsPage() {
                     {item.product_name}
                   </span>
                   <span className="mt-0.5 block truncate text-sm capitalize text-ink-muted">
-                    {item.status.replaceAll("_", " ")} · {formatRelativeTime(item.created_at)}
+                    {item.status.replaceAll("_", " ")} ·{" "}
+                    {formatShortPlace({
+                      city: item.city,
+                      state: item.state,
+                      postalCode: item.postal_code,
+                    })}
+                    {" · "}
+                    {formatRelativeTime(item.created_at)}
                   </span>
                 </span>
                 <GlassBadge className="shrink-0 capitalize">

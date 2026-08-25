@@ -145,7 +145,7 @@ export function CustomerMenuButton({ className }: { className?: string }) {
                 </span>
                 <span className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-ink-subtle">
                   <MapPin className="h-3 w-3 shrink-0" strokeWidth={2.2} />
-                  <span className="truncate">{place || "Add city, state & ZIP"}</span>
+                  <span className="truncate">{place || "Add your city"}</span>
                 </span>
               </span>
             </span>

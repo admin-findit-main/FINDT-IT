@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Panel } from "@/components/dashboard/shell";
 import { Skeleton } from "@/components/ui/primitives";
-import { estimateZipDistanceMiles, isAgeRestrictedFind } from "@findit/domain";
+import { estimateZipDistanceMiles, formatShortPlace, isAgeRestrictedFind } from "@findit/domain";
 import {
   getStoreIncomingRequestsAction,
   getStoreWorkspaceAction,
@@ -66,7 +66,13 @@ export default function StoreRequestDetailPage() {
           {row.category ? `${row.category} · ` : ""}
           {formatRelativeTime(row.created_at)}
           {miles != null ? ` · ~${miles < 10 ? miles.toFixed(1) : Math.round(miles)} mi` : ""}
-          {row.postal_code ? ` · ${row.city} ${row.postal_code}` : ""}
+          {row.postal_code
+            ? ` · ${formatShortPlace({
+                city: row.city,
+                state: row.state,
+                postalCode: row.postal_code,
+              })}`
+            : ""}
         </p>
         {isAgeRestrictedFind({
           category: row.category,

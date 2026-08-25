@@ -84,20 +84,27 @@ export function stateName(code: string): string {
   return STATE_BY_CODE.get(normalizeStateCode(code) as UsStateCode)?.name || code;
 }
 
-/** City, ST ZIP — never a street address. */
+/** City, ST — what people know, without the ZIP. */
+export function formatCityState(place: {
+  city?: string | null;
+  state?: string | null;
+}): string {
+  const city = (place.city || "").trim();
+  const state = normalizeStateCode(place.state);
+  if (city && state) return `${city}, ${state}`;
+  return city || state || "";
+}
+
+/** City, ST ZIP — ZIP is appended so you can see it without having to type it. */
 export function formatShortPlace(place: {
   city?: string | null;
   state?: string | null;
   postalCode?: string | null;
 }): string {
-  const city = (place.city || "").trim();
-  const state = normalizeStateCode(place.state);
+  const cityState = formatCityState(place);
   const zip = digitsPostalCode(place.postalCode || "");
-  if (city && state && zip) return `${city}, ${state} ${zip}`;
-  if (city && state) return `${city}, ${state}`;
-  if (city && zip) return `${city} ${zip}`;
-  if (state && zip) return `${state} ${zip}`;
-  return zip || city || state || "";
+  if (cityState && zip) return `${cityState} ${zip}`;
+  return cityState || zip;
 }
 
 export function emptyShortPlace(): ShortPlace {

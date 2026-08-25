@@ -5,6 +5,7 @@ import {
   buildAnalyticsEvent,
   formatExpiresIn,
   formatRelativeTime,
+  formatShortPlace,
   isRequestExpired,
   mapsDirectionsUrl,
 } from "@findit/domain";
@@ -113,7 +114,12 @@ export default function RequestDetailScreen() {
           · {formatExpiresIn(detail.expires_at)}
         </Text>
         <Text style={[styles.meta, { color: theme.inkMuted }]}>
-          {detail.city}, {detail.state} · {detail.stores_targeted} store
+          {formatShortPlace({
+            city: detail.city,
+            state: detail.state,
+            postalCode: detail.postal_code,
+          })}{" "}
+          · {detail.stores_targeted} store
           {detail.stores_targeted === 1 ? "" : "s"} asked
         </Text>
       </GlassCard>

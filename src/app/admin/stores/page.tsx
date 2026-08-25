@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { formatShortPlace } from "@findit/domain";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getAdminStatsAction, getCurrentProfile } from "@/lib/services/actions";
 
@@ -23,7 +24,11 @@ export default async function AdminStoresPage() {
         >
           <p className="text-lg font-semibold tracking-tight text-ink">{store.name}</p>
           <p className="mt-1 text-sm text-ink-muted">
-            {store.city}, {store.state}
+            {formatShortPlace({
+              city: store.city,
+              state: store.state,
+              postalCode: store.postal_code,
+            })}
           </p>
           <p className="mt-3 text-xs capitalize text-ink-subtle">
             {store.is_suspended ? "Suspended" : store.is_active ? "Active" : "Inactive"}

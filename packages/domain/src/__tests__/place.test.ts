@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   digitsPostalCode,
+  formatCityState,
   formatShortPlace,
   isCompleteShortPlace,
   normalizeStateCode,
@@ -20,7 +21,7 @@ describe("normalizeStateCode", () => {
 });
 
 describe("formatShortPlace", () => {
-  it("prints city, ST ZIP without a street", () => {
+  it("appends ZIP to the city people already know", () => {
     expect(
       formatShortPlace({
         city: "Falls Church",
@@ -28,6 +29,9 @@ describe("formatShortPlace", () => {
         postalCode: "22044",
       })
     ).toBe("Falls Church, VA 22044");
+    expect(formatCityState({ city: "Falls Church", state: "Virginia" })).toBe(
+      "Falls Church, VA"
+    );
     expect(formatShortPlace({ city: "Falls Church", state: "Virginia" })).toBe(
       "Falls Church, VA"
     );

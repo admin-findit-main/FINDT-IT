@@ -39,6 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Profile } from "@/types/database";
 import {
+  formatCityState,
   formatShortPlace,
   isCompleteShortPlace,
   lookupUsZip,
@@ -102,7 +103,6 @@ export default function CustomerHomePage() {
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
   const radiusChoices = radiusOptionsForPlan(entitlements.maxSearchRadiusMiles);
   const plus = CUSTOMER_PLANS.plus;
-  const placeLabel = formatShortPlace(place) || "Add city, state & ZIP";
   const restricted = isAgeRestrictedFind({
     category,
     productName,
@@ -173,7 +173,7 @@ export default function CustomerHomePage() {
 
   async function fillFromLocation() {
     if (!navigator.geolocation) {
-      toast.error("Location isn’t available on this device. Enter a ZIP instead.");
+      toast.error("Location isn’t available on this device. Type your city instead.");
       setEditPlace(true);
       return;
     }
@@ -190,17 +190,17 @@ export default function CustomerHomePage() {
           setEditPlace(!isCompleteShortPlace(found));
           toast.success(
             found.postalCode
-              ? `Using ${found.city ? `${found.city}, ` : ""}${found.state} ${found.postalCode}`
-              : "Location added — confirm your ZIP below"
+              ? `Using ${formatShortPlace(found)}`
+              : "Location added — confirm your city below"
           );
           return;
         }
         setEditPlace(true);
-        toast.message("Confirm or enter your ZIP so we can ask nearby stores.");
+        toast.message("Confirm your city so we can ask nearby stores.");
       },
       () => {
         setLocating(false);
-        toast.error("Couldn’t get location. Enter a ZIP code instead.");
+        toast.error("Couldn’t get location. Type your city instead.");
         setEditPlace(true);
       },
       { enableHighAccuracy: false, timeout: 10000 }
@@ -268,7 +268,7 @@ export default function CustomerHomePage() {
     if (!isCompleteShortPlace(nextPlace)) {
       setLoading(false);
       setEditPlace(true);
-      toast.error("Add your city, state, and ZIP so we can ask nearby stores.");
+      toast.error("Add your city so we can ask nearby stores.");
       return;
     }
     const result = await createCustomerRequestAction({
@@ -527,12 +527,16 @@ export default function CustomerHomePage() {
               >
                 <MapPin className="h-4 w-4 shrink-0 text-ink-muted" />
                 <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-ink">{placeLabel}</span>
-                  {coords ? (
-                    <span className="mt-0.5 block text-xs text-ink-subtle">
-                      Location attached
-                    </span>
-                  ) : null}
+                  <span className="block font-semibold text-ink">
+                    {formatCityState(place) || "Add your city"}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs tabular-nums text-ink-subtle">
+                    {place.postalCode
+                      ? place.postalCode
+                      : coords
+                        ? "Adding your ZIP…"
+                        : "We’ll add your ZIP"}
+                  </span>
                 </span>
                 <span className="text-sm font-semibold text-accent-ink">
                   {editPlace ? "Done" : "Change"}
@@ -548,7 +552,7 @@ export default function CustomerHomePage() {
                     disabled={locating}
                     onClick={useMyLocation}
                   >
-                    {locating ? "Getting ZIP…" : "Use my location"}
+                    {locating ? "Finding your place…" : "Use my location"}
                   </Button>
                 </div>
               ) : null}

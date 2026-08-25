@@ -56,7 +56,7 @@ export default function ProfilePage() {
         <div>
           <Label>Place</Label>
           <p className="mb-2 text-xs text-ink-subtle">
-            City, state, ZIP — the short form FINDIT uses to ask nearby stores.
+            Type your city. We’ll add the ZIP — you don’t have to know it.
           </p>
           <PlaceFields
             value={{

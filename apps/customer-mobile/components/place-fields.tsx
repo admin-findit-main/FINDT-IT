@@ -71,6 +71,11 @@ export function PlaceFields({
     const t = setTimeout(() => {
       lookupUsCity(state, city).then((places) => {
         if (id !== cityReq.current) return;
+        if (places.length === 1) {
+          onChange(places[0]);
+          setSuggestions([]);
+          return;
+        }
         setSuggestions(places);
       });
     }, 350);
@@ -94,15 +99,19 @@ export function PlaceFields({
 
   return (
     <View>
-      <TextInput
-        placeholder="City"
-        placeholderTextColor={theme.inkSubtle}
-        autoCapitalize="words"
-        value={value.city}
-        onChangeText={(city) => onChange({ ...value, city })}
-        style={[inputStyle, styles.field, { borderBottomColor: theme.hairlineStrong }]}
-      />
       <View style={styles.row}>
+        <TextInput
+          placeholder="City"
+          placeholderTextColor={theme.inkSubtle}
+          autoCapitalize="words"
+          value={value.city}
+          onChangeText={(city) => onChange({ ...value, city, postalCode: "" })}
+          style={[
+            inputStyle,
+            styles.city,
+            { borderBottomColor: theme.hairlineStrong },
+          ]}
+        />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="State"
@@ -116,23 +125,24 @@ export function PlaceFields({
             {value.state ? `${value.state} · ${stateName(value.state)}` : "State"}
           </Text>
         </Pressable>
-        <TextInput
-          placeholder="ZIP"
-          placeholderTextColor={theme.inkSubtle}
-          keyboardType="number-pad"
-          value={value.postalCode}
-          onChangeText={(postalCode) =>
-            onChange({ ...value, postalCode: digitsPostalCode(postalCode) })
-          }
-          style={[
-            inputStyle,
-            styles.zip,
-            { borderBottomColor: theme.hairlineStrong },
-          ]}
-        />
       </View>
+      <TextInput
+        placeholder="ZIP — we fill this in"
+        placeholderTextColor={theme.inkSubtle}
+        keyboardType="number-pad"
+        maxLength={5}
+        value={value.postalCode}
+        onChangeText={(postalCode) =>
+          onChange({ ...value, postalCode: digitsPostalCode(postalCode) })
+        }
+        style={[
+          inputStyle,
+          styles.field,
+          { borderBottomColor: theme.hairlineStrong, color: theme.ink },
+        ]}
+      />
       {looking ? (
-        <Text style={[styles.hint, { color: theme.inkSubtle }]}>Finding that ZIP…</Text>
+        <Text style={[styles.hint, { color: theme.inkSubtle }]}>Adding your ZIP…</Text>
       ) : null}
       {suggestions.length > 0 ? (
         <View style={styles.suggest}>
@@ -146,14 +156,14 @@ export function PlaceFields({
               style={[styles.suggestItem, { backgroundColor: theme.solid3 }]}
             >
               <Text style={[styles.suggestText, { color: theme.ink }]}>
-                {place.postalCode} · {place.city}
+                {place.city} {place.postalCode}
               </Text>
             </Pressable>
           ))}
         </View>
       ) : (
         <Text style={[styles.hint, { color: theme.inkSubtle }]}>
-          City, state, ZIP — no street address. Type a ZIP to fill the rest.
+          Type your city — we’ll add the ZIP. No street address.
         </Text>
       )}
 
@@ -192,7 +202,7 @@ export function PlaceFields({
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => {
-                  onChange({ ...value, state: item.code });
+                  onChange({ ...value, state: item.code, postalCode: "" });
                   setStateOpen(false);
                 }}
                 style={styles.stateRow}
@@ -214,15 +224,15 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   row: { flexDirection: "row", gap: spacing.md },
-  stateBtn: {
+  city: {
     flex: 1.4,
     minHeight: 48,
-    justifyContent: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  zip: {
+  stateBtn: {
     flex: 0.9,
     minHeight: 48,
+    justifyContent: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   hint: {

@@ -28,7 +28,7 @@ import {
   createRequestSchema,
   digitsPostalCode,
   findPlaceholderForCategory,
-  formatShortPlace,
+  formatCityState,
   getConsumerEntitlements,
   isAgeRestrictedCategory,
   isAgeRestrictedFind,
@@ -157,7 +157,7 @@ export default function HomeFindItScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        setError("Location denied — enter city and ZIP manually.");
+        setError("Location denied — type your city instead.");
         setEditPlace(true);
         return;
       }
@@ -180,12 +180,12 @@ export default function HomeFindItScreen() {
       setPlace(next);
       setEditPlace(!isCompleteShortPlace(next));
       if (!isCompleteShortPlace(next)) {
-        setError("Confirm your city and ZIP so we can ask nearby stores.");
+        setError("Confirm your city so we can ask nearby stores.");
       } else {
         setError(null);
       }
     } catch {
-      setError("Couldn’t get location. Enter city and ZIP manually.");
+      setError("Couldn’t get location. Type your city instead.");
       setEditPlace(true);
     } finally {
       setLocating(false);
@@ -308,7 +308,7 @@ export default function HomeFindItScreen() {
       }
       if (!isCompleteShortPlace(nextPlace)) {
         setEditPlace(true);
-        setError("Add your city, state, and ZIP so we can ask nearby stores.");
+        setError("Add your city so we can ask nearby stores.");
         return;
       }
 
@@ -381,7 +381,6 @@ export default function HomeFindItScreen() {
   };
 
   const plus = CUSTOMER_PLANS.plus;
-  const placeLabel = formatShortPlace(place) || "Add city, state & ZIP";
   const restricted = isAgeRestrictedFind({
     category,
     productName,
@@ -634,12 +633,16 @@ export default function HomeFindItScreen() {
                   style={styles.placeRow}
                 >
                   <View style={styles.fill}>
-                    <Text style={[styles.placeValue, { color: theme.ink }]}>{placeLabel}</Text>
-                    {coords ? (
-                      <Text style={[styles.placeMeta, { color: theme.inkSubtle }]}>
-                        Location attached
-                      </Text>
-                    ) : null}
+                    <Text style={[styles.placeValue, { color: theme.ink }]}>
+                      {formatCityState(place) || "Add your city"}
+                    </Text>
+                    <Text style={[styles.placeMeta, { color: theme.inkSubtle }]}>
+                      {place.postalCode
+                        ? place.postalCode
+                        : coords
+                          ? "Adding your ZIP…"
+                          : "We’ll add your ZIP"}
+                    </Text>
                   </View>
                   <Text style={[styles.edit, { color: theme.accentInk }]}>
                     {editPlace ? "Done" : "Change"}
@@ -650,7 +653,7 @@ export default function HomeFindItScreen() {
                     <PlaceFields value={place} onChange={setPlace} />
                     <Pressable onPress={useLocation} style={styles.linkPress}>
                       <Text style={[styles.link, { color: theme.inkMuted }]}>
-                        {locating ? "Getting ZIP…" : "Use my location"}
+                        {locating ? "Finding your place…" : "Use my location"}
                       </Text>
                     </Pressable>
                   </View>

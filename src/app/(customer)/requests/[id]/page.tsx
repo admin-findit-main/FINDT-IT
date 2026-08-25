@@ -28,6 +28,7 @@ import {
   mapsDirectionsUrl,
   sortResponsesByAvailability,
 } from "@/lib/utils";
+import { formatShortPlace } from "@findit/domain";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
 import { toast } from "sonner";
 
@@ -159,7 +160,12 @@ export default function RequestDetailPage() {
           {data.product_name}
         </h1>
         <p className="mt-1 text-sm text-ink-muted">
-          {data.city}, {data.state} · Requested {formatRelativeTime(data.created_at)}
+          {formatShortPlace({
+            city: data.city,
+            state: data.state,
+            postalCode: data.postal_code,
+          }) || "ZIP not set"}{" "}
+          · Requested {formatRelativeTime(data.created_at)}
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <StatusBadge

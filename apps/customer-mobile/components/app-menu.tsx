@@ -384,7 +384,7 @@ function CustomerMenuDrawer() {
               <View style={styles.placeRow}>
                 <FontAwesome name="map-marker" size={11} color={theme.inkSubtle} />
                 <Text style={[styles.footerPlace, { color: theme.inkSubtle }]} numberOfLines={1}>
-                  {place || "Add city, state & ZIP"}
+                  {place || "Add your city"}
                 </Text>
               </View>
             </View>
