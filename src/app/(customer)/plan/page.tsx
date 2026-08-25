@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 export default function PlanPage() {
   const catalog = customerPlanCatalog();
-  const [planId, setPlanId] = useState<"free" | "plus">("free");
+  const [planId, setPlanId] = useState<"free" | "plus" | null>(null);
   const [usageLabel, setUsageLabel] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,6 +30,8 @@ export default function PlanPage() {
     });
   }, []);
 
+  const planName = planId === "plus" ? "FINDIT+" : planId === "free" ? "FINDIT" : null;
+
   return (
     <div className="mx-auto max-w-xl px-5 py-8 pb-12 sm:px-8">
       <h1 className="text-2xl font-bold tracking-tight text-ink">Plan</h1>
@@ -37,26 +39,32 @@ export default function PlanPage() {
         FINDIT is free. FINDIT+ is the same account with more Finds and a
         wider search. Billing is not live, so you cannot buy FINDIT+ yet.
       </p>
-      {usageLabel ? (
+      {planName ? (
         <p className="mt-3 text-sm font-medium text-ink">
-          You&apos;re on {planId === "plus" ? "FINDIT+" : "FINDIT"}. {usageLabel}.
+          You&apos;re on {planName}
+          {usageLabel ? `. ${usageLabel}.` : "."}
         </p>
       ) : (
-        <p className="mt-3 text-sm font-medium text-ink">
-          You&apos;re on {planId === "plus" ? "FINDIT+" : "FINDIT"}.
-        </p>
+        <p className="mt-3 text-sm font-medium text-ink-muted">Loading your plan…</p>
       )}
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-4" role="list" aria-label="Plans">
         {catalog.plans.map((plan) => {
-          const current = plan.id === planId;
+          const current = planId != null && plan.id === planId;
           return (
             <Card
               key={plan.id}
+              role="listitem"
+              aria-current={current ? "true" : undefined}
               className={cn(
                 "space-y-4 p-5",
-                current && "border-accent-ring bg-accent-soft"
+                current && "!border-2 !border-accent"
               )}
+              style={
+                current
+                  ? { backgroundColor: "rgba(229, 35, 27, 0.28)" }
+                  : undefined
+              }
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -70,12 +78,27 @@ export default function PlanPage() {
                   <p className="mt-1 text-sm text-ink-muted">{plan.tagline}</p>
                   <p className="mt-1 text-sm text-ink">{plan.who}</p>
                 </div>
-                <p className="shrink-0 text-right text-sm font-semibold tabular-nums text-ink">
-                  {plan.priceLabel}
-                </p>
+                <div className="flex shrink-0 flex-col items-end gap-3">
+                  <p className="text-right text-sm font-semibold tabular-nums text-ink">
+                    {plan.priceLabel}
+                  </p>
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "grid h-[22px] w-[22px] place-items-center rounded-full border-2",
+                      current ? "border-accent" : "border-hairline"
+                    )}
+                  >
+                    {current ? (
+                      <span className="h-2.5 w-2.5 rounded-full bg-accent" />
+                    ) : null}
+                  </span>
+                </div>
               </div>
               {current ? (
-                <p className="text-xs font-semibold text-accent-ink">Your plan</p>
+                <p className="inline-flex rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-inverse">
+                  Your plan
+                </p>
               ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">

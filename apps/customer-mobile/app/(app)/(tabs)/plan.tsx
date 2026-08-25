@@ -50,8 +50,9 @@ export default function PlanScreen() {
               style={[
                 styles.card,
                 current && {
-                  backgroundColor: theme.accentSoft,
-                  borderColor: theme.accentRing,
+                  backgroundColor: "rgba(229, 35, 27, 0.28)",
+                  borderColor: theme.accent,
+                  borderWidth: 2,
                 },
               ]}
             >
@@ -72,14 +73,26 @@ export default function PlanScreen() {
                   </Text>
                   <Text style={[styles.who, { color: theme.ink }]}>{plan.who}</Text>
                 </View>
-                <Text style={[styles.price, { color: theme.ink }]}>
-                  {plan.priceLabel}
-                </Text>
+                <View style={styles.selectCol}>
+                  <Text style={[styles.price, { color: theme.ink }]}>
+                    {plan.priceLabel}
+                  </Text>
+                  <View
+                    style={[
+                      styles.radio,
+                      { borderColor: current ? theme.accent : theme.hairlineStrong },
+                    ]}
+                  >
+                    {current ? (
+                      <View style={[styles.radioDot, { backgroundColor: theme.accent }]} />
+                    ) : null}
+                  </View>
+                </View>
               </View>
               {current ? (
-                <Text style={[styles.badge, { color: theme.accentInk }]}>
-                  Your plan
-                </Text>
+                <View style={[styles.badgeWrap, { backgroundColor: theme.accent }]}>
+                  <Text style={styles.badge}>Your plan</Text>
+                </View>
               ) : null}
 
               <Text style={[styles.group, { color: theme.inkMuted }]}>Pros</Text>
@@ -140,6 +153,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   fill: { flex: 1, minWidth: 0 },
+  selectCol: { alignItems: "flex-end", gap: spacing.sm },
   plusMark: { height: 22, width: 94 },
   planName: {
     fontSize: typography.size.title3,
@@ -152,6 +166,19 @@ const styles = StyleSheet.create({
     textAlign: "right",
     maxWidth: 120,
   },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
   tagline: {
     marginTop: 4,
     fontSize: typography.size.footnote,
@@ -162,10 +189,19 @@ const styles = StyleSheet.create({
     fontSize: typography.size.footnote,
     lineHeight: 18,
   },
-  badge: {
+  badgeWrap: {
+    alignSelf: "flex-start",
     marginTop: spacing.sm,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  badge: {
     fontSize: typography.size.caption,
     fontWeight: typography.weight.semibold,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    color: "#FFFFFF",
   },
   group: {
     marginTop: spacing.md,
