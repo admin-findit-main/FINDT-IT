@@ -30,6 +30,7 @@ import {
   findPlaceholderForCategory,
   formatShortPlace,
   getConsumerEntitlements,
+  isAgeRestrictedCategory,
   isAgeRestrictedFind,
   isCompleteShortPlace,
   isMonthlyFindCapError,
@@ -59,7 +60,7 @@ import { useAuth } from "@/lib/auth";
 import { captureException } from "@/lib/monitoring";
 import { supabase } from "@/lib/supabase";
 
-type Step = "query" | "id" | "radius";
+type Step = "query" | "radius";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -95,7 +96,8 @@ export default function HomeFindItScreen() {
   const [limit, setLimit] = useState(entitlements.monthlyRequestLimit);
   const [showDetails, setShowDetails] = useState(false);
   const [editPlace, setEditPlace] = useState(false);
-  const [idFrom, setIdFrom] = useState<Step>("query");
+  const [pendingCategory, setPendingCategory] = useState("");
+  const pendingSubmit = useRef(false);
   const [locating, setLocating] = useState(false);
   const autoLocated = useRef(false);
 
@@ -239,16 +241,48 @@ export default function HomeFindItScreen() {
       description,
     });
     animateStep();
-    if (restrictedFind && !idConfirmed) {
-      setIdFrom("query");
-      setStep("id");
-      return;
-    }
-    if (restrictedFind) setShowDetails(true);
+    if (restrictedFind && idConfirmed) setShowDetails(true);
     setStep("radius");
   };
 
-  const onSubmit = async () => {
+  const promptAgeGate = (nextCategory?: string, thenSubmit = false) => {
+    if (idConfirmed) {
+      if (nextCategory) setCategory(nextCategory);
+      if (thenSubmit) void onSubmit(true);
+      return;
+    }
+    if (nextCategory) setPendingCategory(nextCategory);
+    pendingSubmit.current = thenSubmit;
+    Alert.alert(
+      AGE_RESTRICTED_ID_TITLE,
+      `${AGE_RESTRICTED_ID_BODY}\n\n${AGE_RESTRICTED_FIND_HINT}`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => {
+            setPendingCategory("");
+            pendingSubmit.current = false;
+          },
+        },
+        {
+          text: AGE_RESTRICTED_ID_CONFIRM,
+          onPress: () => {
+            const submit = pendingSubmit.current;
+            const chosen = nextCategory || pendingCategory;
+            pendingSubmit.current = false;
+            setPendingCategory("");
+            setIdConfirmed(true);
+            setShowDetails(true);
+            if (chosen) setCategory(chosen);
+            if (submit) void onSubmit(true);
+          },
+        },
+      ]
+    );
+  };
+
+  const onSubmit = async (ageOk = idConfirmed) => {
     if (atCap) {
       setError(planLimitReachedMessage(entitlements));
       setStep("query");
@@ -256,11 +290,9 @@ export default function HomeFindItScreen() {
     }
     if (
       isAgeRestrictedFind({ category, productName, description }) &&
-      !idConfirmed
+      !ageOk
     ) {
-      setIdFrom("radius");
-      animateStep();
-      setStep("id");
+      promptAgeGate(undefined, true);
       return;
     }
     setBusy(true);
@@ -311,7 +343,7 @@ export default function HomeFindItScreen() {
         longitude: coords?.lng ?? null,
         ageRestrictedConfirmed:
           !isAgeRestrictedFind({ category, productName, description }) ||
-          idConfirmed,
+          ageOk,
       });
       if (!parsed.success) {
         setError(parsed.error.issues[0]?.message || "Check your form");
@@ -372,7 +404,6 @@ export default function HomeFindItScreen() {
           contentContainerStyle={[
             styles.scroll,
             step === "query" && styles.scrollHero,
-            step === "id" && styles.scrollHero,
           ]}
         >
           {step === "query" ? (
@@ -396,7 +427,6 @@ export default function HomeFindItScreen() {
                   value={productName}
                   onChangeText={(v) => {
                     setProductName(v);
-                    setIdConfirmed(false);
                     if (error) setError(null);
                   }}
                   placeholder={findPlaceholderForCategory(null)}
@@ -477,38 +507,6 @@ export default function HomeFindItScreen() {
                 <Text style={[styles.usage, { color: theme.inkSubtle }]}>{usageLabel}</Text>
               ) : null}
             </View>
-          ) : step === "id" ? (
-            <View>
-              <Pressable
-                onPress={() => {
-                  animateStep();
-                  setStep(idFrom);
-                }}
-                hitSlop={8}
-              >
-                <Text style={[styles.link, { color: theme.inkMuted }]}>Back</Text>
-              </Pressable>
-              <Text style={[styles.hero, { color: theme.ink, marginTop: spacing.lg }]}>
-                {AGE_RESTRICTED_ID_TITLE}
-              </Text>
-              <Text style={[styles.sub, { color: theme.inkMuted }]}>
-                {AGE_RESTRICTED_ID_BODY}
-              </Text>
-              <Text style={[styles.sectionSub, { color: theme.ink, marginTop: spacing.md }]}>
-                {AGE_RESTRICTED_FIND_HINT}
-              </Text>
-              <GlassButton
-                title={AGE_RESTRICTED_ID_CONFIRM}
-                size="lg"
-                onPress={() => {
-                  setIdConfirmed(true);
-                  setShowDetails(true);
-                  animateStep();
-                  setStep("radius");
-                }}
-                style={styles.cta}
-              />
-            </View>
           ) : (
             <View>
               <Pressable
@@ -553,19 +551,11 @@ export default function HomeFindItScreen() {
                       key={item}
                       onPress={() => {
                         const next = category === item ? "" : item;
-                        setCategory(next);
-                        setIdConfirmed(false);
-                        if (
-                          isAgeRestrictedFind({
-                            category: next,
-                            productName,
-                            description,
-                          })
-                        ) {
-                          setIdFrom("radius");
-                          animateStep();
-                          setStep("id");
+                        if (isAgeRestrictedCategory(next) && !idConfirmed) {
+                          promptAgeGate(next);
+                          return;
                         }
+                        setCategory(next);
                       }}
                       style={[
                         styles.chip,

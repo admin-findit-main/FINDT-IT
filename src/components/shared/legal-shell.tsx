@@ -14,9 +14,13 @@ export function LegalShell({
 }) {
   return (
     <div className="app-canvas min-h-screen">
+      <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
+        <div className="mx-auto max-w-2xl px-6 py-4">
+          <BrandHomeLink href="/" />
+        </div>
+      </header>
       <div className="mx-auto max-w-2xl px-6 py-10">
-        <BrandHomeLink href="/" />
-        <GlassCard sheen className="mt-8 rounded-glass-2xl p-6 sm:p-9">
+        <GlassCard sheen className="rounded-glass-2xl p-6 sm:p-9">
           <h1 className="text-3xl font-bold tracking-tight text-ink">{title}</h1>
           {lastUpdated ? (
             <p className="mt-2 text-xs text-ink-subtle">Last updated {lastUpdated}</p>

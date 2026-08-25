@@ -223,7 +223,7 @@ export function DashboardShell({
       </aside>
 
       <div className={cn("min-h-dvh", collapsed ? "md:pl-[72px]" : "md:pl-[240px]")}>
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-hairline-strong bg-white/90 px-4 backdrop-blur-md md:px-8">
+        <header className="glass-chrome sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-hairline-strong px-4 md:px-8">
           <button
             type="button"
             className="grid h-9 w-9 place-items-center rounded-lg hover:bg-black/[0.04] md:hidden"

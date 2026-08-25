@@ -243,7 +243,7 @@ export function GlassNav({
   return (
     <header
       className={cn(
-        "glass-chrome sticky top-0 z-30 border-b border-hairline-strong",
+        "glass-chrome sticky top-0 z-50 border-b border-hairline-strong",
         className
       )}
       {...props}

@@ -67,9 +67,9 @@ export function CustomerMenuButton({ className }: { className?: string }) {
         </button>
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 duration-300" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 duration-300" />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 left-0 z-50 flex w-[min(20rem,88vw)] flex-col bg-white px-5 py-5 shadow-xl focus:outline-none duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[state=open]:animate-in data-[state=open]:slide-in-from-left-full data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left-full"
+          className="fixed inset-y-0 left-0 z-[60] flex w-[min(20rem,88vw)] flex-col bg-white px-5 py-5 shadow-xl focus:outline-none duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-[state=open]:animate-in data-[state=open]:slide-in-from-left-full data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left-full"
           aria-describedby={undefined}
         >
           <div className="flex items-center justify-between gap-3">
@@ -159,18 +159,24 @@ export function CustomerMenuButton({ className }: { className?: string }) {
 export function CustomerTopBar() {
   const homeHref = usePublicHref("/home");
   return (
-    <header className="glass-chrome sticky top-0 z-40 border-b border-hairline-strong">
-      <div className="mx-auto flex h-14 max-w-3xl items-center px-2 sm:px-4">
-        <CustomerMenuButton />
-        <Link
-          href={homeHref}
-          className="mx-auto inline-flex items-center"
-          aria-label="FINDIT home"
-        >
-          <BrandLogo kind="mark" className="h-7 w-auto" />
-        </Link>
-        <div className="w-11 shrink-0" aria-hidden />
-      </div>
-    </header>
+    <>
+      <header className="glass-chrome fixed inset-x-0 top-0 z-50 border-b border-hairline-strong pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-14 max-w-3xl items-center px-2 sm:px-4">
+          <CustomerMenuButton />
+          <Link
+            href={homeHref}
+            className="mx-auto inline-flex items-center"
+            aria-label="FINDIT home"
+          >
+            <BrandLogo kind="mark" className="h-7 w-auto" />
+          </Link>
+          <div className="w-11 shrink-0" aria-hidden />
+        </div>
+      </header>
+      <div
+        className="h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0"
+        aria-hidden
+      />
+    </>
   );
 }

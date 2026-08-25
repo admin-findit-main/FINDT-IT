@@ -235,9 +235,11 @@ h1 {
   box-shadow: var(--shadow-glass-lg);
 }
 
-/* Navigation, tab bars, sticky headers — the only place frost belongs. */
+/* Navigation, tab bars, sticky headers — the only place frost belongs.
+   Do not set `position` here: headers are sticky/fixed and the tab bar is
+   fixed. `position: relative` would override those utilities and the bar
+   would scroll away. */
 .glass-chrome {
-  position: relative;
   background-color: var(--glass-chrome);
   backdrop-filter: blur(var(--blur-chrome)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--blur-chrome)) saturate(var(--glass-saturate));

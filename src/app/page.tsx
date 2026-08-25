@@ -39,8 +39,8 @@ export default async function LandingPage() {
 
   return (
     <div className="app-canvas min-h-screen">
-      <header className="absolute inset-x-0 top-0 z-20">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <BrandHomeLink href="/" tone="dark" />
           <div className="flex items-center gap-2">
             <Button
@@ -68,7 +68,7 @@ export default async function LandingPage() {
 
       <main>
         <section className="app-canvas-dark relative overflow-hidden">
-          <div className="relative mx-auto grid max-w-6xl gap-12 px-6 pb-24 pt-28 md:grid-cols-2 md:items-center md:pb-32 md:pt-36">
+          <div className="relative mx-auto grid max-w-6xl gap-12 px-6 pb-24 pt-16 md:grid-cols-2 md:items-center md:pb-32 md:pt-24">
             <div>
               <BrandLogo kind="mark" tone="dark" className="h-12 w-auto" />
               <Overline className="mt-6 text-ink-inverse/70">{APP_NAME}</Overline>

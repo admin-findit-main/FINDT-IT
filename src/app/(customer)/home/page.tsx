@@ -6,6 +6,7 @@ import { Camera, ChevronLeft, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/primitives";
+import { GlassSheet } from "@/components/ui/dialog";
 import { GlassChip, GlassNotice } from "@/components/ui/glass";
 import { PlusUpgradeCard } from "@/components/customer/plus-upgrade";
 import { PlaceFields } from "@/components/customer/place-fields";
@@ -18,6 +19,7 @@ import {
   PRODUCT_CATEGORIES,
   findPlaceholderForCategory,
   getConsumerEntitlements,
+  isAgeRestrictedCategory,
   isAgeRestrictedFind,
   planLimitReachedMessage,
   radiusLimitMessage,
@@ -45,7 +47,7 @@ import {
   type ShortPlace,
 } from "@findit/domain";
 
-type Step = "query" | "id" | "radius";
+type Step = "query" | "radius";
 
 export default function CustomerHomePage() {
   const router = useRouter();
@@ -60,7 +62,8 @@ export default function CustomerHomePage() {
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [editPlace, setEditPlace] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [idFrom, setIdFrom] = useState<Step>("query");
+  const [ageGateOpen, setAgeGateOpen] = useState(false);
+  const [pendingCategory, setPendingCategory] = useState("");
   const [uploading, setUploading] = useState(false);
 
   const [productName, setProductName] = useState("");
@@ -78,6 +81,7 @@ export default function CustomerHomePage() {
   const [imageStoragePath, setImageStoragePath] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const autoLocated = useRef(false);
+  const pendingSubmit = useRef<{ forceDuplicate: boolean } | null>(null);
 
   useEffect(() => {
     getCurrentProfile().then((p) => {
@@ -121,13 +125,38 @@ export default function CustomerHomePage() {
     }
     setDuplicateId(null);
     setEditPlace(!place.postalCode.trim() || !place.city.trim() || !place.state.trim());
-    if (restricted && !idConfirmed) {
-      setIdFrom("query");
-      setStep("id");
+    if (restricted && idConfirmed) setShowDetails(true);
+    setStep("radius");
+  }
+
+  function onAgeGateOpenChange(open: boolean) {
+    setAgeGateOpen(open);
+    if (!open) {
+      setPendingCategory("");
+      pendingSubmit.current = null;
+    }
+  }
+
+  function confirmAgeGate() {
+    const nextCategory = pendingCategory;
+    const pending = pendingSubmit.current;
+    pendingSubmit.current = null;
+    setPendingCategory("");
+    setIdConfirmed(true);
+    setAgeGateOpen(false);
+    if (nextCategory) setCategory(nextCategory);
+    setShowDetails(true);
+    if (pending) void submitRequest(pending.forceDuplicate, true);
+  }
+
+  function chooseCategory(item: string) {
+    const next = category === item ? "" : item;
+    if (isAgeRestrictedCategory(next) && !idConfirmed) {
+      setPendingCategory(next);
+      setAgeGateOpen(true);
       return;
     }
-    if (restricted) setShowDetails(true);
-    setStep("radius");
+    setCategory(next);
   }
 
   useEffect(() => {
@@ -216,15 +245,15 @@ export default function CustomerHomePage() {
     setImageStoragePath(uploaded.path);
   }
 
-  async function submitRequest(forceDuplicate = false) {
+  async function submitRequest(forceDuplicate = false, ageOk = idConfirmed) {
     if (upgrade) {
       setStep("query");
       toast.error(planLimitReachedMessage(entitlements));
       return;
     }
-    if (restricted && !idConfirmed) {
-      setIdFrom("radius");
-      setStep("id");
+    if (restricted && !ageOk) {
+      pendingSubmit.current = { forceDuplicate };
+      setAgeGateOpen(true);
       return;
     }
     setLoading(true);
@@ -256,7 +285,7 @@ export default function CustomerHomePage() {
       forceDuplicate,
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
-      ageRestrictedConfirmed: !restricted || idConfirmed,
+      ageRestrictedConfirmed: !restricted || ageOk,
     });
     setLoading(false);
     if (result.duplicateOf && !forceDuplicate) {
@@ -329,7 +358,6 @@ export default function CustomerHomePage() {
                 value={productName}
                 onChange={(e) => {
                   setProductName(e.target.value);
-                  setIdConfirmed(false);
                 }}
               />
               <label className="flex min-h-[140px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-hairline-strong bg-white text-center">
@@ -391,37 +419,6 @@ export default function CustomerHomePage() {
               ) : null}
             </form>
           </div>
-        ) : step === "id" ? (
-          <div className="flex flex-1 flex-col justify-center pb-16">
-            <button
-              type="button"
-              onClick={() => setStep(idFrom)}
-              className="mb-6 inline-flex min-h-11 items-center gap-1 self-start text-sm font-semibold text-ink-muted hover:text-ink"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Back
-            </button>
-            <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-ink">
-              {AGE_RESTRICTED_ID_TITLE}
-            </h1>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted">
-              {AGE_RESTRICTED_ID_BODY}
-            </p>
-            <p className="mt-4 max-w-md text-sm leading-relaxed text-ink">
-              {AGE_RESTRICTED_FIND_HINT}
-            </p>
-            <Button
-              className="mt-8 w-full"
-              size="xl"
-              onClick={() => {
-                setIdConfirmed(true);
-                setShowDetails(true);
-                setStep("radius");
-              }}
-            >
-              {AGE_RESTRICTED_ID_CONFIRM}
-            </Button>
-          </div>
         ) : (
           <div className="pb-10">
             <button
@@ -471,21 +468,7 @@ export default function CustomerHomePage() {
                 <GlassChip
                   key={item}
                   selected={category === item}
-                  onClick={() => {
-                    const next = category === item ? "" : item;
-                    setCategory(next);
-                    setIdConfirmed(false);
-                    if (
-                      isAgeRestrictedFind({
-                        category: next,
-                        productName,
-                        description,
-                      })
-                    ) {
-                      setIdFrom("radius");
-                      setStep("id");
-                    }
-                  }}
+                  onClick={() => chooseCategory(item)}
                 >
                   {item}
                 </GlassChip>
@@ -633,6 +616,19 @@ export default function CustomerHomePage() {
           </div>
         )}
       </div>
+      <GlassSheet
+        open={ageGateOpen}
+        onOpenChange={onAgeGateOpenChange}
+        title={AGE_RESTRICTED_ID_TITLE}
+        description={AGE_RESTRICTED_ID_BODY}
+      >
+        <p className="text-sm leading-relaxed text-ink">
+          {AGE_RESTRICTED_FIND_HINT}
+        </p>
+        <Button className="mt-6 w-full" size="xl" onClick={confirmAgeGate}>
+          {AGE_RESTRICTED_ID_CONFIRM}
+        </Button>
+      </GlassSheet>
     </div>
   );
 }

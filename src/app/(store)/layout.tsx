@@ -29,7 +29,7 @@ export default async function StoreLayout({
   if (!access.allowed) {
     return (
       <div className="app-canvas min-h-screen bg-canvas">
-        <header className="border-b border-hairline-strong bg-white px-6 py-4">
+        <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong px-6 py-4">
           <BrandHomeLink href="/" kind="business" />
         </header>
         <main className="mx-auto max-w-lg px-6 py-16">

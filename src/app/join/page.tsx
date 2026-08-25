@@ -91,8 +91,10 @@ export default function JoinAsStorePage() {
   if (submitted) {
     return (
       <div className="app-canvas min-h-screen">
-        <header className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
-          <BrandHomeLink href="/" />
+        <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
+          <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+            <BrandHomeLink href="/" />
+          </div>
         </header>
         <main className="mx-auto max-w-xl px-6 py-16">
           <Card level="strong" sheen className="p-8 text-center">
@@ -125,11 +127,13 @@ export default function JoinAsStorePage() {
 
   return (
     <div className="app-canvas min-h-screen">
-      <header className="mx-auto flex max-w-3xl items-center justify-between px-6 py-5">
-        <BrandHomeLink href="/" />
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/login">Already approved? Log in</Link>
-        </Button>
+      <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+          <BrandHomeLink href="/" />
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/login">Already approved? Log in</Link>
+          </Button>
+        </div>
       </header>
 
       <main className="mx-auto max-w-2xl px-6 pb-20 pt-6 md:pt-10">
