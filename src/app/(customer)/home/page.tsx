@@ -10,6 +10,8 @@ import { GlassSheet } from "@/components/ui/dialog";
 import { GlassChip, GlassNotice } from "@/components/ui/glass";
 import { PlusUpgradeCard } from "@/components/customer/plus-upgrade";
 import { PlaceFields } from "@/components/customer/place-fields";
+import { LocateMeButton } from "@/components/customer/locate-me-button";
+import { geolocateUsPlace } from "@/lib/customer/geolocate";
 import {
   AGE_RESTRICTED_FIND_HINT,
   AGE_RESTRICTED_ID_BODY,
@@ -43,7 +45,6 @@ import {
   formatShortPlace,
   isCompleteShortPlace,
   lookupUsZip,
-  reverseGeocodeUs,
   shortPlaceFromProfile,
   type ShortPlace,
 } from "@findit/domain";
@@ -172,38 +173,21 @@ export default function CustomerHomePage() {
   }
 
   async function fillFromLocation() {
-    if (!navigator.geolocation) {
-      toast.error("Location isn’t available on this device. Type your city instead.");
+    setLocating(true);
+    const result = await geolocateUsPlace();
+    setLocating(false);
+    if (!result.ok) {
+      toast.error(result.error);
       setEditPlace(true);
       return;
     }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCoords({ lat, lng });
-        const found = await reverseGeocodeUs(lat, lng);
-        setLocating(false);
-        if (found && (found.postalCode || found.city)) {
-          setPlace(found);
-          setEditPlace(!isCompleteShortPlace(found));
-          toast.success(
-            found.postalCode
-              ? `Using ${formatShortPlace(found)}`
-              : "Location added — confirm your city below"
-          );
-          return;
-        }
-        setEditPlace(true);
-        toast.message("Confirm your city so we can ask nearby stores.");
-      },
-      () => {
-        setLocating(false);
-        toast.error("Couldn’t get location. Type your city instead.");
-        setEditPlace(true);
-      },
-      { enableHighAccuracy: false, timeout: 10000 }
+    setCoords(result.coords);
+    setPlace(result.place);
+    setEditPlace(!isCompleteShortPlace(result.place));
+    toast.success(
+      result.place.postalCode
+        ? `Using ${formatShortPlace(result.place)}`
+        : "Location added — confirm your city below"
     );
   }
 
@@ -519,6 +503,9 @@ export default function CustomerHomePage() {
             ) : null}
 
             <h2 className="mt-8 text-2xl font-bold tracking-tight text-ink">Near</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Don’t know your ZIP? Tap Locate me and we’ll fill it in.
+            </p>
             <div className="mt-4 overflow-hidden rounded-2xl border border-hairline-strong bg-white">
               <button
                 type="button"
@@ -533,29 +520,27 @@ export default function CustomerHomePage() {
                   <span className="mt-0.5 block truncate text-xs tabular-nums text-ink-subtle">
                     {place.postalCode
                       ? place.postalCode
-                      : coords
+                      : locating
                         ? "Adding your ZIP…"
-                        : "We’ll add your ZIP"}
+                        : coords
+                          ? "Adding your ZIP…"
+                          : "We’ll add your ZIP"}
                   </span>
                 </span>
                 <span className="text-sm font-semibold text-accent-ink">
                   {editPlace ? "Done" : "Change"}
                 </span>
               </button>
-              {editPlace ? (
-                <div className="space-y-3 border-t border-hairline-strong px-5 py-4">
+              <div className="space-y-3 border-t border-hairline-strong px-5 py-4">
+                <LocateMeButton
+                  busy={locating}
+                  emphasized={!place.postalCode.trim()}
+                  onPress={useMyLocation}
+                />
+                {editPlace ? (
                   <PlaceFields value={place} onChange={setPlace} />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    disabled={locating}
-                    onClick={useMyLocation}
-                  >
-                    {locating ? "Finding your place…" : "Use my location"}
-                  </Button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </div>
 
             <button

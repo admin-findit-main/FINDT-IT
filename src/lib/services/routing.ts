@@ -3,6 +3,8 @@ export {
   CUSTOMER_RADIUS_OPTIONS,
   MAX_CUSTOMER_RADIUS_MILES,
   estimateZipDistanceMiles,
+  formatEstimatedDistanceMiles,
+  sortCustomerResponsesByDistance,
   storeCoversCustomerZip,
   isWithinMutualRadius,
   selectEligibleStores,

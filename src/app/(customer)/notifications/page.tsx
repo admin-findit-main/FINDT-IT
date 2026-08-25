@@ -9,6 +9,10 @@ import {
   getNotificationsAction,
   markNotificationReadAction,
 } from "@/lib/services/actions";
+import {
+  browserNotifyPermission,
+  requestBrowserNotifyPermission,
+} from "@/lib/browser-notify";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Notification } from "@/types/database";
 
@@ -33,16 +37,11 @@ export default function NotificationsPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof Notification === "undefined") {
-      setBrowserPermission("unsupported");
-      return;
-    }
-    setBrowserPermission(Notification.permission);
+    setBrowserPermission(browserNotifyPermission());
   }, []);
 
   async function enableBrowserAlerts() {
-    if (typeof Notification === "undefined") return;
-    const next = await Notification.requestPermission();
+    const next = await requestBrowserNotifyPermission();
     setBrowserPermission(next);
     if (next === "granted") toast.success("Browser alerts are on for this device.");
     else toast.message("You can still see alerts here.");

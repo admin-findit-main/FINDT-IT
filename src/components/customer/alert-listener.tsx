@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { showBrowserNotification } from "@/lib/browser-notify";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -44,22 +45,16 @@ export function CustomerAlertListener({ userId }: { userId: string }) {
               };
               const title = row.title || "FINDIT";
               const body = row.body || "A store answered your Find.";
+              const url = row.related_request_id
+                ? `/requests/${row.related_request_id}`
+                : "/notifications";
               toast.success(title, { description: body });
-              if (
-                typeof Notification !== "undefined" &&
-                Notification.permission === "granted"
-              ) {
-                const note = new Notification(title, {
-                  body,
-                  tag: row.related_request_id || title,
-                });
-                note.onclick = () => {
-                  window.focus();
-                  if (row.related_request_id) {
-                    window.location.href = `/requests/${row.related_request_id}`;
-                  }
-                };
-              }
+              void showBrowserNotification({
+                title,
+                body,
+                tag: row.related_request_id || title,
+                url,
+              });
             }
           )
           .subscribe();

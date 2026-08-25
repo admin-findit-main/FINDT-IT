@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
 import { IosSwitch } from "@/components/ui/ios-switch";
 import { PlaceFields } from "@/components/customer/place-fields";
+import { LocateMeButton } from "@/components/customer/locate-me-button";
+import { geolocateUsPlace } from "@/lib/customer/geolocate";
 import { SUPPORT_EMAIL } from "@/lib/auth/admin";
 import { DeleteAccountCard } from "@/components/account/delete-account-card";
 import {
@@ -15,11 +17,16 @@ import {
   updateProfileAction,
 } from "@/lib/services/actions";
 import type { Profile } from "@/types/database";
+import {
+  formatShortPlace,
+  isCompleteShortPlace,
+} from "@findit/domain";
 
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     getCurrentProfile().then(setProfile);
@@ -56,7 +63,7 @@ export default function ProfilePage() {
         <div>
           <Label>Place</Label>
           <p className="mb-2 text-xs text-ink-subtle">
-            Type your city. We’ll add the ZIP — you don’t have to know it.
+            Type your city, or tap Locate me and we’ll add the ZIP — you don’t have to know it.
           </p>
           <PlaceFields
             value={{
@@ -72,6 +79,31 @@ export default function ProfilePage() {
                 default_postal_code: place.postalCode,
               })
             }
+          />
+          <LocateMeButton
+            className="mt-3"
+            busy={locating}
+            emphasized={!profile.default_postal_code}
+            onPress={async () => {
+              setLocating(true);
+              const result = await geolocateUsPlace();
+              setLocating(false);
+              if (!result.ok) {
+                toast.error(result.error);
+                return;
+              }
+              setProfile({
+                ...profile,
+                default_city: result.place.city,
+                default_state: result.place.state,
+                default_postal_code: result.place.postalCode,
+              });
+              toast.success(
+                isCompleteShortPlace(result.place)
+                  ? `Using ${formatShortPlace(result.place)}`
+                  : "Location added — confirm your city above"
+              );
+            }}
           />
         </div>
         <div className="space-y-3 border-t border-hairline-strong pt-4">

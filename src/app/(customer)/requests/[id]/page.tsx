@@ -9,6 +9,7 @@ import { GlassBadge, GlassNotice } from "@/components/ui/glass";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { BackLink } from "@/components/shared/app-header";
 import { ResponseAccent, StatusBadge } from "@/components/shared/status";
+import { NotificationPrompt } from "@/components/customer/notification-prompt";
 import {
   cancelRequestAction,
   fulfillRequestAction,
@@ -26,9 +27,13 @@ import {
   formatRelativeTime,
   isRequestExpired,
   mapsDirectionsUrl,
-  sortResponsesByAvailability,
 } from "@/lib/utils";
-import { formatShortPlace } from "@findit/domain";
+import {
+  estimateZipDistanceMiles,
+  formatEstimatedDistanceMiles,
+  formatShortPlace,
+  sortCustomerResponsesByDistance,
+} from "@findit/domain";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
 import { toast } from "sonner";
 
@@ -36,6 +41,42 @@ type Detail = CustomerRequest & {
   responses?: (StoreResponse & { store?: Store })[];
   targets_count?: number;
 };
+
+function SearchingStoresCard({
+  storesContacted,
+  placeLabel,
+  expiresAt,
+}: {
+  storesContacted: number;
+  placeLabel: string;
+  expiresAt: string;
+}) {
+  return (
+    <Card className="mt-4 p-6 text-center">
+      <div className="flex items-center justify-center gap-2" aria-hidden>
+        <span className="findit-search-dot h-2.5 w-2.5 rounded-full bg-accent" />
+        <span
+          className="findit-search-dot h-2.5 w-2.5 rounded-full bg-accent"
+          style={{ animationDelay: "0.2s" }}
+        />
+        <span
+          className="findit-search-dot h-2.5 w-2.5 rounded-full bg-accent"
+          style={{ animationDelay: "0.4s" }}
+        />
+      </div>
+      <h2 className="mt-4 text-xl font-bold tracking-tight text-ink">
+        Asking nearby stores
+      </h2>
+      <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+        Sent to {storesContacted} store{storesContacted === 1 ? "" : "s"}
+        {placeLabel ? ` near ${placeLabel}` : ""}. Answers will show up here,
+        closest first.
+      </p>
+      <p className="mt-3 text-xs text-ink-subtle">{formatExpiresIn(expiresAt)}</p>
+      <NotificationPrompt compact waiting className="mt-5 text-left" />
+    </Card>
+  );
+}
 
 export default function RequestDetailPage() {
   const params = useParams<{ id: string }>();
@@ -66,17 +107,32 @@ export default function RequestDetailPage() {
   );
 
   const responses = useMemo(
-    () => sortResponsesByAvailability(data?.responses || []),
+    () =>
+      sortCustomerResponsesByDistance(
+        data?.responses || [],
+        data?.postal_code || "",
+        data?.city
+      ),
     [data]
   );
 
   const storesContacted = data?.stores_targeted || data?.targets_count || 0;
-  const stillLooking =
+  const openRequest =
     !expired &&
     data?.status !== "cancelled" &&
-    data?.status !== "fulfilled" &&
-    responses.length === 0 &&
-    storesContacted > 0;
+    data?.status !== "fulfilled";
+  const searching = Boolean(openRequest && responses.length === 0 && storesContacted > 0);
+  const waitingOnMore = Boolean(
+    openRequest && responses.length > 0 && storesContacted > responses.length
+  );
+
+  const placeLabel = data
+    ? formatShortPlace({
+        city: data.city,
+        state: data.state,
+        postalCode: data.postal_code,
+      })
+    : "";
 
   async function markFound(storeId?: string | null) {
     setSelectedStoreId(storeId || null);
@@ -131,22 +187,25 @@ export default function RequestDetailPage() {
     );
   }
 
+  const headline =
+    data.status === "fulfilled"
+      ? "Found"
+      : expired
+        ? "Expired request"
+        : data.status === "cancelled"
+          ? "Cancelled"
+          : searching
+            ? "Asking nearby stores"
+            : responses.length
+              ? "Stores answered · closest first"
+              : "Searching nearby stores…";
+
   return (
     <div className="mx-auto max-w-xl px-5 py-6 pb-12 sm:px-8">
       <div className="mb-2">
         <BackLink href="/requests" label="Back to requests" />
       </div>
-      <p className="text-sm font-medium text-ink-muted">
-        {data.status === "fulfilled"
-          ? "Found"
-          : expired
-            ? "Expired request"
-            : stillLooking
-              ? "Still looking…"
-              : responses.length
-                ? "Stores responded"
-                : "Searching nearby stores…"}
-      </p>
+      <p className="text-sm font-medium text-ink-muted">{headline}</p>
       <Card className="mt-4 overflow-hidden p-5 sm:p-6">
         {data.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -160,12 +219,7 @@ export default function RequestDetailPage() {
           {data.product_name}
         </h1>
         <p className="mt-1 text-sm text-ink-muted">
-          {formatShortPlace({
-            city: data.city,
-            state: data.state,
-            postalCode: data.postal_code,
-          }) || "ZIP not set"}{" "}
-          · Requested {formatRelativeTime(data.created_at)}
+          {placeLabel || "ZIP not set"} · Requested {formatRelativeTime(data.created_at)}
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <StatusBadge
@@ -186,24 +240,19 @@ export default function RequestDetailPage() {
                 ? "This request has expired."
                 : data.status === "cancelled"
                   ? "Cancelled"
-                  : stillLooking
-                    ? "Still looking…"
+                  : searching
+                    ? "Waiting for stores"
                     : responses.length
-                      ? "Stores answered"
+                      ? `${responses.length} store${responses.length === 1 ? "" : "s"} answered`
                       : "Waiting for stores"}
           </span>
         </div>
-        {stillLooking ? (
-          <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-            FINDIT sent your request to {storesContacted} nearby store
-            {storesContacted === 1 ? "" : "s"}. Waiting for responses…
-          </p>
-        ) : (
+        {!searching ? (
           <p className="mt-3 text-sm text-ink-muted">
-            Sent to {storesContacted} nearby stores
+            Sent to {storesContacted} nearby store{storesContacted === 1 ? "" : "s"}
           </p>
-        )}
-        {!expired && data.status !== "cancelled" && data.status !== "fulfilled" ? (
+        ) : null}
+        {!expired && data.status !== "cancelled" && data.status !== "fulfilled" && !searching ? (
           <p className="mt-1 text-xs text-ink-muted">
             {formatExpiresIn(data.expires_at)}
           </p>
@@ -221,120 +270,150 @@ export default function RequestDetailPage() {
         </GlassNotice>
       ) : null}
 
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold text-ink">Responses</h2>
-        {responses.length === 0 ? (
-          <div className="mt-4">
-            <EmptyState
-              title={
-                storesContacted === 0
-                  ? "No participating stores nearby yet."
-                  : stillLooking
-                    ? "Waiting for responses…"
+      {searching ? (
+        <SearchingStoresCard
+          storesContacted={storesContacted}
+          placeLabel={placeLabel}
+          expiresAt={data.expires_at}
+        />
+      ) : (
+        <div className="mt-8">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-ink">
+                {responses.length ? "Stores that answered" : "Responses"}
+              </h2>
+              {responses.length ? (
+                <p className="mt-1 text-sm text-ink-muted">Closest first</p>
+              ) : null}
+            </div>
+            {waitingOnMore ? (
+              <p className="text-xs font-medium text-ink-subtle">Waiting on more…</p>
+            ) : null}
+          </div>
+          {waitingOnMore ? (
+            <div className="mt-4">
+              <NotificationPrompt compact waiting />
+            </div>
+          ) : null}
+          {responses.length === 0 ? (
+            <div className="mt-4">
+              <EmptyState
+                title={
+                  storesContacted === 0
+                    ? "No participating stores nearby yet."
                     : "No replies yet."
-              }
-              description={
-                storesContacted === 0
-                  ? "We saved this ask. Try another ZIP, or check back as more stores join."
-                  : stillLooking
-                    ? `Sent to ${storesContacted} nearby store${storesContacted === 1 ? "" : "s"}.`
-                    : "Replies show up here as stores answer."
-              }
-            />
-          </div>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {responses.map((response) => {
-              const store = response.store;
-              if (!store) return null;
-              const muted = response.response_type === "out_of_stock";
-              const responseSecs = Math.round(
-                (new Date(response.created_at).getTime() -
-                  new Date(data.created_at).getTime()) /
-                  1000
-              );
-              return (
-                <Card
-                  key={response.id}
-                  className={`relative overflow-hidden p-5 pl-6 ${muted ? "opacity-75" : ""}`}
-                >
-                  <ResponseAccent type={response.response_type} />
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-ink">{store.name}</p>
-                      <div className="mt-2">
-                        <StatusBadge type={response.response_type} />
+                }
+                description={
+                  storesContacted === 0
+                    ? "We saved this ask. Try another ZIP, or check back as more stores join."
+                    : "Replies show up here as stores answer, closest first."
+                }
+              />
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {responses.map((response) => {
+                const store = response.store;
+                if (!store) return null;
+                const muted = response.response_type === "out_of_stock";
+                const responseSecs = Math.round(
+                  (new Date(response.created_at).getTime() -
+                    new Date(data.created_at).getTime()) /
+                    1000
+                );
+                const miles = estimateZipDistanceMiles(
+                  data.postal_code,
+                  store.postal_code,
+                  store.city,
+                  data.city
+                );
+                return (
+                  <Card
+                    key={response.id}
+                    className={`relative overflow-hidden p-5 pl-6 ${muted ? "opacity-75" : ""}`}
+                  >
+                    <ResponseAccent type={response.response_type} />
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-ink">{store.name}</p>
+                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
+                          <span className="inline-flex items-center gap-1 font-medium text-ink">
+                            <MapPin className="h-3 w-3" aria-hidden />
+                            {formatEstimatedDistanceMiles(miles)}
+                          </span>
+                          <span>· {store.postal_code}</span>
+                        </p>
+                        <div className="mt-2">
+                          <StatusBadge type={response.response_type} />
+                        </div>
                       </div>
+                      {store.is_verified ? (
+                        <GlassBadge className="shrink-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">
+                          Verified
+                        </GlassBadge>
+                      ) : null}
                     </div>
-                    {store.is_verified ? (
-                      <GlassBadge className="shrink-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">
-                        Verified
-                      </GlassBadge>
+                    {formatPrice(response.price) ? (
+                      <p className="mt-3 text-lg font-semibold text-ink">
+                        {formatPrice(response.price)}
+                      </p>
                     ) : null}
-                  </div>
-                  {formatPrice(response.price) ? (
-                    <p className="mt-3 text-lg font-semibold text-ink">
-                      {formatPrice(response.price)}
+                    {response.availability_amount ? (
+                      <p className="mt-1 text-sm capitalize text-ink-muted">
+                        {response.availability_amount.replace("_", " ")}
+                      </p>
+                    ) : null}
+                    {response.estimated_availability_label ? (
+                      <p className="mt-1 text-sm text-ink-muted">
+                        Available {response.estimated_availability_label.toLowerCase()}
+                      </p>
+                    ) : null}
+                    {response.note ? (
+                      <p className="mt-2 text-sm italic text-ink-muted">
+                        “{response.note}”
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-xs text-ink-muted">
+                      Responded {formatRelativeTime(response.updated_at)} ·{" "}
+                      {formatDurationSeconds(responseSecs)}
                     </p>
-                  ) : null}
-                  {response.availability_amount ? (
-                    <p className="mt-1 text-sm capitalize text-ink-muted">
-                      {response.availability_amount.replace("_", " ")}
-                    </p>
-                  ) : null}
-                  {response.estimated_availability_label ? (
-                    <p className="mt-1 text-sm text-ink-muted">
-                      Available {response.estimated_availability_label.toLowerCase()}
-                    </p>
-                  ) : null}
-                  {response.note ? (
-                    <p className="mt-2 text-sm italic text-ink-muted">
-                      “{response.note}”
-                    </p>
-                  ) : null}
-                  <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="h-3 w-3" aria-hidden />
-                      Near {store.postal_code}
-                    </span>
-                    <span>· Responded {formatRelativeTime(response.updated_at)}</span>
-                    <span>· {formatDurationSeconds(responseSecs)}</span>
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/stores/${store.slug}`}>View store</Link>
-                    </Button>
-                    {response.response_type !== "out_of_stock" ? (
-                      <Button asChild size="sm" variant="secondary">
-                        <a
-                          href={mapsDirectionsUrl(store)}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={() =>
-                            trackDirectionsClickAction(data.id, store.id)
-                          }
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/stores/${store.slug}`}>View store</Link>
+                      </Button>
+                      {response.response_type !== "out_of_stock" ? (
+                        <Button asChild size="sm" variant="secondary">
+                          <a
+                            href={mapsDirectionsUrl(store)}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={() =>
+                              trackDirectionsClickAction(data.id, store.id)
+                            }
+                          >
+                            Directions
+                            <ExternalLink className="h-3.5 w-3.5" />
+                          </a>
+                        </Button>
+                      ) : null}
+                      {data.status !== "fulfilled" &&
+                      response.response_type !== "out_of_stock" ? (
+                        <Button
+                          size="sm"
+                          onClick={() => markFound(store.id)}
                         >
-                          Directions
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </Button>
-                    ) : null}
-                    {data.status !== "fulfilled" &&
-                    response.response_type !== "out_of_stock" ? (
-                      <Button
-                        size="sm"
-                        onClick={() => markFound(store.id)}
-                      >
-                        I found it here
-                      </Button>
-                    ) : null}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                          I found it here
+                        </Button>
+                      ) : null}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {foundStep === "ask" ? (
         <Card level="strong" className="mt-6 p-5">

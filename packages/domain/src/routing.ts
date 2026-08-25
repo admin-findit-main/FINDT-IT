@@ -85,6 +85,54 @@ export function estimateZipDistanceMiles(
   return 99;
 }
 
+export const RESPONSE_TYPE_SORT_ORDER: Record<string, number> = {
+  in_stock: 0,
+  can_order: 1,
+  out_of_stock: 2,
+};
+
+export function formatEstimatedDistanceMiles(miles: number): string {
+  if (!Number.isFinite(miles) || miles < 0) return "Distance unknown";
+  if (miles <= 0) return "Same ZIP";
+  if (miles >= 99) return "Farther away";
+  return `About ${Math.round(miles)} mi`;
+}
+
+export type DistanceSortableResponse = {
+  response_type: string;
+  store?: {
+    postal_code?: string | null;
+    city?: string | null;
+  } | null;
+};
+
+/** Closest store first, then in-stock before can-order before out-of-stock. */
+export function sortCustomerResponsesByDistance<T extends DistanceSortableResponse>(
+  responses: T[],
+  customerZip: string,
+  customerCity?: string | null
+): T[] {
+  return [...responses].sort((a, b) => {
+    const da = estimateZipDistanceMiles(
+      customerZip,
+      a.store?.postal_code || "",
+      a.store?.city,
+      customerCity
+    );
+    const db = estimateZipDistanceMiles(
+      customerZip,
+      b.store?.postal_code || "",
+      b.store?.city,
+      customerCity
+    );
+    if (da !== db) return da - db;
+    return (
+      (RESPONSE_TYPE_SORT_ORDER[a.response_type] ?? 9) -
+      (RESPONSE_TYPE_SORT_ORDER[b.response_type] ?? 9)
+    );
+  });
+}
+
 export function storeCoversCustomerZip(
   store: Pick<RoutingStoreCandidate, "postal_code" | "service_zips">,
   customerZip: string
