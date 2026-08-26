@@ -219,7 +219,9 @@ h1 {
 .glass,
 .glass-subtle,
 .glass-strong {
-  position: relative;
+  /* Do not set `position` here. Dialogs and sheets add `fixed`; `relative`
+     in this unlayered file would win and pin the 21+ sheet off-screen while
+     the overlay still locks the page. */
   background-clip: padding-box;
   background-color: var(--solid-2);
   border: 1px solid var(--hairline-strong);

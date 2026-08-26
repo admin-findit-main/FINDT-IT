@@ -68,7 +68,7 @@ export function GlassCard({
     <Comp
       className={cn(
         LEVEL_CLASS[level],
-        "rounded-glass-xl",
+        "relative rounded-glass-xl",
         sheen && "glass-sheen",
         padded && "p-5 sm:p-6",
         interactive && "glass-lift glass-press cursor-pointer",

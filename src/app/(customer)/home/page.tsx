@@ -84,6 +84,7 @@ export default function CustomerHomePage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const autoLocated = useRef(false);
   const pendingSubmit = useRef<{ forceDuplicate: boolean } | null>(null);
+  const ageGateAfterClose = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     getCurrentProfile().then((p) => {
@@ -99,6 +100,12 @@ export default function CustomerHomePage() {
         setStep("query");
       }
     });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      document.body.style.removeProperty("pointer-events");
+    };
   }, []);
 
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
@@ -132,10 +139,16 @@ export default function CustomerHomePage() {
 
   function onAgeGateOpenChange(open: boolean) {
     setAgeGateOpen(open);
-    if (!open) {
+    if (open) return;
+    const run = ageGateAfterClose.current;
+    ageGateAfterClose.current = null;
+    document.body.style.removeProperty("pointer-events");
+    if (!run) {
       setPendingCategory("");
       pendingSubmit.current = null;
+      return;
     }
+    window.setTimeout(run, 50);
   }
 
   function confirmAgeGate() {
@@ -144,10 +157,14 @@ export default function CustomerHomePage() {
     pendingSubmit.current = null;
     setPendingCategory("");
     setIdConfirmed(true);
-    setAgeGateOpen(false);
     if (nextCategory) setCategory(nextCategory);
     setShowDetails(true);
-    if (pending) void submitRequest(pending.forceDuplicate, true);
+    ageGateAfterClose.current = pending
+      ? () => {
+          void submitRequest(pending.forceDuplicate, true);
+        }
+      : null;
+    setAgeGateOpen(false);
   }
 
   function chooseCategory(item: string) {
@@ -614,7 +631,11 @@ export default function CustomerHomePage() {
         <p className="text-sm leading-relaxed text-ink">
           {AGE_RESTRICTED_FIND_HINT}
         </p>
-        <Button className="mt-6 w-full" size="xl" onClick={confirmAgeGate}>
+        <Button
+          className="mt-6 h-auto min-h-14 w-full whitespace-normal text-center"
+          size="xl"
+          onClick={confirmAgeGate}
+        >
           {AGE_RESTRICTED_ID_CONFIRM}
         </Button>
       </GlassSheet>
