@@ -39,14 +39,28 @@ describe("reply copy", () => {
     });
   });
 
-  it("keeps the phone push short", () => {
+  it("names the store on the phone push so a closed app still shows where", () => {
+    expect(
+      customerReplyPushCopy({
+        responseType: "in_stock",
+        productName: "Oat milk",
+        storeName: "Main Street Market",
+      })
+    ).toEqual({
+      title: "Your product has been found",
+      body: "at Main Street Market",
+    });
+  });
+
+  it("names the store when it can order", () => {
     expect(
       customerReplyPushCopy({
         responseType: "can_order",
         productName: "Oat milk",
+        storeName: "Main Street Market",
       })
     ).toEqual({
-      title: "A store can order it",
+      title: "Main Street Market can order it",
       body: "Oat milk",
     });
   });

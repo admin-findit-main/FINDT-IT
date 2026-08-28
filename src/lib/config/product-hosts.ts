@@ -91,6 +91,7 @@ export function supabaseCookieOptions(hostHeader: string): {
 }
 
 const PASS_THROUGH_PREFIXES = [
+  "/api",
   "/auth",
   "/invite",
   "/admin",

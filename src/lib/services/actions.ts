@@ -1332,6 +1332,7 @@ export async function respondToRequestAction(input: {
       const push = customerReplyPushCopy({
         responseType: input.responseType,
         productName: requestRow.product_name,
+        storeName: store?.name,
       });
       if (push) {
         await notifyCustomerDevices({
@@ -1342,6 +1343,8 @@ export async function respondToRequestAction(input: {
           data: {
             type: input.responseType,
             requestId: input.requestId,
+            storeId: input.storeId,
+            url: `/requests/${input.requestId}`,
           },
         });
       }

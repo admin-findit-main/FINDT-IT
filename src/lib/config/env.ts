@@ -29,6 +29,10 @@ const envSchema = z.object({
   /** Public App Store listing URL when it exists. Empty = coming soon. */
   NEXT_PUBLIC_IOS_APP_STORE_URL: z.string().optional().or(z.literal("")),
   NEXT_PUBLIC_PLAY_STORE_URL: z.string().optional().or(z.literal("")),
+  NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY: z.string().optional().or(z.literal("")),
+  WEB_PUSH_VAPID_PRIVATE_KEY: z.string().optional().or(z.literal("")),
+  WEB_PUSH_VAPID_SUBJECT: z.string().optional().or(z.literal("")),
+  PUSH_INTERNAL_SECRET: z.string().optional().or(z.literal("")),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
@@ -57,6 +61,11 @@ export function getEnv(): AppEnv {
     FINDIT_APP_HOST: process.env.FINDIT_APP_HOST,
     NEXT_PUBLIC_IOS_APP_STORE_URL: process.env.NEXT_PUBLIC_IOS_APP_STORE_URL,
     NEXT_PUBLIC_PLAY_STORE_URL: process.env.NEXT_PUBLIC_PLAY_STORE_URL,
+    NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY:
+      process.env.NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY,
+    WEB_PUSH_VAPID_PRIVATE_KEY: process.env.WEB_PUSH_VAPID_PRIVATE_KEY,
+    WEB_PUSH_VAPID_SUBJECT: process.env.WEB_PUSH_VAPID_SUBJECT,
+    PUSH_INTERNAL_SECRET: process.env.PUSH_INTERNAL_SECRET,
   });
 }
 

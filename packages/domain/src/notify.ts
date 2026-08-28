@@ -37,13 +37,21 @@ export function customerReplyAlertCopy(input: {
 export function customerReplyPushCopy(input: {
   responseType: CustomerReplyType | string;
   productName: string;
+  storeName?: string | null;
 }): { title: string; body: string } | null {
+  const store = (input.storeName || "a nearby store").trim() || "a nearby store";
   const product = input.productName.trim() || "your Find";
   if (input.responseType === "in_stock") {
-    return { title: "In stock nearby", body: product };
+    return {
+      title: "Your product has been found",
+      body: `at ${store}`,
+    };
   }
   if (input.responseType === "can_order") {
-    return { title: "A store can order it", body: product };
+    return {
+      title: `${store} can order it`,
+      body: product,
+    };
   }
   return null;
 }

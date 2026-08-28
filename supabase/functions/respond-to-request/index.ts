@@ -5,7 +5,7 @@ import {
   jsonResponse,
   responseTimeSeconds,
 } from "../_shared/domain.ts";
-import { sendExpoPush } from "../_shared/push.ts";
+import { customerReplyPushCopy, notifyCustomerPush } from "../_shared/push.ts";
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
@@ -192,6 +192,18 @@ Deno.serve(async (req) => {
         : customer?.notify_can_order !== false;
     if (wantsAlert) {
       const storeName = store?.name || "A store";
+      const copy =
+        customerReplyPushCopy({
+          responseType,
+          productName: requestRow.product_name,
+          storeName,
+        }) || {
+          title:
+            responseType === "in_stock"
+              ? `${storeName} has it in stock`
+              : `${storeName} can order it`,
+          body: `${requestRow.product_name}`,
+        };
       await admin.from("notifications").insert({
         user_id: requestRow.customer_id,
         type: responseType,
@@ -204,25 +216,18 @@ Deno.serve(async (req) => {
         related_store_id: storeId,
       });
 
-      const { data: tokens } = await admin
-        .from("device_push_tokens")
-        .select("token")
-        .eq("user_id", requestRow.customer_id)
-        .eq("app_surface", "customer");
-      if (tokens?.length) {
-        await sendExpoPush(
-          tokens.map((t) => ({
-            to: t.token,
-            sound: "default",
-            title:
-              responseType === "in_stock"
-                ? "In stock nearby"
-                : "A store can order it",
-            body: requestRow.product_name,
-            data: { type: responseType, requestId },
-          }))
-        );
-      }
+      await notifyCustomerPush({
+        admin,
+        customerId: requestRow.customer_id,
+        title: copy.title,
+        body: copy.body,
+        data: {
+          type: responseType,
+          requestId,
+          storeId,
+          url: `/requests/${requestId}`,
+        },
+      });
     }
   }
 

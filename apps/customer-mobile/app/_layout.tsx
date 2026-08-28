@@ -21,6 +21,8 @@ import {
 
 export { ErrorBoundary } from "expo-router";
 
+let handledNotificationId: string | null = null;
+
 if (Platform.OS !== "web") {
   SplashScreen.preventAutoHideAsync().catch(() => {});
 }
@@ -47,6 +49,25 @@ function RootNavigator() {
   const segments = useSegments();
   const [seenOnboarding, setSeenOnboarding] = useState<boolean | null>(null);
   const lastTarget = useRef<string | null>(null);
+  const pendingRequestId = useRef<string | null>(null);
+
+  const isCustomer = Boolean(
+    session &&
+      profile?.account_type === "customer" &&
+      !isSoloAdminEmail(profile?.email) &&
+      !isSoloAdminEmail(session?.user?.email)
+  );
+
+  const openRequest = (id: string) => {
+    if (isCustomer && !customerNeedsFirstName(profile || {})) {
+      pendingRequestId.current = null;
+      router.push(`/(app)/request/${id}`);
+      return;
+    }
+    pendingRequestId.current = id;
+  };
+  const openRequestRef = useRef(openRequest);
+  openRequestRef.current = openRequest;
   const navTheme = useMemo(
     () => ({
       ...(scheme === "light" ? DefaultTheme : DarkTheme),
@@ -109,7 +130,14 @@ function RootNavigator() {
       target = "/(app)/(tabs)";
     }
 
-    if (!target) return;
+    if (!target) {
+      const pending = pendingRequestId.current;
+      if (isCustomer && !needsName && pending) {
+        pendingRequestId.current = null;
+        router.push(`/(app)/request/${pending}`);
+      }
+      return;
+    }
     const next = String(target);
     if (lastTarget.current === next) return;
     lastTarget.current = next;
@@ -130,19 +158,27 @@ function RootNavigator() {
   useEffect(() => {
     const handleUrl = (url: string) => {
       const parsed = parseCustomerDeepLink(url);
-      if (parsed?.type === "request") {
-        router.push(`/(app)/request/${parsed.id}`);
-      }
+      if (parsed?.type === "request") openRequestRef.current(parsed.id);
     };
     Linking.getInitialURL().then((url) => {
       if (url) handleUrl(url);
     });
     const linkSub = Linking.addEventListener("url", ({ url }) => handleUrl(url));
+    void Notifications.getLastNotificationResponseAsync().then((last) => {
+      if (!last) return;
+      const identifier = last.notification.request.identifier;
+      if (handledNotificationId === identifier) return;
+      handledNotificationId = identifier;
+      const id = getRequestIdFromNotificationData(
+        last.notification.request.content.data as Record<string, unknown>
+      );
+      if (id) openRequestRef.current(id);
+    });
     const notifSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const id = getRequestIdFromNotificationData(
         response.notification.request.content.data as Record<string, unknown>
       );
-      if (id) router.push(`/(app)/request/${id}`);
+      if (id) openRequestRef.current(id);
     });
     return () => {
       linkSub.remove();

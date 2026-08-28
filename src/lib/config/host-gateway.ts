@@ -56,6 +56,23 @@ export function decideHostRouting(
   const surface = matchProductSurface(host);
   const publicPath = request.nextUrl.pathname || "/";
 
+  if (publicPath === "/api" || publicPath.startsWith("/api/")) {
+    if (surface === "apex") {
+      const url = request.nextUrl.clone();
+      url.protocol = "https:";
+      url.port = "";
+      url.hostname = CANONICAL_PRODUCT_HOSTS.www;
+      return { kind: "redirect", url, permanent: true };
+    }
+    return {
+      kind: "continue",
+      surface,
+      publicPath,
+      internalPath: publicPath,
+      rewrite: false,
+    };
+  }
+
   if (surface === "apex") {
     const url = request.nextUrl.clone();
     url.protocol = "https:";

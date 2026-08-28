@@ -23,6 +23,15 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     return null;
   }
 
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("findit-alerts", {
+      name: "Store replies",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      sound: "default",
+    });
+  }
+
   const { status: existing } = await Notifications.getPermissionsAsync();
   let finalStatus = existing;
   if (existing !== "granted") {

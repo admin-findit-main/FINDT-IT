@@ -9,6 +9,11 @@ import {
   requestBrowserNotifyPermission,
 } from "@/lib/browser-notify";
 import { cn } from "@/lib/utils";
+import {
+  isIosDevice,
+  isStandaloneDisplay,
+  subscribeWebPush,
+} from "@/lib/web-push-client";
 
 const DISMISS_KEY = "findit-web-notify-prompt-dismissed";
 
@@ -25,10 +30,12 @@ export function NotificationPrompt({
   const [permission, setPermission] = useState<ReturnType<
     typeof browserNotifyPermission
   > | null>(null);
+  const [iosHomeScreen, setIosHomeScreen] = useState(false);
   const [dismissed, setDismissed] = useState(true);
 
   useEffect(() => {
     setPermission(browserNotifyPermission());
+    setIosHomeScreen(isIosDevice() && !isStandaloneDisplay());
     try {
       setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1");
     } catch {
@@ -45,8 +52,18 @@ export function NotificationPrompt({
   async function enable() {
     const next = await requestBrowserNotifyPermission();
     setPermission(next);
-    if (next === "granted") toast.success("Alerts are on for this device.");
-    else toast.message("You can still see replies here and on Alerts.");
+    if (next === "granted") {
+      const subscribed = await subscribeWebPush();
+      if (subscribed.ok) {
+        toast.success("We’ll ping this phone even after you close FINDIT.");
+      } else if (subscribed.error === "ios-homescreen") {
+        toast.message("Add FINDIT to your Home Screen to get alerts after you close it.");
+      } else {
+        toast.success("Alerts are on for this device.");
+      }
+    } else {
+      toast.message("You can still see replies here and on Alerts.");
+    }
   }
 
   function dismiss() {
@@ -79,9 +96,14 @@ export function NotificationPrompt({
         </p>
         <p className="mt-1 text-sm leading-relaxed text-ink-muted">
           {waiting
-            ? "This page updates as stores reply. Allow notifications so you don’t miss one if you leave."
-            : "We’ll notify you on this device when a nearby store answers a Find."}
+            ? "Allow alerts so we can ping this phone with the store name even after you close FINDIT."
+            : "We’ll notify this phone when a nearby store answers a Find — including after you close the app."}
         </p>
+        {iosHomeScreen ? (
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+            On iPhone, tap Share, then Add to Home Screen, then open FINDIT from there and allow alerts.
+          </p>
+        ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <Button type="button" size="sm" onClick={() => void enable()}>
             Allow alerts

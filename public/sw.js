@@ -6,6 +6,45 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+self.addEventListener("push", (event) => {
+  event.waitUntil(showPushNotification(event));
+});
+
+async function showPushNotification(event) {
+  let payload = {
+    title: "FINDIT",
+    body: "A store answered your Find.",
+    url: "/notifications",
+    tag: "findit",
+  };
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      payload = {
+        title: parsed.title || payload.title,
+        body: parsed.body || payload.body,
+        url: parsed.url || payload.url,
+        tag: parsed.tag || parsed.url || payload.tag,
+      };
+    }
+  } catch {
+    try {
+      const text = event.data && event.data.text();
+      if (text) payload.body = text;
+    } catch {
+      // Keep the fallback copy.
+    }
+  }
+
+  await self.registration.showNotification(payload.title, {
+    body: payload.body,
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    data: { url: payload.url },
+    tag: payload.tag,
+  });
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const target =
@@ -17,7 +56,8 @@ self.addEventListener("notificationclick", (event) => {
         includeUncontrolled: true,
       });
       for (const client of all) {
-        if ("focus" in client) {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.origin === self.location.origin && "focus" in client) {
           await client.focus();
           if ("navigate" in client) {
             try {

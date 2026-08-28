@@ -1,12 +1,32 @@
+import { isExpoPushToken, sendWebPush } from "@/lib/services/web-push";
+
 type ExpoPushMessage = {
   to: string;
   sound: "default";
   title: string;
   body: string;
   data: Record<string, string>;
+  channelId?: string;
+  priority?: "default" | "normal" | "high";
 };
 
 type TokenRow = { token: string };
+
+type TokenQuery = {
+  select: (columns: string) => TokenQuery;
+  eq: (column: string, value: string) => TokenQuery;
+  in: (column: string, values: string[]) => TokenQuery;
+  delete: () => TokenQuery;
+  then: (
+    resolve: (value: { data: TokenRow[] | null }) => void
+  ) => Promise<{ data: TokenRow[] | null }>;
+};
+
+function asTokenTable(admin: {
+  from: (table: string) => unknown;
+}): TokenQuery {
+  return admin.from("device_push_tokens") as TokenQuery;
+}
 
 export async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
   if (!messages.length) return;
@@ -35,41 +55,52 @@ export async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
 }
 
 export async function notifyCustomerDevices(input: {
-  // Service client; table is not in the generated Database type yet.
-  admin: { from: (table: "device_push_tokens") => unknown };
+  admin: { from: (table: string) => unknown };
   customerId: string;
   title: string;
   body: string;
   data: Record<string, string>;
 }): Promise<void> {
-  const query = input.admin.from("device_push_tokens") as {
-    select: (columns: string) => {
-      eq: (column: string, value: string) => {
-        eq: (
-          column: string,
-          value: string
-        ) => Promise<{ data: TokenRow[] | null }>;
-      };
-    };
-  };
-  const { data: tokens } = await query
+  const table = asTokenTable(input.admin);
+  const { data: tokens } = await table
     .select("token")
     .eq("user_id", input.customerId)
-    .eq("app_surface", "customer");
+    .in("app_surface", ["customer", "web"]);
   if (!tokens?.length) return;
-  await sendExpoPush(
-    tokens.map((row) => ({
-      to: row.token,
-      sound: "default",
+
+  const expoTokens = tokens
+    .map((row) => row.token)
+    .filter((token) => isExpoPushToken(token));
+  const webTokens = tokens
+    .map((row) => row.token)
+    .filter((token) => !isExpoPushToken(token));
+
+  await Promise.all([
+    sendExpoPush(
+      expoTokens.map((token) => ({
+        to: token,
+        sound: "default",
+        title: input.title,
+        body: input.body,
+        data: input.data,
+        channelId: "findit-alerts",
+        priority: "high",
+      }))
+    ),
+    sendWebPush({
+      tokens: webTokens,
       title: input.title,
       body: input.body,
       data: input.data,
-    }))
-  );
+      onGoneToken: async (token) => {
+        await asTokenTable(input.admin).delete().eq("token", token);
+      },
+    }),
+  ]);
 }
 
 export async function notifyEmployeeDevices(input: {
-  admin: { from: (table: "device_push_tokens") => unknown };
+  admin: { from: (table: string) => unknown };
   userIds: string[];
   title: string;
   body: string;
@@ -77,17 +108,7 @@ export async function notifyEmployeeDevices(input: {
 }): Promise<void> {
   const ids = [...new Set(input.userIds.filter(Boolean))];
   if (!ids.length) return;
-  const query = input.admin.from("device_push_tokens") as {
-    select: (columns: string) => {
-      in: (column: string, values: string[]) => {
-        eq: (
-          column: string,
-          value: string
-        ) => Promise<{ data: TokenRow[] | null }>;
-      };
-    };
-  };
-  const { data: tokens } = await query
+  const { data: tokens } = await asTokenTable(input.admin)
     .select("token")
     .in("user_id", ids)
     .eq("app_surface", "employee");
@@ -99,6 +120,8 @@ export async function notifyEmployeeDevices(input: {
       title: input.title,
       body: input.body,
       data: input.data,
+      channelId: "findit-alerts",
+      priority: "high",
     }))
   );
 }

@@ -108,4 +108,15 @@ describe("decideHostRouting", () => {
       expect(decision.rewrite).toBe(false);
     }
   });
+
+  it("does not rewrite API push delivery on dashboard or store hosts", () => {
+    for (const host of ["dashboard.askfindit.com", "store.askfindit.com"]) {
+      const decision = decideHostRouting(req(host, "/api/push/deliver"), "anonymous");
+      expect(decision.kind).toBe("continue");
+      if (decision.kind === "continue") {
+        expect(decision.internalPath).toBe("/api/push/deliver");
+        expect(decision.rewrite).toBe(false);
+      }
+    }
+  });
 });
