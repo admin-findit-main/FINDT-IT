@@ -333,6 +333,41 @@ export function StatusRail({ tone }: { tone: StatusTone }) {
   );
 }
 
+/** Blue check shown to shoppers after FINDIT accepts a store. */
+export function VerifiedStoreBadge({
+  label = "Verified",
+  className,
+}: {
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 text-[11px] font-bold tracking-wide text-[#1D9BF0]",
+        className
+      )}
+      title="Verified FINDIT store"
+    >
+      <span
+        aria-hidden
+        className="grid h-4 w-4 place-items-center rounded-full bg-[#1D9BF0] text-white"
+      >
+        <svg viewBox="0 0 12 12" className="h-2.5 w-2.5" fill="none">
+          <path
+            d="M2.5 6.2 4.8 8.5 9.5 3.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+      {label}
+    </span>
+  );
+}
+
 /** Neutral / accent metadata badge. */
 export function GlassBadge({
   tone = "neutral",

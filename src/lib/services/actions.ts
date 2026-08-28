@@ -2124,6 +2124,9 @@ export async function submitStoreApplicationAction(raw: unknown) {
     const application = demoSubmitStoreApplication({
       businessName: parsed.data.businessName,
       businessType: parsed.data.businessType,
+      legalName: parsed.data.legalName,
+      ein: parsed.data.ein,
+      entityType: parsed.data.entityType,
       streetAddress: parsed.data.streetAddress,
       city: parsed.data.city,
       state: parsed.data.state,
@@ -2205,6 +2208,9 @@ export async function submitStoreApplicationAction(raw: unknown) {
     .insert({
       business_name: parsed.data.businessName,
       business_type: parsed.data.businessType,
+      legal_name: parsed.data.legalName,
+      ein: parsed.data.ein,
+      entity_type: parsed.data.entityType,
       street_address: parsed.data.streetAddress,
       city: parsed.data.city,
       state: parsed.data.state,
@@ -2337,7 +2343,7 @@ export async function getMyStoreApplicationStatusAction() {
     .from("store_applications")
     .select("*")
     .eq("owner_email", profile.email)
-    .eq("status", "pending")
+    .in("status", ["pending", "needs_info"])
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

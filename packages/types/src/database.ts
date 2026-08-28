@@ -88,6 +88,9 @@ export interface Store {
   state: string;
   postal_code: string;
   country: string;
+  legal_name?: string | null;
+  ein?: string | null;
+  entity_type?: string | null;
   latitude: number | null;
   longitude: number | null;
   is_active: boolean;
@@ -110,6 +113,9 @@ export interface StoreApplication {
   id: string;
   business_name: string;
   business_type: string;
+  legal_name?: string | null;
+  ein?: string | null;
+  entity_type?: string | null;
   street_address: string;
   city: string;
   state: string;

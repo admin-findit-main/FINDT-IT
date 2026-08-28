@@ -12,6 +12,7 @@ import {
   getStoreSettingsAction,
   getStoreWorkspaceAction,
 } from "@/lib/services/actions";
+import { listStoreDevicesAction } from "@/lib/services/hub-devices";
 import { formatDurationSeconds } from "@/lib/services/request-lifecycle";
 import { isStoreOpenAt } from "@/lib/services/store-hours";
 import { formatRelativeTime, greetingForHour } from "@/lib/utils";
@@ -32,6 +33,7 @@ function OwnerOverview() {
   const [metrics, setMetrics] = useState<StoreMetrics | null>(null);
   const [items, setItems] = useState<Incoming[]>([]);
   const [demand, setDemand] = useState<DemandItem[]>([]);
+  const [hubConnected, setHubConnected] = useState(true);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -42,15 +44,17 @@ function OwnerOverview() {
       return;
     }
     setStoreName(ws?.store?.name || "");
-    const [m, list, d, settings] = await Promise.all([
+    const [m, list, d, settings, devices] = await Promise.all([
       getStoreMetricsAction(id),
       getStoreIncomingRequestsAction(id, "all", "7d"),
       getStoreDemandAction(id),
       getStoreSettingsAction(id),
+      listStoreDevicesAction(),
     ]);
     setMetrics(m);
     setItems(list);
     setDemand(d);
+    setHubConnected(devices.some((device) => !device.revoked_at));
     if (settings?.hours?.length) {
       setOpenLabel(isStoreOpenAt(settings.hours).open ? "Open" : "Closed");
     } else {
@@ -98,6 +102,36 @@ function OwnerOverview() {
           <p className="mt-1 text-sm text-ink-muted">{openLabel}</p>
         ) : null}
       </div>
+
+      {!hubConnected ? (
+        <div className="rounded-2xl border border-hairline-strong bg-white px-5 py-4">
+          <p className="text-sm font-semibold text-ink">Open your store</p>
+          <p className="mt-1 text-sm text-ink-muted">
+            FINDIT accepted you. Connect a counter tablet, invite staff, and
+            confirm hours so you can answer Asks.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/store/hub"
+              className="rounded-full bg-[#E5231B] px-4 py-2 text-sm font-semibold text-white"
+            >
+              Connect FINDIT Hub
+            </Link>
+            <Link
+              href="/store/team"
+              className="rounded-full border border-hairline-strong px-4 py-2 text-sm font-semibold text-ink"
+            >
+              Invite staff
+            </Link>
+            <Link
+              href="/store/settings"
+              className="rounded-full border border-hairline-strong px-4 py-2 text-sm font-semibold text-ink"
+            >
+              Store profile
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard

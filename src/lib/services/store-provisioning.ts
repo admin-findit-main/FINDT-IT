@@ -85,6 +85,9 @@ export async function provisionStoreFromApplication(applicationId: string, revie
       owner_id: ownerId,
       name: application.business_name,
       slug,
+      legal_name: application.legal_name || application.business_name,
+      ein: application.ein || null,
+      entity_type: application.entity_type || null,
       street_address: application.street_address,
       city: application.city,
       state: application.state,
@@ -184,7 +187,7 @@ export async function provisionStoreFromApplication(applicationId: string, revie
     user_id: ownerId,
     type: "store_approved",
     title: "Your store was approved",
-    body: `${store.name} is live on FINDIT with a ${STORE_TRIAL_DAYS}-day free pilot. No credit card required.`,
+    body: `${store.name} is live on FINDIT with a ${STORE_TRIAL_DAYS}-day free pilot. Open your dashboard and connect FINDIT Hub. No credit card required.`,
     related_store_id: store.id,
   });
 

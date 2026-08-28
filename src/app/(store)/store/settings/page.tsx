@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
-import { GlassBadge, GlassChip, GlassNotice } from "@/components/ui/glass";
+import { GlassBadge, GlassChip, GlassNotice, VerifiedStoreBadge } from "@/components/ui/glass";
 import {
   DAYS_OF_WEEK,
   PILOT_STORE_BANNER,
@@ -483,8 +483,12 @@ export default function StoreSettingsPage() {
           </div>
           <div className="flex justify-between gap-4">
             <dt className="text-ink-muted">Verified</dt>
-            <dd className="text-ink">
-              {store?.is_verified ? "Verified FINDIT store" : "Unverified"}
+            <dd className="text-right text-ink">
+              {store?.is_verified ? (
+                <VerifiedStoreBadge label="Verified FINDIT store" />
+              ) : (
+                "Pending FINDIT review"
+              )}
             </dd>
           </div>
         </dl>

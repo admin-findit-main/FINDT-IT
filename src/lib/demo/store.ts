@@ -426,6 +426,9 @@ function seedState(): DemoState {
         owner_name: "Pat Rivera",
         owner_email: "pat@sunrisecorner.example",
         owner_phone: "703-555-0198",
+        legal_name: "Sunrise Corner Market LLC",
+        ein: "123456789",
+        entity_type: "LLC",
         why_legit:
           "We are a licensed convenience store in Falls Church serving the neighborhood for 8 years. Want to answer local product asks during the pilot.",
         confirmed_legitimate: true,
@@ -1382,6 +1385,9 @@ export function demoCreateStore(input: {
     is_active: true,
     is_verified: false,
     is_suspended: false,
+    legal_name: input.name,
+    ein: null,
+    entity_type: null,
     age_restricted: input.ageRestricted ?? false,
     subscription_plan: "free",
     subscription_status: "active",
@@ -1440,6 +1446,9 @@ export function demoCountCustomerRequestsThisMonth(customerId: string): number {
 export function demoSubmitStoreApplication(input: {
   businessName: string;
   businessType: string;
+  legalName?: string;
+  ein?: string;
+  entityType?: string;
   streetAddress: string;
   city: string;
   state: string;
@@ -1469,6 +1478,9 @@ export function demoSubmitStoreApplication(input: {
     owner_name: input.ownerName.trim(),
     owner_email: input.ownerEmail.toLowerCase().trim(),
     owner_phone: input.ownerPhone?.trim() || null,
+    legal_name: input.legalName?.trim() || input.businessName.trim(),
+    ein: input.ein ? input.ein.replace(/\D/g, "").slice(0, 9) : null,
+    entity_type: input.entityType || null,
     why_legit: input.whyLegit.trim(),
     confirmed_legitimate: input.confirmedLegitimate,
     request_categories:
@@ -1504,7 +1516,8 @@ export function demoGetPendingApplicationForEmail(email: string | null | undefin
   if (!email) return undefined;
   return getDemoState().storeApplications.find(
     (a) =>
-      a.owner_email.toLowerCase() === email.toLowerCase() && a.status === "pending"
+      a.owner_email.toLowerCase() === email.toLowerCase() &&
+      (a.status === "pending" || a.status === "needs_info")
   );
 }
 
@@ -1574,6 +1587,9 @@ export function demoApproveStoreApplication(
     ageRestricted: Boolean(application.requires_customer_id),
   });
   store.is_verified = true;
+  store.legal_name = application.legal_name || application.business_name;
+  store.ein = application.ein || null;
+  store.entity_type = application.entity_type || null;
   store.subscription_plan = "free";
   store.trial_ends_at = new Date(
     Date.now() + STORE_TRIAL_DAYS * 86400000

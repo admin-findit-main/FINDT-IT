@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
-import { GlassBadge, GlassNav } from "@/components/ui/glass";
+import { GlassNav, VerifiedStoreBadge } from "@/components/ui/glass";
 import { BrandHomeLink } from "@/components/brand/logo";
 import { getStoreBySlugAction } from "@/lib/services/actions";
 import { DAYS_OF_WEEK } from "@/lib/config/constants";
@@ -51,14 +51,7 @@ export default async function PublicStorePage({ params }: Props) {
             <h1 className="text-3xl font-bold tracking-tight text-ink">
               {store.name}
             </h1>
-            {store.is_verified ? (
-              <GlassBadge
-                tone="ink"
-                className="text-[10px] font-bold uppercase tracking-wide"
-              >
-                Verified FINDIT
-              </GlassBadge>
-            ) : null}
+            {store.is_verified ? <VerifiedStoreBadge label="Verified FINDIT" /> : null}
           </div>
           <p className="mt-2 text-sm text-ink-muted">
             {(categories || []).join(" · ") || "Local store"}

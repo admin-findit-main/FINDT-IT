@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, MapPin } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { GlassBadge, GlassNotice } from "@/components/ui/glass";
+import { GlassNotice, VerifiedStoreBadge } from "@/components/ui/glass";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { BackLink } from "@/components/shared/app-header";
 import { ResponseAccent, StatusBadge } from "@/components/shared/status";
@@ -368,9 +368,7 @@ export default function RequestDetailPage() {
                         </div>
                       </div>
                       {store.is_verified ? (
-                        <GlassBadge className="shrink-0 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">
-                          Verified
-                        </GlassBadge>
+                        <VerifiedStoreBadge className="shrink-0" />
                       ) : null}
                     </div>
                     {formatPrice(response.price) ? (

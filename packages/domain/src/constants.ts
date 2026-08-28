@@ -14,6 +14,15 @@ export const PRODUCT_CATEGORIES = [
   "Other",
 ] as const;
 
+export const BUSINESS_ENTITY_TYPES = [
+  "Sole proprietor",
+  "LLC",
+  "Corporation",
+  "Partnership",
+  "Nonprofit",
+  "Other",
+] as const;
+
 export const STORE_CATEGORIES = [
   "Grocery",
   "Convenience",

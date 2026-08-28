@@ -156,6 +156,7 @@ export default function RequestDetailScreen() {
                   city?: string;
                   state?: string;
                   postal_code?: string;
+                  is_verified?: boolean;
                 }
               | undefined;
             const tone = toneForResponse(r.response_type);
@@ -164,7 +165,17 @@ export default function RequestDetailScreen() {
                 <StatusRail tone={tone} />
                 <View style={styles.responseBody}>
                 <StatusPill tone={tone} />
-                <Text style={[styles.store, { color: theme.ink }]}>{store?.name || "Store"}</Text>
+                <View style={styles.storeRow}>
+                  <Text style={[styles.store, { color: theme.ink, flex: 1 }]}>
+                    {store?.name || "Store"}
+                  </Text>
+                  {store?.is_verified ? (
+                    <View style={styles.verified}>
+                      <View style={styles.verifiedMark} />
+                      <Text style={styles.verifiedText}>Verified</Text>
+                    </View>
+                  ) : null}
+                </View>
                 {r.price != null ? (
                   <Text style={[styles.price, { color: theme.ink }]}>${Number(r.price).toFixed(2)}</Text>
                 ) : null}
@@ -366,10 +377,27 @@ const styles = StyleSheet.create({
   },
   responseCard: { marginBottom: spacing.sm, overflow: "hidden" },
   responseBody: { padding: spacing.lg, paddingLeft: spacing.lg + 6 },
+  storeRow: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
   store: {
     fontSize: typography.size.body,
     fontWeight: typography.weight.semibold,
-    marginTop: spacing.sm,
+  },
+  verified: { flexDirection: "row", alignItems: "center", gap: 4 },
+  verifiedMark: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#1D9BF0",
+  },
+  verifiedText: {
+    fontSize: typography.size.caption,
+    fontWeight: typography.weight.bold,
+    color: "#1D9BF0",
   },
   price: {
     marginTop: spacing.xs,

@@ -284,6 +284,9 @@ describe("store join applications", () => {
       ownerName: "Casey Owner",
       ownerEmail: "casey@testhardware.example",
       whyLegit: "Licensed hardware retailer operating on Main Street for five years.",
+      legalName: "Test Hardware LLC",
+      ein: "123456789",
+      entityType: "LLC",
       confirmedLegitimate: true,
       requestCategories: ["Hardware", "Other"],
     });
@@ -296,6 +299,8 @@ describe("store join applications", () => {
     );
     expect(approved.status).toBe("approved");
     expect(store.name).toBe("Test Hardware Co");
+    expect(store.is_verified).toBe(true);
+    expect(store.ein).toBe("123456789");
     expect(store.trial_ends_at).toBeTruthy();
     expect(store.subscription_plan).toBe("free");
   });
@@ -314,6 +319,9 @@ describe("store join applications", () => {
       ownerEmail: "jordan@fcsmoke.example",
       whyLegit:
         "Licensed tobacco retailer. We check government ID for every nicotine sale.",
+      legalName: "Falls Church Smoke Shop LLC",
+      ein: "987654321",
+      entityType: "LLC",
       confirmedLegitimate: true,
       requestCategories: ["Tobacco & Vape", "Convenience"],
       requiresCustomerId: true,

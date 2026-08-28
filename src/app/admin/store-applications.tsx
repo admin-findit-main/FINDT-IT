@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/primitives";
 import { GlassBadge, GlassNotice } from "@/components/ui/glass";
 import { reviewStoreApplicationAction } from "@/lib/services/actions";
 import { STORE_TRIAL_DAYS } from "@/lib/config/constants";
+import { formatEin } from "@findit/domain";
 import type { StoreApplication } from "@/types/database";
 
 export function AdminStoreApplications({
@@ -63,11 +64,21 @@ export function AdminStoreApplications({
                 <div>
                   <p className="font-semibold text-ink">{app.business_name}</p>
                   <p className="mt-0.5 text-ink-muted">
+                    {app.legal_name || app.business_name}
+                    {app.entity_type ? ` · ${app.entity_type}` : ""}
+                  </p>
+                  <p className="mt-0.5 text-ink-muted">
                     {app.business_type} · {app.city}, {app.state} {app.postal_code}
                   </p>
                   <p className="mt-1 text-ink-muted">
                     {app.owner_name} · {app.owner_email} · {app.phone}
                   </p>
+                  {app.ein ? (
+                    <p className="mt-1 font-medium tabular-nums text-ink">
+                      EIN {formatEin(app.ein)}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-xs text-ink-muted">{app.street_address}</p>
                   {app.request_categories?.length ? (
                     <p className="mt-1 text-xs text-ink-muted">
                       Categories: {app.request_categories.join(", ")}
@@ -108,7 +119,7 @@ export function AdminStoreApplications({
                     disabled={pending}
                     onClick={() => review(app.id, "approved")}
                   >
-                    Approve
+                    Approve — blue badge + dashboard
                   </Button>
                   <Button
                     size="sm"

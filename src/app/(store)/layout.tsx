@@ -36,14 +36,25 @@ export default async function StoreLayout({
           <Card sheen className="p-8 text-center">
             {access.reason === "pending_application" ? (
               <>
-                <h1 className="text-2xl font-bold tracking-tight">Application under review</h1>
+                <h1 className="text-2xl font-bold tracking-tight">
+                  {access.pendingApplication?.status === "needs_info"
+                    ? "We need a bit more information"
+                    : "Waiting for FINDIT to accept you"}
+                </h1>
                 <p className="mt-3 text-ink-muted">
                   We&apos;re reviewing{" "}
                   <span className="font-semibold">
                     {access.pendingApplication?.business_name}
                   </span>
-                  . Approved stores get {STORE_TRIAL_DAYS} days free.
+                  . The dashboard, Hub, and devices stay locked until we accept
+                  the application. Approved stores get {STORE_TRIAL_DAYS} days free
+                  and a blue verified badge for shoppers.
                 </p>
+                {access.pendingApplication?.admin_notes ? (
+                  <p className="mt-4 rounded-2xl border border-hairline-strong bg-white px-4 py-3 text-sm text-ink">
+                    {access.pendingApplication.admin_notes}
+                  </p>
+                ) : null}
                 <Button asChild variant="ghost" className="mt-8">
                   <Link href="/home">Browse as a customer</Link>
                 </Button>

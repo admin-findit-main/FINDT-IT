@@ -1,11 +1,13 @@
 import { z } from "zod";
 import {
+  BUSINESS_ENTITY_TYPES,
   MAX_DESCRIPTION_LENGTH,
   MAX_PRODUCT_NAME_LENGTH,
   MIN_PRODUCT_NAME_LENGTH,
   PRODUCT_CATEGORIES,
   STORE_CATEGORIES,
 } from "./constants";
+import { normalizeEin } from "./business";
 import { MAX_CUSTOMER_RADIUS_MILES } from "./routing";
 
 export const signupSchema = z.object({
@@ -84,6 +86,17 @@ export const storeOnboardingSchema = z.object({
 });
 
 export const storeJoinApplicationSchema = z.object({
+  ownerName: z.string().min(2).max(100),
+  ownerEmail: z.string().email(),
+  ownerPhone: z.string().max(30).optional().or(z.literal("")),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  confirmPassword: z.string().min(8, "Confirm your password"),
+  legalName: z.string().min(2, "Legal business name is required").max(120),
+  ein: z
+    .string()
+    .transform((value) => normalizeEin(value))
+    .pipe(z.string().regex(/^\d{9}$/, "Enter a 9-digit EIN")),
+  entityType: z.enum(BUSINESS_ENTITY_TYPES),
   businessName: z.string().min(2).max(100),
   businessType: z.enum(STORE_CATEGORIES),
   streetAddress: z.string().min(3).max(200),
@@ -91,12 +104,15 @@ export const storeJoinApplicationSchema = z.object({
   state: z.string().min(2).max(2),
   postalCode: z.string().regex(/^\d{5}(-\d{4})?$/),
   phone: z.string().min(7).max(30),
-  website: z.string().url().optional().or(z.literal("")),
-  ownerName: z.string().min(2).max(100),
-  ownerEmail: z.string().email(),
-  ownerPhone: z.string().max(30).optional().or(z.literal("")),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string().min(8, "Confirm your password"),
+  website: z
+    .string()
+    .trim()
+    .transform((value) => {
+      if (!value) return "";
+      if (/^https?:\/\//i.test(value)) return value;
+      return `https://${value}`;
+    })
+    .pipe(z.union([z.literal(""), z.string().url("Enter a valid website")])),
   whyLegit: z
     .string()
     .min(20, "Tell us a bit about your business (at least 20 characters)")

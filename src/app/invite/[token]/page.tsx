@@ -78,7 +78,7 @@ export default function AcceptInvitePage() {
                 {error}
               </GlassNotice>
               <Button asChild className="mt-6 w-full" variant="outline">
-                <Link href="/login">Log in</Link>
+                <Link href="/login/business">Log in</Link>
               </Button>
             </>
           ) : invite ? (
@@ -100,7 +100,7 @@ export default function AcceptInvitePage() {
               {!email ? (
                 <div className="mt-6 space-y-3">
                   <Button asChild className="w-full" size="lg">
-                    <Link href={`/login?next=${encodeURIComponent(`/invite/${token}`)}`}>
+                    <Link href={`/login/business?next=${encodeURIComponent(`/invite/${token}`)}`}>
                       Log in to accept
                     </Link>
                   </Button>
@@ -125,7 +125,7 @@ export default function AcceptInvitePage() {
                     onClick={async () => {
                       await signOutAction();
                       router.push(
-                        `/login?next=${encodeURIComponent(`/invite/${token}`)}`
+                        `/login/business?next=${encodeURIComponent(`/invite/${token}`)}`
                       );
                       router.refresh();
                     }}
