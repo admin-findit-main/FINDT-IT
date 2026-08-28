@@ -19,13 +19,12 @@ import {
   AGE_RESTRICTED_ID_TITLE,
   CUSTOMER_PLANS,
   PRODUCT_CATEGORIES,
+  RADIUS_OPTIONS,
   findPlaceholderForCategory,
   getConsumerEntitlements,
   isAgeRestrictedCategory,
   isAgeRestrictedFind,
   planLimitReachedMessage,
-  radiusLimitMessage,
-  radiusOptionsForPlan,
 } from "@/lib/config/constants";
 import {
   createCustomerRequestAction,
@@ -47,6 +46,8 @@ import {
   lookupUsZip,
   shortPlaceFromProfile,
   type ShortPlace,
+  classifyRequest,
+  classificationLabel,
 } from "@findit/domain";
 
 type Step = "query" | "radius";
@@ -72,6 +73,7 @@ export default function CustomerHomePage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [idConfirmed, setIdConfirmed] = useState(false);
+  const [categoryConfirmed, setCategoryConfirmed] = useState(false);
   const [place, setPlace] = useState<ShortPlace>({
     city: "",
     state: "VA",
@@ -109,13 +111,21 @@ export default function CustomerHomePage() {
   }, []);
 
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
-  const radiusChoices = radiusOptionsForPlan(entitlements.maxSearchRadiusMiles);
+  const radiusChoices = RADIUS_OPTIONS;
   const plus = CUSTOMER_PLANS.plus;
   const restricted = isAgeRestrictedFind({
     category,
     productName,
     description,
   });
+  const guessed = classifyRequest({
+    productName,
+    description,
+    category,
+    confirmed: categoryConfirmed || Boolean(category),
+  });
+  const needsCategoryConfirm =
+    guessed.status === "needs_confirm" && !categoryConfirmed && !category;
 
   function goNextFromQuery() {
     if (upgrade) {
@@ -175,6 +185,7 @@ export default function CustomerHomePage() {
       return;
     }
     setCategory(next);
+    if (next) setCategoryConfirmed(true);
   }
 
   useEffect(() => {
@@ -257,6 +268,10 @@ export default function CustomerHomePage() {
       setAgeGateOpen(true);
       return;
     }
+    if (needsCategoryConfirm) {
+      toast.error("Confirm the category so we send this to the right stores.");
+      return;
+    }
     setLoading(true);
     let nextPlace = place;
     if (!nextPlace.city.trim() && nextPlace.postalCode.trim()) {
@@ -275,7 +290,9 @@ export default function CustomerHomePage() {
     const result = await createCustomerRequestAction({
       productName: productName.trim() || "Item in photo",
       description,
-      category,
+      category: category || guessed.productCategory || "",
+      categoryConfirmed:
+        categoryConfirmed || Boolean(category) || guessed.status === "confident",
       city: nextPlace.city,
       state: nextPlace.state || "VA",
       postalCode: nextPlace.postalCode,
@@ -464,6 +481,42 @@ export default function CustomerHomePage() {
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
               Optional — helps us ask the right stores. Tobacco & vape asks for ID first.
             </p>
+            {needsCategoryConfirm ? (
+              <div className="mt-4 rounded-2xl border border-hairline-strong bg-white p-4">
+                <p className="text-sm font-semibold text-ink">
+                  We think you&apos;re looking for:
+                </p>
+                <p className="mt-1 text-base font-bold text-ink">
+                  {classificationLabel(guessed)}
+                </p>
+                <p className="mt-1 text-xs text-ink-muted">{guessed.reason}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      if (guessed.productCategory) setCategory(guessed.productCategory);
+                      setCategoryConfirmed(true);
+                    }}
+                    disabled={!guessed.productCategory}
+                  >
+                    Yes, search nearby
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setCategoryConfirmed(false)}
+                  >
+                    Change category
+                  </Button>
+                </div>
+              </div>
+            ) : guessed.businessTypeName && (category || categoryConfirmed) ? (
+              <p className="mt-3 text-sm text-ink-muted">
+                Sending to {classificationLabel(guessed)} stores nearby.
+              </p>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               {PRODUCT_CATEGORIES.map((item) => (
                 <GlassChip
@@ -480,7 +533,7 @@ export default function CustomerHomePage() {
               How far should we look?
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-              {radiusLimitMessage(entitlements)}
+              We’ll look this far from your location — up to 40 miles.
             </p>
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-hairline-strong bg-white">

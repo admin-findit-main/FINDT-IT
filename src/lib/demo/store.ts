@@ -31,6 +31,7 @@ import {
   getConsumerEntitlements,
   isAgeRestrictedFind,
   isSoloAdmin,
+  MAX_CUSTOMER_RADIUS_MILES,
 } from "@findit/domain";
 import { selectEligibleStores } from "@/lib/services/routing";
 import {
@@ -721,6 +722,8 @@ export function demoRouteRequestToStores(requestId: string): number {
         .map((a) => a.postal_code),
       month_targets_received: monthTargets,
       free_plan_monthly_cap: STORE_PLANS.free.monthlyRequests,
+      latitude: store.latitude,
+      longitude: store.longitude,
     };
   });
 
@@ -735,6 +738,8 @@ export function demoRouteRequestToStores(requestId: string): number {
       city: request.city,
       category: request.category,
       radius_miles: request.radius_miles,
+      latitude: request.latitude,
+      longitude: request.longitude,
     },
     stores: candidates,
     alreadyTargetedStoreIds: already,
@@ -899,14 +904,11 @@ export function demoCreateRequest(input: {
     }
   }
 
-  if (
-    input.radiusMiles > entitlements.maxSearchRadiusMiles &&
-    !bypassConsumerPlanLimits()
-  ) {
+  if (input.radiusMiles > MAX_CUSTOMER_RADIUS_MILES) {
     return {
       request: null as unknown as CustomerRequest,
       storesTargeted: 0,
-      blocked: `${entitlements.brandName} searches up to ${entitlements.maxSearchRadiusMiles} miles.`,
+      blocked: `FINDIT searches up to ${MAX_CUSTOMER_RADIUS_MILES} miles.`,
     };
   }
 
@@ -955,7 +957,7 @@ export function demoRespondToRequest(input: {
   requestId: string;
   storeId: string;
   userId: string;
-  responseType: "in_stock" | "out_of_stock" | "can_order";
+  responseType: "in_stock" | "out_of_stock" | "can_order" | "not_relevant";
   price?: number | null;
   quantity?: number | null;
   note?: string;

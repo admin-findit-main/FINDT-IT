@@ -16,6 +16,8 @@ export function storeCategoriesForRequestCategory(
     collectibles: ["Collectibles"],
     hardware: ["Hardware"],
     "tobacco & vape": ["Smoke Shop", "Convenience", "Tobacco & Vape"],
+    coffee: ["Coffee Shop"],
+    nails: ["Nail Salon", "Beauty"],
     specialty: ["Specialty Retail", "Other", "Specialty"],
     other: ["Other", "Specialty Retail", "Convenience", "Grocery"],
   };
@@ -45,6 +47,8 @@ export const JOIN_REQUEST_CATEGORIES = [
   "Collectibles",
   "Hardware",
   "Tobacco & Vape",
+  "Coffee",
+  "Nails",
   "Specialty",
   "Other",
 ] as const;

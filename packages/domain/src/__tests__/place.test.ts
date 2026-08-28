@@ -69,6 +69,28 @@ describe("zip lookup parsers", () => {
     ).toEqual({ city: "Falls Church", state: "VA", postalCode: "22044" });
   });
 
+  it("reads ZIP centroid coordinates when present", () => {
+    expect(
+      parseZipLookup({
+        "post code": "20001",
+        places: [
+          {
+            "place name": "Washington",
+            "state abbreviation": "DC",
+            latitude: "38.9102",
+            longitude: "-77.0170",
+          },
+        ],
+      })
+    ).toEqual({
+      city: "Washington",
+      state: "DC",
+      postalCode: "20001",
+      latitude: 38.9102,
+      longitude: -77.017,
+    });
+  });
+
   it("reads city ZIP options", () => {
     const places = parseCityLookup(
       {

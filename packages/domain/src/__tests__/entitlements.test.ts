@@ -74,7 +74,7 @@ describe("getConsumerEntitlements", () => {
       getConsumerEntitlements("plus").maxSearchRadiusMiles
     );
     expect(free.map((o) => o.miles)).toEqual([2, 5, 10]);
-    expect(plus.map((o) => o.miles)).toEqual([2, 5, 10, 15, 25]);
+    expect(plus.map((o) => o.miles)).toEqual([2, 5, 10, 15, 25, 40]);
   });
 
   it("does not refund a Find when the request is later cancelled", () => {

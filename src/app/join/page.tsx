@@ -33,6 +33,15 @@ export default function JoinAsStorePage() {
       );
       if (requiresCustomerId == null) setRequiresCustomerId(true);
     }
+    if (next === "Coffee Shop") {
+      setRequestCategories((prev) => (prev.includes("Coffee") ? prev : [...prev, "Coffee"]));
+    }
+    if (next === "Nail Salon") {
+      setRequestCategories((prev) => (prev.includes("Nails") ? prev : [...prev, "Nails"]));
+    }
+    if (next === "Auto Parts") {
+      setRequestCategories((prev) => (prev.includes("Auto Parts") ? prev : [...prev, "Auto Parts"]));
+    }
   }
 
   function toggleCategory(c: string) {

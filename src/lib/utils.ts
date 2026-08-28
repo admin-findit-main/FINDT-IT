@@ -32,6 +32,8 @@ export function responseLabel(type: string): string {
       return "Out of stock";
     case "can_order":
       return "Can order";
+    case "not_relevant":
+      return "Not relevant";
     default:
       return type.replaceAll("_", " ");
   }

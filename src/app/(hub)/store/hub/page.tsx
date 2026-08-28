@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Settings } from "lucide-react";
-import { estimateZipDistanceMiles, isRequestExpired } from "@findit/domain";
+import { estimateRoutingDistanceMiles, isRequestExpired } from "@findit/domain";
 import {
   getStoreIncomingRequestsAction,
   markStoreRequestOpenedAction,
@@ -224,12 +224,16 @@ export default function FinditHubPage() {
 
   const distanceLabel = useMemo(() => {
     if (!store || !active) return null;
-    const miles = estimateZipDistanceMiles(
-      active.postal_code,
-      store.postal_code,
-      store.city,
-      active.city
-    );
+    const miles = estimateRoutingDistanceMiles({
+      customerZip: active.postal_code,
+      storeZip: store.postal_code,
+      customerCity: active.city,
+      storeCity: store.city,
+      customerLatitude: active.latitude,
+      customerLongitude: active.longitude,
+      storeLatitude: store.latitude,
+      storeLongitude: store.longitude,
+    });
     return formatMiles(miles);
   }, [store, active]);
 
@@ -382,17 +386,26 @@ export default function FinditHubPage() {
             </div>
 
             <div className="mt-6 grid flex-1 gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-              <div>
+              <div className="flex min-h-0 min-w-0 flex-col">
                 {active.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={active.image_url}
-                    alt=""
-                    className="mb-6 max-h-56 w-full rounded-3xl object-cover"
-                  />
+                  <figure className="mb-6 flex max-h-[min(36vh,22rem)] min-h-40 w-full items-center justify-center overflow-hidden rounded-3xl bg-[#111113] ring-1 ring-inset ring-white/10 md:max-h-[min(52vh,36rem)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={active.image_url}
+                      alt={active.product_name}
+                      draggable={false}
+                      className="h-auto w-auto max-h-[min(36vh,22rem)] max-w-full object-contain md:max-h-[min(52vh,36rem)]"
+                    />
+                  </figure>
                 ) : null}
                 <p className="text-sm uppercase tracking-[0.18em] text-white/40">Product</p>
-                <h1 className="mt-2 text-5xl font-bold leading-none tracking-tight md:text-7xl">
+                <h1
+                  className={
+                    active.image_url
+                      ? "mt-2 text-4xl font-bold leading-tight tracking-tight md:text-5xl"
+                      : "mt-2 text-5xl font-bold leading-none tracking-tight md:text-7xl"
+                  }
+                >
                   {active.product_name}
                 </h1>
                 {active.description ? (

@@ -18,7 +18,11 @@ import {
   updateStoreCoverageAction,
   updateStoreProfileAction,
 } from "@/lib/services/actions";
-import { JOIN_REQUEST_CATEGORIES as CATS } from "@/lib/services/category-routing";
+import {
+  FINDIT_CATALOG,
+  catalogTypeById,
+  defaultCategoryIdsForType,
+} from "@findit/domain";
 import { IosSwitch } from "@/components/ui/ios-switch";
 import type { Store } from "@/types/database";
 
@@ -34,6 +38,10 @@ export default function StoreSettingsPage() {
     }[]
   >([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [catalogCategoryIds, setCatalogCategoryIds] = useState<string[]>([]);
+  const [customKeywords, setCustomKeywords] = useState("");
+  const [businessType, setBusinessType] = useState("");
+  const [acceptingRequests, setAcceptingRequests] = useState(true);
   const [serviceZips, setServiceZips] = useState("");
   const [radius, setRadius] = useState(10);
   const [name, setName] = useState("");
@@ -70,6 +78,10 @@ export default function StoreSettingsPage() {
               }))
         );
         setCategories(settings.categories);
+        setCatalogCategoryIds(settings.catalogCategoryIds || []);
+        setCustomKeywords((settings.customKeywords || []).join(", "));
+        setBusinessType(settings.store.business_type || "");
+        setAcceptingRequests(settings.store.accepting_requests !== false);
         setServiceZips(settings.serviceZips.join(", "));
         setRadius(settings.store.service_radius_miles || 10);
         setPilotBanner(settings.pilotMode);
@@ -100,6 +112,13 @@ export default function StoreSettingsPage() {
       serviceRadiusMiles: radius,
       serviceZips: zips,
       categories,
+      businessType: businessType || null,
+      acceptingRequests,
+      catalogCategoryIds,
+      customKeywords: customKeywords
+        .split(/[,\n]+/)
+        .map((k) => k.trim())
+        .filter(Boolean),
       hours,
     });
     setSaving(false);
@@ -321,23 +340,87 @@ export default function StoreSettingsPage() {
       </Card>
 
       <Card sheen id="categories" className="mt-4 scroll-mt-8 p-5 sm:p-6">
-        <h2 className="font-semibold text-ink">Request categories</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {(CATS as readonly string[]).map((c) => (
-            <GlassChip
-              key={c}
-              disabled={!canManage}
-              selected={categories.includes(c)}
-              onClick={() =>
+        <h2 className="font-semibold text-ink">What you sell</h2>
+        <p className="mt-1 text-sm text-ink-muted">
+          Pick your business type, then the categories you want FINDIT requests for.
+          Keywords are predefined — add a custom tag only for unusual brands.
+        </p>
+        <div className="mt-4">
+          <Label htmlFor="business-type">Business type</Label>
+          <select
+            id="business-type"
+            disabled={!canManage}
+            value={businessType}
+            onChange={(e) => {
+              const next = e.target.value;
+              setBusinessType(next);
+              setCatalogCategoryIds(defaultCategoryIdsForType(next));
+              const type = catalogTypeById(next);
+              if (type) {
                 setCategories((prev) =>
-                  prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
-                )
+                  prev.includes(type.productCategory)
+                    ? prev
+                    : [...prev, type.productCategory]
+                );
               }
-              className="disabled:opacity-50"
-            >
-              {c}
-            </GlassChip>
-          ))}
+            }}
+            className="mt-1 h-12 w-full rounded-glass-lg border border-hairline-strong bg-white px-3 text-base text-ink"
+          >
+            <option value="">Select type</option>
+            {FINDIT_CATALOG.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink">Accepting FINDIT requests</p>
+            <p className="mt-1 text-xs text-ink-muted">
+              Off means nearby Finds will not be sent to this store.
+            </p>
+          </div>
+          <IosSwitch
+            label="Accepting FINDIT requests"
+            checked={acceptingRequests}
+            onCheckedChange={setAcceptingRequests}
+            disabled={!canManage}
+          />
+        </div>
+        {catalogTypeById(businessType) ? (
+          <div className="mt-4">
+            <p className="text-sm font-medium text-ink">Categories</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {catalogTypeById(businessType)!.categories.map((c) => (
+                <GlassChip
+                  key={c.id}
+                  disabled={!canManage}
+                  selected={catalogCategoryIds.includes(c.id)}
+                  onClick={() =>
+                    setCatalogCategoryIds((prev) =>
+                      prev.includes(c.id)
+                        ? prev.filter((id) => id !== c.id)
+                        : [...prev, c.id]
+                    )
+                  }
+                  className="disabled:opacity-50"
+                >
+                  {c.name}
+                </GlassChip>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <div className="mt-4">
+          <Label htmlFor="custom-keywords">Custom keywords (optional)</Label>
+          <Input
+            id="custom-keywords"
+            disabled={!canManage}
+            value={customKeywords}
+            onChange={(e) => setCustomKeywords(e.target.value)}
+            placeholder="Rare brand, comma separated"
+          />
         </div>
         <div className="mt-5 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
           <div className="min-w-0">

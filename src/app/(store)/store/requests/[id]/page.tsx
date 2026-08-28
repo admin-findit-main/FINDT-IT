@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Panel } from "@/components/dashboard/shell";
 import { Skeleton } from "@/components/ui/primitives";
-import { estimateZipDistanceMiles, formatShortPlace, isAgeRestrictedFind } from "@findit/domain";
+import { estimateRoutingDistanceMiles, formatShortPlace, isAgeRestrictedFind } from "@findit/domain";
 import {
   getStoreIncomingRequestsAction,
   getStoreWorkspaceAction,
@@ -39,7 +39,16 @@ export default function StoreRequestDetailPage() {
 
   const miles = useMemo(() => {
     if (!store || !row) return null;
-    return estimateZipDistanceMiles(row.postal_code, store.postal_code, store.city, row.city);
+    return estimateRoutingDistanceMiles({
+      customerZip: row.postal_code,
+      storeZip: store.postal_code,
+      customerCity: row.city,
+      storeCity: store.city,
+      customerLatitude: row.latitude,
+      customerLongitude: row.longitude,
+      storeLatitude: store.latitude,
+      storeLongitude: store.longitude,
+    });
   }, [store, row]);
 
   if (loading) return <Skeleton className="h-64" />;

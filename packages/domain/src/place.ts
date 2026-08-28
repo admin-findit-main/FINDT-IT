@@ -2,7 +2,16 @@ export type ShortPlace = {
   city: string;
   state: string;
   postalCode: string;
+  latitude?: number;
+  longitude?: number;
 };
+
+/** Parse a finite lat/lng value from GPS, ZIP lookup, or a numeric DB column. */
+export function parseGeoCoord(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
 export const US_STATES = [
   { code: "AL", name: "Alabama" },
@@ -135,6 +144,8 @@ type ZippoPlace = {
   "place name"?: string;
   state?: string;
   "state abbreviation"?: string;
+  latitude?: string;
+  longitude?: string;
 };
 
 type ZippoPayload = {
@@ -151,7 +162,14 @@ export function parseZipLookup(payload: unknown, fallbackZip = ""): ShortPlace |
   const city = (first["place name"] || "").trim();
   const postalCode = digitsPostalCode(data["post code"] || fallbackZip);
   if (!city || !state) return null;
-  return { city, state, postalCode };
+  const latitude = parseGeoCoord(first.latitude);
+  const longitude = parseGeoCoord(first.longitude);
+  return {
+    city,
+    state,
+    postalCode,
+    ...(latitude != null && longitude != null ? { latitude, longitude } : {}),
+  };
 }
 
 export function parseCityLookup(payload: unknown, stateHint = ""): ShortPlace[] {
@@ -218,14 +236,22 @@ const ZIPPO = "https://api.zippopotam.us/us";
 const REVERSE_GEOCODE =
   "https://api.bigdatacloud.net/data/reverse-geocode-client";
 
-/** Resolve a US ZIP to city + state. No street address. */
+const zipLookupCache = new Map<string, ShortPlace | null>();
+
+/** Resolve a US ZIP to city + state (+ centroid when the lookup includes it). */
 export async function lookupUsZip(zip: string): Promise<ShortPlace | null> {
   const code = digitsPostalCode(zip);
   if (code.length !== 5) return null;
+  if (zipLookupCache.has(code)) return zipLookupCache.get(code) || null;
   try {
     const res = await fetch(`${ZIPPO}/${code}`);
-    if (!res.ok) return null;
-    return parseZipLookup(await res.json(), code);
+    if (!res.ok) {
+      zipLookupCache.set(code, null);
+      return null;
+    }
+    const parsed = parseZipLookup(await res.json(), code);
+    zipLookupCache.set(code, parsed);
+    return parsed;
   } catch {
     return null;
   }

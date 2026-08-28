@@ -52,6 +52,8 @@ describe("Edge domain constants stay aligned with @findit/domain", () => {
     expect(edge).toContain(
       `export const FREE_MAX_RADIUS_MILES = ${FREE_MAX_RADIUS_MILES}`
     );
+    expect(edge).toContain("estimateRoutingDistanceMiles");
+    expect(edge).toContain("UNKNOWN_ZIP_DISTANCE_MILES");
     expect(edge).toContain('"Tobacco & Vape"');
     expect(edge).toContain('isAgeRestrictedFind');
   });

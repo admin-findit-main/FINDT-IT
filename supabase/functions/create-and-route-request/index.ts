@@ -12,9 +12,8 @@ import {
   selectEligibleStores,
   STORE_PLANS_FREE_MONTHLY,
   FREE_MONTHLY_REQUEST_LIMIT,
-  FREE_MAX_RADIUS_MILES,
   PLUS_MONTHLY_REQUEST_LIMIT,
-  PLUS_MAX_RADIUS_MILES,
+  MAX_CUSTOMER_RADIUS_MILES,
 } from "../_shared/domain.ts";
 import { sendExpoPush } from "../_shared/push.ts";
 
@@ -175,7 +174,6 @@ Deno.serve(async (req) => {
   if (!bypassConsumerLimits) {
     const isPlus = profile.subscription_plan === "plus";
     const monthlyLimit = isPlus ? PLUS_MONTHLY_REQUEST_LIMIT : FREE_MONTHLY_REQUEST_LIMIT;
-    const maxRadius = isPlus ? PLUS_MAX_RADIUS_MILES : FREE_MAX_RADIUS_MILES;
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
@@ -198,22 +196,45 @@ Deno.serve(async (req) => {
         origin
       );
     }
-    if (radiusMiles > maxRadius) {
-      return jsonResponse(
-        {
-          error: `${isPlus ? "FINDIT+" : "FINDIT"} searches up to ${maxRadius} miles.`,
-          code: "radius_limit",
-          upgradeRequired: !isPlus,
-        },
-        400,
-        origin
-      );
-    }
+  }
+
+  if (radiusMiles > MAX_CUSTOMER_RADIUS_MILES) {
+    return jsonResponse(
+      {
+        error: `FINDIT searches up to ${MAX_CUSTOMER_RADIUS_MILES} miles.`,
+        code: "radius_limit",
+      },
+      400,
+      origin
+    );
   }
 
   const expiresAt = new Date(
     Date.now() + expirationHours * 60 * 60 * 1000
   ).toISOString();
+
+  let requestLat = latitude != null && Number.isFinite(latitude) ? latitude : null;
+  let requestLng =
+    longitude != null && Number.isFinite(longitude) ? longitude : null;
+  if (requestLat == null || requestLng == null) {
+    try {
+      const zipRes = await fetch(
+        `https://api.zippopotam.us/us/${postalCode.slice(0, 5)}`
+      );
+      if (zipRes.ok) {
+        const zipJson = await zipRes.json();
+        const place = zipJson?.places?.[0];
+        const lat = Number(place?.latitude);
+        const lng = Number(place?.longitude);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          requestLat = lat;
+          requestLng = lng;
+        }
+      }
+    } catch {
+      // Keep ZIP-only routing if the centroid lookup fails.
+    }
+  }
 
   const { data: request, error } = await admin
     .from("customer_requests")
@@ -231,8 +252,8 @@ Deno.serve(async (req) => {
       expires_at: expiresAt,
       image_url: imageUrl,
       image_storage_path: imageStoragePath,
-      latitude,
-      longitude,
+      latitude: requestLat,
+      longitude: requestLng,
     })
     .select("*")
     .single();
@@ -274,7 +295,7 @@ Deno.serve(async (req) => {
   const { data: stores } = await admin
     .from("stores")
     .select(
-      "id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan"
+      "id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan, latitude, longitude"
     )
     .eq("is_active", true)
     .eq("is_suspended", false);
@@ -329,6 +350,8 @@ Deno.serve(async (req) => {
       city: store.city,
       service_radius_miles: store.service_radius_miles ?? 10,
       subscription_plan: store.subscription_plan,
+      latitude: store.latitude,
+      longitude: store.longitude,
       categories: (cats || [])
         .filter((c) => c.store_id === store.id)
         .map((c) => c.category),
@@ -346,6 +369,8 @@ Deno.serve(async (req) => {
         city: request.city,
         category: request.category,
         radius_miles: request.radius_miles,
+        latitude: request.latitude,
+        longitude: request.longitude,
       },
       stores: candidates,
       alreadyTargetedStoreIds: (existingTargets || []).map((t) => t.store_id),

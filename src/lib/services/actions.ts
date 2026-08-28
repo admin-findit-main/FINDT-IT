@@ -69,12 +69,14 @@ import {
   getConsumerEntitlements,
   isAccountDeletionConfirmed,
   isAgeRestrictedFind,
+  classifyRequest,
   isMonthlyFindCapError,
   monthlyFindWindowStart,
   planLimitReachedMessage,
-  radiusLimitMessage,
+  MAX_CUSTOMER_RADIUS_MILES,
 } from "@findit/domain";
 import { selectEligibleStores } from "@/lib/services/routing";
+import { resolvePoint, resolvePointsByZip } from "@/lib/services/zip-centroids";
 import {
   canRebroadcastStillLooking,
   deriveRequestStatus,
@@ -679,6 +681,25 @@ export async function createCustomerRequestAction(raw: unknown) {
   ) {
     return { error: AGE_RESTRICTED_ID_REQUIRED, code: "age_restricted" as const };
   }
+  const classified = classifyRequest({
+    productName: parsed.data.productName,
+    description: parsed.data.description,
+    category: parsed.data.category,
+    confirmed: Boolean(parsed.data.categoryConfirmed || parsed.data.category),
+  });
+  if (
+    classified.status === "needs_confirm" &&
+    !parsed.data.categoryConfirmed &&
+    !parsed.data.category
+  ) {
+    return {
+      error: "Confirm the category so we send this to the right stores.",
+      code: "category_confirm" as const,
+      classification: classified,
+    };
+  }
+  const resolvedCategory =
+    classified.productCategory || parsed.data.category || null;
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Please sign in to submit a request", needsAuth: true };
   if (isSoloAdmin(profile)) {
@@ -690,7 +711,7 @@ export async function createCustomerRequestAction(raw: unknown) {
       customerId: profile.id,
       productName: parsed.data.productName,
       description: parsed.data.description,
-      category: parsed.data.category || undefined,
+      category: resolvedCategory || undefined,
       city: parsed.data.city,
       state: parsed.data.state,
       postalCode: parsed.data.postalCode,
@@ -752,7 +773,7 @@ export async function createCustomerRequestAction(raw: unknown) {
       .limit(20);
     const dup = isNearDuplicateRequest({
       normalizedProductName: normalizeProductName(parsed.data.productName),
-      category: parsed.data.category || null,
+      category: resolvedCategory,
       existing: existingActive || [],
     });
     if (dup.duplicate && dup.existingId) {
@@ -777,11 +798,10 @@ export async function createCustomerRequestAction(raw: unknown) {
         upgradeRequired: entitlements.planId === "free",
       };
     }
-    if (parsed.data.radiusMiles > entitlements.maxSearchRadiusMiles) {
+    if (parsed.data.radiusMiles > MAX_CUSTOMER_RADIUS_MILES) {
       return {
-        error: radiusLimitMessage(entitlements),
+        error: `FINDIT searches up to ${MAX_CUSTOMER_RADIUS_MILES} miles.`,
         code: "radius_limit" as const,
-        upgradeRequired: entitlements.planId === "free",
       };
     }
   }
@@ -798,6 +818,12 @@ export async function createCustomerRequestAction(raw: unknown) {
     Date.now() + parsed.data.expirationHours * 60 * 60 * 1000
   ).toISOString();
 
+  const point = await resolvePoint({
+    postalCode: parsed.data.postalCode,
+    latitude: parsed.data.latitude,
+    longitude: parsed.data.longitude,
+  });
+
   // Service role insert after auth checks — avoids brittle INSERT RLS during pilot
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
@@ -808,7 +834,7 @@ export async function createCustomerRequestAction(raw: unknown) {
       product_name: parsed.data.productName.trim(),
       normalized_product_name: normalizeProductName(parsed.data.productName),
       description: parsed.data.description || null,
-      category: parsed.data.category || null,
+      category: resolvedCategory,
       city: parsed.data.city,
       state: parsed.data.state,
       postal_code: parsed.data.postalCode,
@@ -817,8 +843,17 @@ export async function createCustomerRequestAction(raw: unknown) {
       expires_at: expiresAt,
       image_url: imageUrl,
       image_storage_path: parsed.data.imageStoragePath || null,
-      latitude: parsed.data.latitude ?? null,
-      longitude: parsed.data.longitude ?? null,
+      latitude: point.latitude,
+      longitude: point.longitude,
+      detected_business_type: classified.businessTypeId,
+      detected_category: classified.categoryId,
+      detected_subcategory: classified.subcategoryId,
+      routing_confidence: classified.confidence,
+      classification_status: classified.status,
+      classification_reason: classified.reason,
+      category_confirmed: Boolean(
+        parsed.data.categoryConfirmed || parsed.data.category || classified.status === "confident"
+      ),
     })
     .select("*")
     .single();
@@ -863,14 +898,22 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
 
   const { data: stores } = await admin
     .from("stores")
-    .select("id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan")
+    .select("id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan, business_type, accepting_requests, latitude, longitude")
     .eq("is_active", true)
     .eq("is_suspended", false);
 
   if (!stores?.length) return 0;
 
   const storeIds = stores.map((s) => s.id);
-  const [{ data: cats }, { data: areas }, { data: hours }, { data: existingTargets }] =
+  const [
+    { data: cats },
+    { data: areas },
+    { data: hours },
+    { data: existingTargets },
+    { data: catalogCats },
+    { data: catalogKeys },
+    { data: customKeys },
+  ] =
     await Promise.all([
       admin.from("store_categories").select("store_id, category").in("store_id", storeIds),
       admin.from("store_service_areas").select("store_id, postal_code").in("store_id", storeIds),
@@ -879,6 +922,9 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
         .select("store_id, day_of_week, open_time, close_time, is_closed")
         .in("store_id", storeIds),
       admin.from("request_targets").select("store_id").eq("request_id", requestId),
+      admin.from("store_catalog_categories").select("store_id, category_id").in("store_id", storeIds),
+      admin.from("store_catalog_keywords").select("store_id, keyword_id").in("store_id", storeIds),
+      admin.from("store_custom_keywords").select("store_id, normalized_keyword").in("store_id", storeIds),
     ]);
 
   const monthStart = new Date();
@@ -895,24 +941,53 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
     monthCounts.set(t.store_id, (monthCounts.get(t.store_id) || 0) + 1);
   }
 
-  const candidates = stores.map((store) => ({
-    id: store.id,
-    is_active: store.is_active,
-    is_suspended: store.is_suspended,
-    is_verified: store.is_verified,
-    postal_code: store.postal_code,
-    city: store.city,
-    service_radius_miles: store.service_radius_miles ?? 10,
-    subscription_plan: store.subscription_plan,
-    categories: (cats || [])
-      .filter((c) => c.store_id === store.id)
-      .map((c) => c.category),
-    service_zips: (areas || [])
-      .filter((a) => a.store_id === store.id)
-      .map((a) => a.postal_code),
-    month_targets_received: monthCounts.get(store.id) || 0,
-    free_plan_monthly_cap: STORE_PLANS.free.monthlyRequests,
-  }));
+  const requestPoint = await resolvePoint({
+    postalCode: request.postal_code,
+    latitude: request.latitude,
+    longitude: request.longitude,
+  });
+  const storeZipPoints = await resolvePointsByZip(
+    stores
+      .filter((store) => store.latitude == null || store.longitude == null)
+      .map((store) => store.postal_code)
+  );
+
+  const candidates = stores.map((store) => {
+    const fromZip = storeZipPoints.get(
+      String(store.postal_code || "").replace(/\D/g, "").slice(0, 5)
+    );
+    return {
+      id: store.id,
+      is_active: store.is_active,
+      is_suspended: store.is_suspended,
+      is_verified: store.is_verified,
+      postal_code: store.postal_code,
+      city: store.city,
+      service_radius_miles: store.service_radius_miles ?? 10,
+      subscription_plan: store.subscription_plan,
+      businessTypeId: store.business_type || null,
+      acceptingRequests: store.accepting_requests !== false,
+      categories: (cats || [])
+        .filter((c) => c.store_id === store.id)
+        .map((c) => c.category),
+      catalogCategoryIds: (catalogCats || [])
+        .filter((c) => c.store_id === store.id)
+        .map((c) => c.category_id),
+      catalogKeywordIds: (catalogKeys || [])
+        .filter((c) => c.store_id === store.id)
+        .map((c) => c.keyword_id),
+      customKeywords: (customKeys || [])
+        .filter((c) => c.store_id === store.id)
+        .map((c) => c.normalized_keyword),
+      service_zips: (areas || [])
+        .filter((a) => a.store_id === store.id)
+        .map((a) => a.postal_code),
+      month_targets_received: monthCounts.get(store.id) || 0,
+      free_plan_monthly_cap: STORE_PLANS.free.monthlyRequests,
+      latitude: store.latitude ?? fromZip?.latitude ?? null,
+      longitude: store.longitude ?? fromZip?.longitude ?? null,
+    };
+  });
 
   const { eligible } = selectEligibleStores({
     request: {
@@ -921,6 +996,11 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
       city: request.city,
       category: request.category,
       radius_miles: request.radius_miles,
+      productName: request.product_name,
+      description: request.description,
+      categoryConfirmed: Boolean(request.category_confirmed || request.category),
+      latitude: requestPoint.latitude,
+      longitude: requestPoint.longitude,
     },
     stores: candidates,
     alreadyTargetedStoreIds: (existingTargets || []).map((t) => t.store_id),
@@ -937,6 +1017,9 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
       delivery_status: "sent",
       route_sent_at: nowIso,
       was_closed_at_route: !openInfo.open,
+      routing_reason: d.routingReason || null,
+      match_kind: d.matchKind || null,
+      relevant: null,
       notify_after:
         !openInfo.open && openInfo.reopenAt ? openInfo.reopenAt.toISOString() : null,
     };
@@ -1112,7 +1195,7 @@ export async function cancelRequestAction(requestId: string) {
 export async function respondToRequestAction(input: {
   requestId: string;
   storeId: string;
-  responseType: "in_stock" | "out_of_stock" | "can_order";
+  responseType: "in_stock" | "out_of_stock" | "can_order" | "not_relevant";
   price?: number | null;
   quantity?: number | null;
   note?: string;
@@ -1205,6 +1288,7 @@ export async function respondToRequestAction(input: {
       response_time_seconds: secs,
       opened_at: target.opened_at || respondedAt,
       viewed_at: target.viewed_at || respondedAt,
+      relevant: input.responseType === "not_relevant" ? false : true,
     })
     .eq("id", target.id);
 
@@ -2529,6 +2613,11 @@ export async function updateStoreCoverageAction(
     serviceRadiusMiles?: number;
     serviceZips?: string[];
     categories?: string[];
+    businessType?: string | null;
+    acceptingRequests?: boolean;
+    catalogCategoryIds?: string[];
+    catalogKeywordIds?: string[];
+    customKeywords?: string[];
     hours?: {
       day_of_week: number;
       open_time: string | null;
@@ -2566,11 +2655,12 @@ export async function updateStoreCoverageAction(
     return { error: "Only owners and managers can update store settings" };
   }
 
-  if (input.serviceRadiusMiles != null) {
-    await supabase
-      .from("stores")
-      .update({ service_radius_miles: input.serviceRadiusMiles })
-      .eq("id", storeId);
+  if (input.serviceRadiusMiles != null || input.businessType !== undefined || input.acceptingRequests !== undefined) {
+    const patch: Record<string, unknown> = {};
+    if (input.serviceRadiusMiles != null) patch.service_radius_miles = input.serviceRadiusMiles;
+    if (input.businessType !== undefined) patch.business_type = input.businessType;
+    if (input.acceptingRequests !== undefined) patch.accepting_requests = input.acceptingRequests;
+    await supabase.from("stores").update(patch).eq("id", storeId);
   }
   if (input.serviceZips) {
     await supabase.from("store_service_areas").delete().eq("store_id", storeId);
@@ -2585,6 +2675,35 @@ export async function updateStoreCoverageAction(
     if (input.categories.length) {
       await supabase.from("store_categories").insert(
         input.categories.map((category) => ({ store_id: storeId, category }))
+      );
+    }
+  }
+  if (input.catalogCategoryIds) {
+    await supabase.from("store_catalog_categories").delete().eq("store_id", storeId);
+    if (input.catalogCategoryIds.length) {
+      await supabase.from("store_catalog_categories").insert(
+        input.catalogCategoryIds.map((category_id) => ({ store_id: storeId, category_id }))
+      );
+    }
+  }
+  if (input.catalogKeywordIds) {
+    await supabase.from("store_catalog_keywords").delete().eq("store_id", storeId);
+    if (input.catalogKeywordIds.length) {
+      await supabase.from("store_catalog_keywords").insert(
+        input.catalogKeywordIds.map((keyword_id) => ({ store_id: storeId, keyword_id }))
+      );
+    }
+  }
+  if (input.customKeywords) {
+    await supabase.from("store_custom_keywords").delete().eq("store_id", storeId);
+    const unique = [...new Set(input.customKeywords.map((k) => k.trim()).filter(Boolean))];
+    if (unique.length) {
+      await supabase.from("store_custom_keywords").insert(
+        unique.map((keyword) => ({
+          store_id: storeId,
+          keyword,
+          normalized_keyword: keyword.toLowerCase().replace(/\s+/g, " "),
+        }))
       );
     }
   }
@@ -2627,6 +2746,8 @@ export async function getStoreSettingsAction(storeId: string) {
       serviceZips: state.storeServiceAreas
         .filter((a) => a.store_id === storeId)
         .map((a) => a.postal_code),
+      catalogCategoryIds: [] as string[],
+      customKeywords: [] as string[],
       pilotMode: isPilotMode() || Boolean(store.trial_ends_at),
     };
   }
@@ -2642,12 +2763,14 @@ export async function getStoreSettingsAction(storeId: string) {
     .maybeSingle();
   if (!membership && profile.account_type !== "admin") return null;
 
-  const [{ data: store }, { data: hours }, { data: cats }, { data: areas }] =
+  const [{ data: store }, { data: hours }, { data: cats }, { data: areas }, { data: catalogCats }, { data: customKeys }] =
     await Promise.all([
       supabase.from("stores").select("*").eq("id", storeId).single(),
       supabase.from("store_hours").select("*").eq("store_id", storeId),
       supabase.from("store_categories").select("category").eq("store_id", storeId),
       supabase.from("store_service_areas").select("postal_code").eq("store_id", storeId),
+      supabase.from("store_catalog_categories").select("category_id").eq("store_id", storeId),
+      supabase.from("store_custom_keywords").select("keyword").eq("store_id", storeId),
     ]);
   if (!store) return null;
   return {
@@ -2655,6 +2778,8 @@ export async function getStoreSettingsAction(storeId: string) {
     role: membership?.role || "owner",
     hours: hours || [],
     categories: (cats || []).map((c) => c.category),
+    catalogCategoryIds: (catalogCats || []).map((c) => c.category_id),
+    customKeywords: (customKeys || []).map((c) => c.keyword),
     serviceZips: (areas || []).map((a) => a.postal_code),
     pilotMode: isPilotMode() || Boolean(store.trial_ends_at),
   };

@@ -2,7 +2,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -38,8 +38,7 @@ import {
   normalizeStateCode,
   reverseGeocodeUs,
   planLimitReachedMessage,
-  radiusLimitMessage,
-  radiusOptionsForPlan,
+  RADIUS_OPTIONS,
   REQUEST_IMAGES_BUCKET,
   shortPlaceFromProfile,
   type ShortPlace,
@@ -73,10 +72,7 @@ export default function HomeFindItScreen() {
   const { profile, refreshProfile } = useAuth();
   const router = useRouter();
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
-  const radiusChoices = useMemo(
-    () => radiusOptionsForPlan(entitlements.maxSearchRadiusMiles),
-    [entitlements.maxSearchRadiusMiles]
-  );
+  const radiusChoices = RADIUS_OPTIONS;
   const [step, setStep] = useState<Step>("query");
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
@@ -584,7 +580,7 @@ export default function HomeFindItScreen() {
                 How far should we look?
               </Text>
               <Text style={[styles.sectionSub, { color: theme.inkMuted }]}>
-                {radiusLimitMessage(entitlements)}
+                We’ll look this far from your location — up to 40 miles.
               </Text>
 
               <GlassCard padded={false} style={styles.radiusCard}>

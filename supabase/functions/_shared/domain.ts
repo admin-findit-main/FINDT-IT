@@ -15,15 +15,17 @@ export const PRODUCT_CATEGORIES = [
   "Collectibles",
   "Hardware",
   "Tobacco & Vape",
+  "Coffee",
+  "Nails",
   "Specialty",
   "Other",
 ] as const;
 
 export const STORE_PLANS_FREE_MONTHLY = 20;
-export const MAX_CUSTOMER_RADIUS_MILES = 25;
+export const MAX_CUSTOMER_RADIUS_MILES = 40;
 export const FREE_MONTHLY_REQUEST_LIMIT = 5;
 export const PLUS_MONTHLY_REQUEST_LIMIT = 25;
-export const PLUS_MAX_RADIUS_MILES = 25;
+export const PLUS_MAX_RADIUS_MILES = 40;
 export const FREE_MAX_RADIUS_MILES = 10;
 
 export function normalizeProductName(name: string): string {
@@ -45,6 +47,8 @@ export function storeCategoriesForRequestCategory(
     collectibles: ["Collectibles"],
     hardware: ["Hardware"],
     "tobacco & vape": ["Smoke Shop", "Convenience", "Tobacco & Vape"],
+    coffee: ["Coffee Shop"],
+    nails: ["Nail Salon", "Beauty"],
     specialty: ["Specialty Retail", "Other", "Specialty"],
     other: ["Other", "Specialty Retail", "Convenience", "Grocery"],
   };
@@ -98,16 +102,60 @@ function categoriesOverlap(
   );
 }
 
+export const UNKNOWN_ZIP_DISTANCE_MILES = 99;
+const EARTH_RADIUS_MILES = 3958.7613;
+
+function zipFive(value: string): string {
+  return value.trim().slice(0, 5);
+}
+
+function toRad(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
+function finiteCoord(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function haversineMiles(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  return EARTH_RADIUS_MILES * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export function estimateZipDistanceMiles(
   customerZip: string,
   storeZip: string,
   storeCity?: string | null,
   customerCity?: string | null
 ): number {
-  const cZip = customerZip.trim().slice(0, 5);
-  const sZip = storeZip.trim().slice(0, 5);
+  const cZip = zipFive(customerZip);
+  const sZip = zipFive(storeZip);
+  if (!cZip || !sZip) return UNKNOWN_ZIP_DISTANCE_MILES;
   if (cZip === sZip) return 0;
-  if (cZip.slice(0, 3) === sZip.slice(0, 3)) return 8;
+
+  const samePrefix = cZip.slice(0, 3) === sZip.slice(0, 3);
+  const cNum = /^\d{5}$/.test(cZip) ? Number(cZip) : NaN;
+  const sNum = /^\d{5}$/.test(sZip) ? Number(sZip) : NaN;
+  if (samePrefix && Number.isFinite(cNum) && Number.isFinite(sNum)) {
+    const diff = Math.abs(cNum - sNum);
+    if (diff <= 2) return 2;
+    if (diff <= 10) return 4;
+    return 6;
+  }
   if (
     storeCity &&
     customerCity &&
@@ -115,7 +163,37 @@ export function estimateZipDistanceMiles(
   ) {
     return 5;
   }
-  return 99;
+  return UNKNOWN_ZIP_DISTANCE_MILES;
+}
+
+export function estimateRoutingDistanceMiles(input: {
+  customerZip: string;
+  storeZip: string;
+  customerCity?: string | null;
+  storeCity?: string | null;
+  customerLatitude?: number | string | null;
+  customerLongitude?: number | string | null;
+  storeLatitude?: number | string | null;
+  storeLongitude?: number | string | null;
+}): number {
+  const customerLat = finiteCoord(input.customerLatitude);
+  const customerLng = finiteCoord(input.customerLongitude);
+  const storeLat = finiteCoord(input.storeLatitude);
+  const storeLng = finiteCoord(input.storeLongitude);
+  if (
+    customerLat != null &&
+    customerLng != null &&
+    storeLat != null &&
+    storeLng != null
+  ) {
+    return Math.round(haversineMiles(customerLat, customerLng, storeLat, storeLng) * 10) / 10;
+  }
+  return estimateZipDistanceMiles(
+    input.customerZip,
+    input.storeZip,
+    input.storeCity,
+    input.customerCity
+  );
 }
 
 type RoutingStoreCandidate = {
@@ -131,6 +209,8 @@ type RoutingStoreCandidate = {
   service_zips: string[];
   month_targets_received?: number;
   free_plan_monthly_cap?: number | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
 };
 
 function storeCoversCustomerZip(
@@ -145,11 +225,13 @@ function storeCoversCustomerZip(
 function isWithinMutualRadius(
   estimatedMiles: number,
   customerRadiusMiles: number,
-  storeRadiusMiles: number
+  _storeRadiusMiles?: number
 ): boolean {
-  const customerCap = Math.min(customerRadiusMiles, MAX_CUSTOMER_RADIUS_MILES);
-  const storeCap = Math.min(storeRadiusMiles, MAX_CUSTOMER_RADIUS_MILES);
-  return estimatedMiles <= customerCap && estimatedMiles <= storeCap;
+  const customerCap = Math.min(
+    Math.max(customerRadiusMiles, 0),
+    MAX_CUSTOMER_RADIUS_MILES
+  );
+  return estimatedMiles <= customerCap;
 }
 
 export function selectEligibleStores(input: {
@@ -159,6 +241,8 @@ export function selectEligibleStores(input: {
     city?: string | null;
     category: string | null;
     radius_miles: number;
+    latitude?: number | string | null;
+    longitude?: number | string | null;
   };
   stores: RoutingStoreCandidate[];
   alreadyTargetedStoreIds?: string[];
@@ -178,15 +262,19 @@ export function selectEligibleStores(input: {
       if (!categoriesOverlap(store.categories, allowedCategories)) continue;
     }
 
-    const est = estimateZipDistanceMiles(
-      input.request.postal_code,
-      store.postal_code,
-      store.city,
-      input.request.city
-    );
+    const est = estimateRoutingDistanceMiles({
+      customerZip: input.request.postal_code,
+      storeZip: store.postal_code,
+      customerCity: input.request.city,
+      storeCity: store.city,
+      customerLatitude: input.request.latitude,
+      customerLongitude: input.request.longitude,
+      storeLatitude: store.latitude,
+      storeLongitude: store.longitude,
+    });
 
     if (!storeCoversCustomerZip(store, input.request.postal_code)) {
-      if (est >= 99) continue;
+      if (est >= UNKNOWN_ZIP_DISTANCE_MILES) continue;
       if (
         !isWithinMutualRadius(
           est,

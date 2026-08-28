@@ -29,7 +29,7 @@ import {
   mapsDirectionsUrl,
 } from "@/lib/utils";
 import {
-  estimateZipDistanceMiles,
+  estimateRoutingDistanceMiles,
   formatEstimatedDistanceMiles,
   formatShortPlace,
   sortCustomerResponsesByDistance,
@@ -109,9 +109,10 @@ export default function RequestDetailPage() {
   const responses = useMemo(
     () =>
       sortCustomerResponsesByDistance(
-        data?.responses || [],
+        (data?.responses || []).filter((r) => r.response_type !== "not_relevant"),
         data?.postal_code || "",
-        data?.city
+        data?.city,
+        { latitude: data?.latitude, longitude: data?.longitude }
       ),
     [data]
   );
@@ -322,12 +323,16 @@ export default function RequestDetailPage() {
                     new Date(data.created_at).getTime()) /
                     1000
                 );
-                const miles = estimateZipDistanceMiles(
-                  data.postal_code,
-                  store.postal_code,
-                  store.city,
-                  data.city
-                );
+                const miles = estimateRoutingDistanceMiles({
+                  customerZip: data.postal_code,
+                  storeZip: store.postal_code,
+                  customerCity: data.city,
+                  storeCity: store.city,
+                  customerLatitude: data.latitude,
+                  customerLongitude: data.longitude,
+                  storeLatitude: store.latitude,
+                  storeLongitude: store.longitude,
+                });
                 return (
                   <Card
                     key={response.id}

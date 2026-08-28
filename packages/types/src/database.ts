@@ -1,7 +1,7 @@
 export type AccountType = "customer" | "business" | "admin";
 export type StoreMemberRole = "owner" | "manager" | "employee";
 export type StoreMemberStatus = "invited" | "active" | "disabled";
-export type ResponseType = "in_stock" | "out_of_stock" | "can_order";
+export type ResponseType = "in_stock" | "out_of_stock" | "can_order" | "not_relevant";
 export type RequestStatus =
   | "draft"
   | "active"
@@ -23,6 +23,8 @@ export type ProductCategory =
   | "Collectibles"
   | "Hardware"
   | "Tobacco & Vape"
+  | "Coffee"
+  | "Nails"
   | "Specialty"
   | "Other";
 
@@ -36,6 +38,8 @@ export type StoreCategory =
   | "Collectibles"
   | "Hardware"
   | "Smoke Shop"
+  | "Coffee Shop"
+  | "Nail Salon"
   | "Specialty Retail"
   | "Other";
 
@@ -90,6 +94,8 @@ export interface Store {
   is_verified: boolean;
   is_suspended: boolean;
   age_restricted: boolean;
+  business_type?: string | null;
+  accepting_requests?: boolean;
   subscription_plan: string;
   subscription_status: string;
   /** ISO timestamp when the 30-day FINDIT+ Business trial ends; null if not on trial */
@@ -156,6 +162,13 @@ export interface CustomerRequest {
   status: RequestStatus;
   expires_at: string;
   stores_targeted: number;
+  detected_business_type?: string | null;
+  detected_category?: string | null;
+  detected_subcategory?: string | null;
+  routing_confidence?: string | null;
+  classification_status?: string | null;
+  classification_reason?: string | null;
+  category_confirmed?: boolean;
   fulfilled_at?: string | null;
   fulfilled_store_id?: string | null;
   found_with_findit?: boolean | null;
@@ -177,6 +190,9 @@ export interface RequestTarget {
   response_time_seconds?: number | null;
   notify_after?: string | null;
   was_closed_at_route?: boolean;
+  routing_reason?: string | null;
+  match_kind?: string | null;
+  relevant?: boolean | null;
   created_at: string;
 }
 

@@ -296,6 +296,8 @@ export function toneForResponse(type: string | null | undefined): StatusTone {
       return "order";
     case "out_of_stock":
       return "oos";
+    case "not_relevant":
+      return "oos";
     default:
       return "pending";
   }

@@ -5,6 +5,8 @@ import {
   storeCategoriesForRequestCategory,
 } from "@/lib/services/category-routing";
 import { slugify } from "@/lib/utils";
+import { defaultCategoryIdsForType } from "@findit/domain";
+import { coordsFromZip } from "@/lib/services/zip-centroids";
 import type { DemandItem, Store, StoreMetrics } from "@/types/database";
 
 export async function provisionStoreFromApplication(applicationId: string, reviewerId: string) {
@@ -75,6 +77,8 @@ export async function provisionStoreFromApplication(applicationId: string, revie
       ? application.request_categories
       : [application.business_type];
 
+  const zipPoint = await coordsFromZip(application.postal_code);
+
   const { data: store, error: storeError } = await admin
     .from("stores")
     .insert({
@@ -95,6 +99,23 @@ export async function provisionStoreFromApplication(applicationId: string, revie
       trial_ends_at: trialEnds,
       service_radius_miles: 10,
       age_restricted: Boolean(application.requires_customer_id),
+      accepting_requests: true,
+      latitude: zipPoint?.latitude ?? null,
+      longitude: zipPoint?.longitude ?? null,
+      business_type:
+        application.business_type === "Smoke Shop"
+          ? "smoke_shop"
+          : application.business_type === "Coffee Shop"
+            ? "coffee_shop"
+            : application.business_type === "Auto Parts"
+              ? "auto_parts"
+              : application.business_type === "Nail Salon"
+                ? "nail_salon"
+                : application.business_type === "Grocery"
+                  ? "grocery"
+                  : application.business_type === "Convenience"
+                    ? "convenience"
+                    : "other",
     })
     .select("*")
     .single();
@@ -111,6 +132,13 @@ export async function provisionStoreFromApplication(applicationId: string, revie
     (category) => ({ store_id: store.id, category })
   );
   await admin.from("store_categories").insert(categoryRows);
+
+  const catalogIds = defaultCategoryIdsForType(store.business_type || "");
+  if (catalogIds.length) {
+    await admin.from("store_catalog_categories").insert(
+      catalogIds.map((category_id) => ({ store_id: store.id, category_id }))
+    );
+  }
 
   await admin.from("store_service_areas").insert({
     store_id: store.id,

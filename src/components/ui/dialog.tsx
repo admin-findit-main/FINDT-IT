@@ -94,16 +94,11 @@ export function GlassSheet({
         <DialogPrimitive.Content
           onCloseAutoFocus={(event) => event.preventDefault()}
           className={cn(
-            "glass-strong fixed inset-x-0 bottom-0 z-[80] max-h-[92vh] overflow-y-auto rounded-t-glass-2xl px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 focus:outline-none",
-            "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-glass-2xl sm:pt-6 sm:pb-6",
+            "glass-strong fixed left-1/2 top-1/2 z-[80] w-[calc(100%-2rem)] max-w-md max-h-[92vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-glass-2xl px-6 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] focus:outline-none",
             className
           )}
         >
-          <div
-            aria-hidden
-            className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-hairline-strong sm:hidden"
-          />
-          <DialogPrimitive.Title className="text-xl font-bold tracking-tight text-ink">
+          <DialogPrimitive.Title className="pr-10 text-xl font-bold tracking-tight text-ink">
             {title}
           </DialogPrimitive.Title>
           {description ? (

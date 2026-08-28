@@ -8,6 +8,8 @@ export const PRODUCT_CATEGORIES = [
   "Collectibles",
   "Hardware",
   "Tobacco & Vape",
+  "Coffee",
+  "Nails",
   "Specialty",
   "Other",
 ] as const;
@@ -22,6 +24,8 @@ export const STORE_CATEGORIES = [
   "Collectibles",
   "Hardware",
   "Smoke Shop",
+  "Coffee Shop",
+  "Nail Salon",
   "Specialty Retail",
   "Other",
 ] as const;
@@ -47,6 +51,7 @@ export const RADIUS_OPTIONS = [
   { label: "10 miles", miles: 10 },
   { label: "15 miles", miles: 15 },
   { label: "25 miles", miles: 25 },
+  { label: "40 miles", miles: 40 },
 ] as const;
 
 export const STORE_SERVICE_RADIUS_OPTIONS = [
@@ -55,6 +60,7 @@ export const STORE_SERVICE_RADIUS_OPTIONS = [
   { label: "10 miles", miles: 10 },
   { label: "15 miles", miles: 15 },
   { label: "25 miles", miles: 25 },
+  { label: "40 miles", miles: 40 },
 ] as const;
 
 /** In-stock shelf amount (optional) */
@@ -104,7 +110,7 @@ export const PLUS_MONTHLY_REQUEST_LIMIT = 25;
 
 /** Keep Edge `_shared/domain.ts` in lockstep with these radius caps. */
 export const FREE_MAX_RADIUS_MILES = 10;
-export const PLUS_MAX_RADIUS_MILES = 25;
+export const PLUS_MAX_RADIUS_MILES = 40;
 
 /** FINDIT+ Business price after trial. Billing is not connected yet. */
 export const BUSINESS_PRICE_MONTHLY = 49.99;
@@ -128,7 +134,7 @@ export const CUSTOMER_PLANS = {
   plus: {
     id: "plus",
     name: "FINDIT+",
-    tagline: "More Finds, larger radius, Expand Search",
+    tagline: "More Finds, 40-mile search, Expand Search",
     priceMonthly: null as number | null,
     monthlyRequests: PLUS_MONTHLY_REQUEST_LIMIT as number | null,
     maxRadiusMiles: PLUS_MAX_RADIUS_MILES,

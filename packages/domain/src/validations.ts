@@ -6,6 +6,7 @@ import {
   PRODUCT_CATEGORIES,
   STORE_CATEGORIES,
 } from "./constants";
+import { MAX_CUSTOMER_RADIUS_MILES } from "./routing";
 
 export const signupSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(60),
@@ -36,7 +37,7 @@ export const createRequestSchema = z.object({
     .string()
     .trim()
     .regex(/^\d{5}(-\d{4})?$/, "Enter a valid ZIP code"),
-  radiusMiles: z.coerce.number().int().min(1).max(25).default(10),
+  radiusMiles: z.coerce.number().int().min(1).max(MAX_CUSTOMER_RADIUS_MILES).default(10),
   expirationHours: z.coerce.number().int().refine((v) => [4, 12, 24, 48].includes(v), {
     message: "Invalid expiration",
   }),
@@ -52,6 +53,7 @@ export const createRequestSchema = z.object({
   latitude: z.coerce.number().optional().nullable(),
   longitude: z.coerce.number().optional().nullable(),
   ageRestrictedConfirmed: z.boolean().optional().default(false),
+  categoryConfirmed: z.boolean().optional().default(false),
 });
 
 export const inStockResponseSchema = z.object({

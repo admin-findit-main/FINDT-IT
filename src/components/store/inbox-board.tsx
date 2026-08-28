@@ -107,7 +107,7 @@ export function StoreInboxBoard() {
   useStoreInboxRealtime(storeId, { onChange: () => load(storeId) });
 
   async function respond(
-    type: "in_stock" | "out_of_stock" | "can_order",
+    type: "in_stock" | "out_of_stock" | "can_order" | "not_relevant",
     request: Incoming | null = activeRequest,
     extra?: {
       price?: number | null;
@@ -426,6 +426,17 @@ export function StoreInboxBoard() {
                     }}
                   >
                     Can Order
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="col-span-3 min-h-11"
+                    disabled={submitting}
+                    onClick={async () => {
+                      await respond("not_relevant", item);
+                    }}
+                  >
+                    Not relevant to this store
                   </Button>
                 </div>
               )}
