@@ -5,7 +5,6 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
-import { loginEmailPassword } from "@/lib/auth/client-login";
 import { PlaceFields } from "@/components/customer/place-fields";
 import { signUpAction } from "@/lib/services/actions";
 import { marketingHomeHref } from "@/lib/config/product-hosts";
@@ -16,75 +15,32 @@ import type { AppHomePath } from "@/lib/auth/home-path";
 
 type Finished = { homePath: AppHomePath; needsName?: boolean };
 
-export function CustomerEmailLoginForm({
-  next,
-}: {
-  onFinished?: (result: Finished) => void;
-  next?: string | null;
-}) {
-  const [loading, setLoading] = useState(false);
-
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    const fd = new FormData(e.currentTarget);
-    const result = await loginEmailPassword(
-      String(fd.get("email")),
-      String(fd.get("password")),
-      next
-    );
-    setLoading(false);
-    if (result.error) {
-      toast.error(result.error);
-    }
-  }
-
-  return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-4">
-      <div>
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          autoFocus
-        />
-      </div>
-      <div>
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-        />
-      </div>
-      <Button type="submit" className="w-full" size="lg" disabled={loading}>
-        {loading ? "Signing in…" : "Sign in"}
-      </Button>
-    </form>
-  );
-}
-
 export function CustomerEmailSignupForm({
   onFinished,
   onExistingAccount,
+  email,
+  onEmailChange,
 }: {
   onFinished: (result: Finished) => void;
   onExistingAccount?: () => void;
+  email?: string;
+  onEmailChange?: (value: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
   const [password, setPassword] = useState("");
-  const [email, setEmail] = useState("");
+  const [internalEmail, setInternalEmail] = useState("");
   const [place, setPlace] = useState<ShortPlace>({
     city: "",
     state: "VA",
     postalCode: "",
   });
+  const emailValue = email ?? internalEmail;
+
+  function setEmailValue(next: string) {
+    onEmailChange?.(next);
+    if (email === undefined) setInternalEmail(next);
+  }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -144,7 +100,7 @@ export function CustomerEmailSignupForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <div>
         <Label htmlFor="firstName">First name</Label>
         <Input id="firstName" name="firstName" autoComplete="given-name" required />
@@ -157,8 +113,8 @@ export function CustomerEmailSignupForm({
           type="email"
           required
           autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={emailValue}
+          onChange={(e) => setEmailValue(e.target.value)}
         />
       </div>
       <div>
@@ -173,7 +129,7 @@ export function CustomerEmailSignupForm({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <PasswordStrengthMeter password={password} email={email} />
+        <PasswordStrengthMeter password={password} email={emailValue} />
       </div>
       <div>
         <Label>Place</Label>
@@ -183,7 +139,7 @@ export function CustomerEmailSignupForm({
         type="submit"
         className="w-full"
         size="lg"
-        disabled={loading || !passwordStrength(password, email).ok}
+        disabled={loading || !passwordStrength(password, emailValue).ok}
       >
         {loading ? "Creating…" : "Create account"}
       </Button>

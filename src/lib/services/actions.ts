@@ -252,6 +252,13 @@ export async function sendMagicLinkAction(emailRaw: string) {
   if (!email || !email.includes("@")) {
     return { error: "Enter a valid email." };
   }
+  const limited = await consumeRateLimit({
+    bucket: "magic-link",
+    limit: 5,
+    windowMs: 60 * 60_000,
+    key: email,
+  });
+  if (!limited.ok) return { error: limited.error };
   if (isDemoMode()) {
     return {
       ok: true as const,
@@ -267,7 +274,21 @@ export async function sendMagicLinkAction(emailRaw: string) {
       email,
       options: { redirectTo: MAGIC_LINK_REDIRECT },
     });
-    if (error) return { error: authEmailErrorMessage(error.message) };
+    if (error) {
+      const text = (error.message || "").toLowerCase();
+      if (
+        text.includes("user not found") ||
+        text.includes("unable to find") ||
+        text.includes("no user")
+      ) {
+        return {
+          error:
+            "We couldn’t send a link for that email. Try a password, or create an account.",
+          code: "no_account" as const,
+        };
+      }
+      return { error: authEmailErrorMessage(error.message) };
+    }
 
     const tokenHash = data.properties.hashed_token;
     if (!tokenHash) {
