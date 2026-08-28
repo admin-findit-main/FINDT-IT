@@ -6,7 +6,17 @@ import { ExternalLink, MapPin } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { GlassNotice, VerifiedStoreBadge } from "@/components/ui/glass";
-import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
+import { Card, EmptyState } from "@/components/ui/primitives";
+import {
+  FindProgress,
+  sendStageLabel,
+  useClimbingPercent,
+} from "@/components/shared/load-progress";
+import {
+  clearPendingFind,
+  readPendingFind,
+  type PendingFind,
+} from "@/lib/customer/pending-find";
 import { BackLink } from "@/components/shared/app-header";
 import { ResponseAccent, StatusBadge } from "@/components/shared/status";
 import { NotificationPrompt } from "@/components/customer/notification-prompt";
@@ -19,7 +29,7 @@ import {
   submitPilotFeedbackAction,
   trackDirectionsClickAction,
 } from "@/lib/services/actions";
-import { useRequestRealtime } from "@/lib/supabase/realtime";
+import { LIVE_POLL_MS, useRequestRealtime } from "@/lib/supabase/realtime";
 import { formatDurationSeconds } from "@/lib/services/request-lifecycle";
 import {
   formatExpiresIn,
@@ -44,33 +54,52 @@ type Detail = CustomerRequest & {
 
 const STORES_PAGE_SIZE = 5;
 
+function detailFromPending(pending: PendingFind): Detail {
+  return {
+    id: pending.id,
+    customer_id: "",
+    product_name: pending.productName,
+    normalized_product_name: "",
+    description: null,
+    image_url: pending.imageUrl,
+    category: null,
+    city: pending.city,
+    state: pending.state,
+    postal_code: pending.postalCode,
+    radius_miles: 10,
+    status: "active",
+    expires_at: pending.expiresAt,
+    stores_targeted: pending.storesTargeted,
+    created_at: pending.createdAt,
+    updated_at: pending.createdAt,
+    responses: [],
+    targets_count: pending.storesTargeted,
+  };
+}
+
 function SearchingStoresCard({
   storesContacted,
   placeLabel,
   expiresAt,
+  percent,
+  syncLabel,
 }: {
   storesContacted: number;
   placeLabel: string;
   expiresAt: string;
+  percent: number;
+  syncLabel: string;
 }) {
   return (
     <Card className="mt-4 p-6 text-center">
-      <div className="flex items-center justify-center gap-2" aria-hidden>
-        <span className="findit-search-dot h-2.5 w-2.5 rounded-full bg-accent" />
-        <span
-          className="findit-search-dot h-2.5 w-2.5 rounded-full bg-accent"
-          style={{ animationDelay: "0.2s" }}
-        />
-        <span
-          className="findit-search-dot h-2.5 w-2.5 rounded-full bg-accent"
-          style={{ animationDelay: "0.4s" }}
-        />
-      </div>
-      <h2 className="mt-4 text-xl font-bold tracking-tight text-ink">
+      <FindProgress percent={percent} label={syncLabel} size="inline" />
+      <h2 className="mt-5 text-xl font-bold tracking-tight text-ink">
         Asking nearby stores
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Sent to {storesContacted} store{storesContacted === 1 ? "" : "s"}
+        {storesContacted > 0
+          ? `Sent to ${storesContacted} store${storesContacted === 1 ? "" : "s"}`
+          : "Finding stores"}
         {placeLabel ? ` near ${placeLabel}` : ""}. Answers will show up here,
         closest first.
       </p>
@@ -91,24 +120,48 @@ export default function RequestDetailPage() {
 
   const load = useCallback(async () => {
     const result = await getCustomerRequestAction(params.id);
-    setData(result);
+    if (result) {
+      setData(result);
+      clearPendingFind(params.id);
+    }
     setLoading(false);
     if (result?.status === "fulfilled") setFoundStep("done");
   }, [params.id]);
 
   useEffect(() => {
-    load();
+    const pending = readPendingFind(params.id);
+    if (pending) {
+      setData(detailFromPending(pending));
+      setLoading(false);
+    }
+    void load();
     const t = setInterval(() => {
-      if (document.visibilityState === "visible") load();
-    }, 20000);
+      if (document.visibilityState === "visible") void load();
+    }, LIVE_POLL_MS);
     return () => clearInterval(t);
-  }, [load]);
+  }, [load, params.id]);
 
   useEffect(() => {
     setVisibleStoreCount(STORES_PAGE_SIZE);
   }, [params.id]);
 
-  useRequestRealtime(params.id, { onChange: load });
+  const sync = useRequestRealtime(params.id, { onChange: load });
+  const climb = useClimbingPercent(
+    loading ||
+      Boolean(
+        data &&
+          (data.responses?.length || 0) === 0 &&
+          data.status === "active"
+      ),
+    90
+  );
+  const syncPercent = sync.state === "live" ? 100 : Math.max(climb, sync.percent);
+  const syncLabel =
+    sync.state === "live"
+      ? "Live"
+      : sync.state === "polling"
+        ? "Checking stores"
+        : sendStageLabel(syncPercent);
 
   const expired = useMemo(
     () => (data ? isRequestExpired(data.expires_at, data.status) : false),
@@ -133,7 +186,14 @@ export default function RequestDetailPage() {
     !expired &&
     data?.status !== "cancelled" &&
     data?.status !== "fulfilled";
-  const searching = Boolean(openRequest && responses.length === 0 && storesContacted > 0);
+  const recentlyCreated = Boolean(
+    data && Date.now() - new Date(data.created_at).getTime() < 12_000
+  );
+  const searching = Boolean(
+    openRequest &&
+      responses.length === 0 &&
+      (storesContacted > 0 || recentlyCreated)
+  );
   const waitingOnMore = Boolean(
     openRequest && responses.length > 0 && storesContacted > responses.length
   );
@@ -167,12 +227,10 @@ export default function RequestDetailPage() {
     load();
   }
 
-  if (loading) {
+  if (loading && !data) {
     return (
-      <div className="mx-auto max-w-xl space-y-4 px-5 py-8 sm:px-8">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-28 w-full" />
+      <div className="mx-auto max-w-xl px-5 py-8 sm:px-8">
+        <FindProgress percent={syncPercent || climb || 18} label={syncLabel} />
       </div>
     );
   }
@@ -271,7 +329,7 @@ export default function RequestDetailPage() {
         ) : null}
       </Card>
 
-      {storesContacted === 0 ? (
+      {storesContacted === 0 && !searching ? (
         <GlassNotice tone="muted" className="mt-4">
           <h2 className="font-semibold text-ink">
             We don&apos;t have enough participating stores in this area yet.
@@ -287,6 +345,8 @@ export default function RequestDetailPage() {
           storesContacted={storesContacted}
           placeLabel={placeLabel}
           expiresAt={data.expires_at}
+          percent={syncPercent}
+          syncLabel={syncLabel}
         />
       ) : (
         <div className="mt-8">

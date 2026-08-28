@@ -1,13 +1,9 @@
-import { Skeleton } from "@/components/ui/primitives";
+import { FindProgress } from "@/components/shared/load-progress";
 
 export default function HubLoading() {
   return (
     <div className="grid h-dvh place-items-center bg-canvas px-6">
-      <div className="w-full max-w-md space-y-4">
-        <Skeleton className="mx-auto h-8 w-32" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-16 w-full" />
-      </div>
+      <FindProgress percent={32} label="Opening FINDIT Hub" />
     </div>
   );
 }

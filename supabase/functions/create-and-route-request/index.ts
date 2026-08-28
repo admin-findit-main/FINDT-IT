@@ -426,7 +426,7 @@ Deno.serve(async (req) => {
           await admin.from("notifications").insert(notifications);
         }
 
-        await fanoutEmployeePush(admin, members || [], {
+        const pushTask = fanoutEmployeePush(admin, members || [], {
           title: "New FINDIT request",
           body: request.product_name,
           data: {
@@ -434,7 +434,15 @@ Deno.serve(async (req) => {
             requestId: request.id,
             url: `/store/requests/${request.id}`,
           },
+        }).catch((err) => {
+          console.error("[FINDIT] Store push failed", err);
         });
+        const runtime = (
+          globalThis as {
+            EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void };
+          }
+        ).EdgeRuntime;
+        if (runtime?.waitUntil) runtime.waitUntil(pushTask);
       }
     }
 

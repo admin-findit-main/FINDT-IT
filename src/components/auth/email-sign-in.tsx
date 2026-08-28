@@ -3,9 +3,11 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import type { LoginAudience } from "@findit/domain";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
 import { GlassNotice } from "@/components/ui/glass";
+import { WrongLoginSideNotice } from "@/components/auth/auth-audience";
 import { loginEmailPassword } from "@/lib/auth/client-login";
 import { sendMagicLinkAction } from "@/lib/services/actions";
 import { cn } from "@/lib/utils";
@@ -65,6 +67,7 @@ export function OneTimeLoginPanel({
   autoFocus = false,
   onNoAccount,
   onUsePassword,
+  audience,
 }: {
   emailId?: string;
   email?: string;
@@ -72,13 +75,16 @@ export function OneTimeLoginPanel({
   autoFocus?: boolean;
   onNoAccount?: () => void;
   onUsePassword?: () => void;
+  audience?: LoginAudience;
 }) {
   const [internalEmail, setInternalEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
+  const [wrongSide, setWrongSide] = useState<LoginAudience | null>(null);
   const value = email ?? internalEmail;
 
   function setValue(next: string) {
+    setWrongSide(null);
     onEmailChange?.(next);
     if (email === undefined) setInternalEmail(next);
   }
@@ -90,13 +96,18 @@ export function OneTimeLoginPanel({
       return;
     }
     setLoading(true);
-    const result = await sendMagicLinkAction(trimmed);
+    const result = await sendMagicLinkAction(trimmed, audience);
     setLoading(false);
     if ("error" in result && result.error) {
       toast.error(result.error);
+      if ("code" in result && result.code === "wrong_side" && result.requiredAudience) {
+        setWrongSide(result.requiredAudience);
+        return;
+      }
       if ("code" in result && result.code === "no_account") onNoAccount?.();
       return;
     }
+    setWrongSide(null);
     const message =
       "message" in result && result.message ? result.message : "";
     if (message.toLowerCase().includes("demo mode")) {
@@ -155,6 +166,7 @@ export function OneTimeLoginPanel({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      {wrongSide ? <WrongLoginSideNotice requiredAudience={wrongSide} /> : null}
       <div>
         <Label htmlFor={emailId}>Email</Label>
         <Input
@@ -182,14 +194,17 @@ export function EmailSignIn({
   next,
   emailId = "signin-email",
   initialEmail = "",
+  audience,
 }: {
   next?: string | null;
   emailId?: string;
   initialEmail?: string;
+  audience?: LoginAudience;
 }) {
   const [method, setMethod] = useState<AuthMethod>("password");
   const [email, setEmail] = useState(initialEmail);
   const [loading, setLoading] = useState(false);
+  const [wrongSide, setWrongSide] = useState<LoginAudience | null>(null);
 
   async function onPassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -198,26 +213,44 @@ export function EmailSignIn({
     const result = await loginEmailPassword(
       String(fd.get("email") || email),
       String(fd.get("password")),
-      next
+      next,
+      audience
     );
     setLoading(false);
+    if (result.code === "wrong_side" && result.requiredAudience) {
+      setWrongSide(result.requiredAudience);
+      toast.error(result.error);
+      return;
+    }
+    setWrongSide(null);
     if (result.error) toast.error(result.error);
   }
 
   return (
     <div className="mt-6 space-y-5">
-      <AuthMethodSwitch value={method} onChange={setMethod} />
+      <AuthMethodSwitch
+        value={method}
+        onChange={(nextMethod) => {
+          setMethod(nextMethod);
+          setWrongSide(null);
+        }}
+      />
       {method === "onetime" ? (
         <OneTimeLoginPanel
           emailId={`${emailId}-onetime`}
           email={email}
-          onEmailChange={setEmail}
+          onEmailChange={(value) => {
+            setEmail(value);
+            setWrongSide(null);
+          }}
           autoFocus
+          audience={audience}
           onNoAccount={() => setMethod("password")}
           onUsePassword={() => setMethod("password")}
         />
       ) : (
         <form onSubmit={onPassword} className="space-y-4">
+          {wrongSide ? <WrongLoginSideNotice requiredAudience={wrongSide} /> : null}
           <div>
             <Label htmlFor={emailId}>Email</Label>
             <Input
@@ -228,7 +261,10 @@ export function EmailSignIn({
               autoComplete="email"
               autoFocus
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setWrongSide(null);
+              }}
             />
           </div>
           <div>

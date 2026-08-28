@@ -78,6 +78,9 @@ import {
   boundUuid,
   boundSlug,
   signupSchema,
+  loginAudienceForAccount,
+  wrongLoginSideMessage,
+  type LoginAudience,
 } from "@findit/domain";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import {
@@ -205,7 +208,37 @@ async function getStoreActor(storeId: string): Promise<StoreActor | null> {
   return null;
 }
 
-export async function signInAction(email: string, password: string) {
+function loginSideForAccount(input: {
+  email: string;
+  accountType?: string | null;
+  hasActiveStoreMembership: boolean;
+}): LoginAudience {
+  return loginAudienceForAccount({
+    isAdmin: isSoloAdminEmail(input.email) || input.accountType === "admin",
+    accountType: input.accountType,
+    hasActiveStoreMembership: input.hasActiveStoreMembership,
+  });
+}
+
+function wrongLoginSideResult(belongs: LoginAudience) {
+  return {
+    error: wrongLoginSideMessage(belongs),
+    code: "wrong_side" as const,
+    requiredAudience: belongs,
+  };
+}
+
+function demoHasActiveStoreMembership(userId: string): boolean {
+  return getDemoState().storeMembers.some(
+    (member) => member.user_id === userId && member.status === "active"
+  );
+}
+
+export async function signInAction(
+  email: string,
+  password: string,
+  audience?: LoginAudience
+) {
   const normalized = email.trim().toLowerCase();
   const limited = await consumeRateLimit({
     bucket: "login",
@@ -217,12 +250,21 @@ export async function signInAction(email: string, password: string) {
   if (isDemoMode()) {
     const result = demoLoginWithSession(normalized, password);
     if (!result) return { error: "Invalid email or password" };
+    const hasActiveStoreMembership = demoHasActiveStoreMembership(result.profile.id);
+    const belongs = loginSideForAccount({
+      email: normalized,
+      accountType: result.profile.account_type,
+      hasActiveStoreMembership,
+    });
+    if (audience && belongs !== audience) {
+      demoLogout(result.sessionId);
+      return wrongLoginSideResult(belongs);
+    }
     await setDemoSessionCookie(result.sessionId);
-    const stores = await getUserStoresAction();
     const homePath = resolvePostAuthDestination({
       profile: result.profile,
       authEmail: result.profile.email || normalized,
-      hasActiveStoreMembership: stores.length > 0,
+      hasActiveStoreMembership,
     }) as AppHomePath;
     return { profile: result.profile, homePath };
   }
@@ -241,21 +283,46 @@ export async function signInAction(email: string, password: string) {
     ? (coerceSoloAdminProfile(row as Profile, user?.email || normalized) as Profile)
     : null;
   if (isSoloAdminEmail(normalized) || isSoloAdmin(profile) || isSoloAdminEmail(user?.email)) {
+    if (audience && audience !== "store") {
+      await supabase.auth.signOut();
+      return wrongLoginSideResult("store");
+    }
     return { profile, homePath: "/admin" as AppHomePath };
   }
   if (!profile) return { error: "Profile not found" };
-  const stores = await getUserStoresAction();
+  const { data: membership } = user
+    ? await supabase
+        .from("store_members")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+  const hasActiveStoreMembership = Boolean(membership);
+  const belongs = loginSideForAccount({
+    email: normalized,
+    accountType: profile.account_type,
+    hasActiveStoreMembership,
+  });
+  if (audience && belongs !== audience) {
+    await supabase.auth.signOut();
+    return wrongLoginSideResult(belongs);
+  }
   const homePath = resolvePostAuthDestination({
     profile,
     authEmail: profile.email || normalized,
-    hasActiveStoreMembership: stores.length > 0,
+    hasActiveStoreMembership,
   }) as AppHomePath;
   return { profile, homePath };
 }
 
 const MAGIC_LINK_REDIRECT = "https://www.askfindit.com/auth/callback";
 
-export async function sendMagicLinkAction(emailRaw: string) {
+export async function sendMagicLinkAction(
+  emailRaw: string,
+  audience?: LoginAudience
+) {
   const email = emailRaw.trim().toLowerCase();
   if (!email || !email.includes("@")) {
     return { error: "Enter a valid email." };
@@ -268,6 +335,19 @@ export async function sendMagicLinkAction(emailRaw: string) {
   });
   if (!limited.ok) return { error: limited.error };
   if (isDemoMode()) {
+    if (audience) {
+      const profile = getDemoState().profiles.find(
+        (row) => row.email && row.email.toLowerCase() === email
+      );
+      if (profile) {
+        const belongs = loginSideForAccount({
+          email,
+          accountType: profile.account_type,
+          hasActiveStoreMembership: demoHasActiveStoreMembership(profile.id),
+        });
+        if (belongs !== audience) return wrongLoginSideResult(belongs);
+      }
+    }
     return {
       ok: true as const,
       message: "Demo mode does not send email. Use the password on this screen.",
@@ -277,6 +357,31 @@ export async function sendMagicLinkAction(emailRaw: string) {
   try {
     const { createServiceClient } = await import("@/lib/supabase/admin");
     const admin = createServiceClient();
+    if (audience) {
+      if (isSoloAdminEmail(email) && audience !== "store") {
+        return wrongLoginSideResult("store");
+      }
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("id, account_type, email")
+        .eq("email", email)
+        .maybeSingle();
+      if (profile) {
+        const { data: membership } = await admin
+          .from("store_members")
+          .select("id")
+          .eq("user_id", profile.id)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+        const belongs = loginSideForAccount({
+          email,
+          accountType: profile.account_type,
+          hasActiveStoreMembership: Boolean(membership),
+        });
+        if (belongs !== audience) return wrongLoginSideResult(belongs);
+      }
+    }
     const { data, error } = await admin.auth.admin.generateLink({
       type: "magiclink",
       email,
@@ -946,6 +1051,55 @@ export async function createCustomerRequestAction(raw: unknown) {
   };
 }
 
+async function notifyStoresOfNewRequest(input: {
+  admin: Awaited<ReturnType<typeof import("@/lib/supabase/admin")["createServiceClient"]>>;
+  requestId: string;
+  productName: string;
+  storeIds: string[];
+}) {
+  const { admin, requestId, productName, storeIds } = input;
+  if (!storeIds.length) return;
+
+  const { data: members } = await admin
+    .from("store_members")
+    .select("user_id, store_id")
+    .in("store_id", storeIds)
+    .eq("status", "active");
+
+  const notifications = (members || [])
+    .filter((m) => m.user_id)
+    .map((m) => ({
+      user_id: m.user_id!,
+      type: "new_request",
+      title: "New product request",
+      body: `New request nearby: ${productName}`,
+      related_request_id: requestId,
+      related_store_id: m.store_id,
+    }));
+  if (notifications.length) {
+    await admin.from("notifications").insert(notifications);
+  }
+  const staffIds = [
+    ...new Set(notifications.map((n) => n.user_id).filter(Boolean)),
+  ];
+  if (!staffIds.length) return;
+
+  // Device push is extra — don't hold the Find on Expo/Web Push round-trips.
+  void notifyEmployeeDevices({
+    admin,
+    userIds: staffIds,
+    title: "New product request",
+    body: `New request nearby: ${productName}`,
+    data: {
+      type: "new_request",
+      requestId,
+      url: `/store/requests/${requestId}`,
+    },
+  }).catch((err) => {
+    console.error("[FINDIT] Store push failed", err);
+  });
+}
+
 export async function routeRequestToStoresAction(requestId: string): Promise<number> {
   if (isDemoMode()) return demoRouteRequestToStores(requestId);
 
@@ -1096,43 +1250,14 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
       .map((r) => r.store_id);
 
     if (notifyStoreIds.length) {
-      const { data: members } = await admin
-        .from("store_members")
-        .select("user_id, store_id")
-        .in("store_id", notifyStoreIds)
-        .eq("status", "active");
-
-      const notifications = (members || [])
-        .filter((m) => m.user_id)
-        .map((m) => ({
-          user_id: m.user_id!,
-          type: "new_request",
-          title: "New product request",
-          body: `New request nearby: ${request.product_name}`,
-          related_request_id: requestId,
-          related_store_id: m.store_id,
-        }));
-      if (notifications.length) await admin.from("notifications").insert(notifications);
-      const staffIds = [
-        ...new Set(notifications.map((n) => n.user_id).filter(Boolean)),
-      ];
-      if (staffIds.length) {
-        try {
-          await notifyEmployeeDevices({
-            admin,
-            userIds: staffIds,
-            title: "New product request",
-            body: `New request nearby: ${request.product_name}`,
-            data: {
-              type: "new_request",
-              requestId,
-              url: `/store/requests/${requestId}`,
-            },
-          });
-        } catch (err) {
-          console.error("[FINDIT] Store push failed", err);
-        }
-      }
+      await notifyStoresOfNewRequest({
+        admin,
+        requestId,
+        productName: request.product_name,
+        storeIds: notifyStoreIds,
+      }).catch((err) => {
+        console.error("[FINDIT] Store notify failed", err);
+      });
     }
   }
 

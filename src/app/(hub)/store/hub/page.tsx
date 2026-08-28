@@ -14,7 +14,7 @@ import {
   getHubRuntimeAction,
   touchHubDeviceAction,
 } from "@/lib/services/hub-devices";
-import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
+import { LIVE_POLL_MS, useStoreInboxRealtime } from "@/lib/supabase/realtime";
 import { BrandLogo } from "@/components/brand/logo";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
 
@@ -206,7 +206,7 @@ export default function FinditHubPage() {
           console.error("[FINDIT Hub] device heartbeat failed", err);
         });
       }
-    }, 20000);
+    }, LIVE_POLL_MS);
     return () => window.clearInterval(id);
   }, [storeId, loadQueue, source]);
 
@@ -345,7 +345,7 @@ export default function FinditHubPage() {
 
       {!online ? (
         <div className="mx-6 mb-2 rounded-2xl border border-[#E5231B]/40 bg-[#E5231B]/15 px-5 py-3 text-center">
-          <p className="text-lg font-bold">Connection lost</p>
+          <p className="text-lg font-bold">FINDIT HUB is offline</p>
           <p className="text-sm text-white/70">Reconnecting…</p>
         </div>
       ) : null}

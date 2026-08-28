@@ -33,25 +33,88 @@ function resourcePercent(): number {
   return Math.max(8, Math.min(99, Math.round(Math.max(fromNav, fromResources))));
 }
 
-export function LoadMark({ percent, label }: { percent: number; label?: string }) {
+export function sendStageLabel(percent: number) {
+  if (percent >= 100) return "Live";
+  if (percent >= 70) return "Syncing with stores";
+  if (percent >= 35) return "Finding nearby stores";
+  return "Sending your Find";
+}
+
+export function useClimbingPercent(active: boolean, ceiling = 90) {
+  const [percent, setPercent] = useState(0);
+
+  useEffect(() => {
+    if (!active) {
+      setPercent(0);
+      return;
+    }
+    setPercent(12);
+    const started = Date.now();
+    const id = window.setInterval(() => {
+      const elapsed = Date.now() - started;
+      setPercent(Math.min(ceiling, 12 + Math.floor(elapsed / 90)));
+    }, 120);
+    return () => window.clearInterval(id);
+  }, [active, ceiling]);
+
+  return percent;
+}
+
+export function FindProgress({
+  percent,
+  label,
+  size = "card",
+}: {
+  percent: number;
+  label?: string;
+  size?: "card" | "page" | "inline";
+}) {
   const shown = Math.max(0, Math.min(100, Math.round(percent)));
+  const body = (
+    <div
+      className="flex w-full max-w-xs flex-col items-center text-center"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={shown}
+      aria-label={label || "Loading FINDIT"}
+    >
+      <BrandLogo kind="mark" className="h-9 w-auto" />
+      <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
+        <div
+          className="h-full rounded-full bg-accent transition-[width] duration-200"
+          style={{ width: `${shown}%` }}
+        />
+      </div>
+      <p className="mt-3 text-sm font-semibold tabular-nums text-ink">{shown}%</p>
+      <p className="mt-1 text-xs text-ink-muted">{label || "Loading FINDIT"}</p>
+    </div>
+  );
+  if (size === "inline") return body;
+  if (size === "page") {
+    return <div className="grid place-items-center px-6 py-12">{body}</div>;
+  }
+  return <div className="grid place-items-center px-6 py-8">{body}</div>;
+}
+
+export function FindSendOverlay({
+  percent,
+  label,
+}: {
+  percent: number;
+  label?: string;
+}) {
   return (
-    <div className="grid min-h-[40vh] place-items-center px-6 py-16">
-      <div className="flex w-full max-w-xs flex-col items-center text-center">
-        <BrandLogo kind="mark" className="h-10 w-auto" />
-        <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
-          <div
-            className="h-full rounded-full bg-accent transition-[width] duration-200"
-            style={{ width: `${shown}%` }}
-          />
-        </div>
-        <p className="mt-3 text-sm font-semibold tabular-nums text-ink">
-          {shown}%
-        </p>
-        <p className="mt-1 text-xs text-ink-muted">{label || "Loading FINDIT"}</p>
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-canvas/75 p-6">
+      <div className="w-full max-w-sm rounded-2xl border border-hairline-strong bg-white px-6 py-7 shadow-[0_12px_40px_rgba(0,0,0,0.08)]">
+        <FindProgress percent={percent} label={label || sendStageLabel(percent)} size="inline" />
       </div>
     </div>
   );
+}
+
+export function LoadMark({ percent, label }: { percent: number; label?: string }) {
+  return <FindProgress percent={percent} label={label} size="card" />;
 }
 
 /** Accurate % from completed network work (resources + in-flight fetches). */

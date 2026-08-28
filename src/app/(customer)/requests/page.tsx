@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GlassBadge } from "@/components/ui/glass";
-import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
+import { Card, EmptyState } from "@/components/ui/primitives";
+import { FindProgress } from "@/components/shared/load-progress";
 import { getCustomerRequestsAction } from "@/lib/services/actions";
 import { formatRelativeTime } from "@/lib/utils";
 import { formatShortPlace } from "@findit/domain";
@@ -51,10 +52,7 @@ export default function RequestsPage() {
 
       <div className="mt-6">
         {loading ? (
-          <>
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-28 w-full" />
-          </>
+          <FindProgress percent={36} label="Loading your Finds" />
         ) : items.length === 0 ? (
           <EmptyState
             title={

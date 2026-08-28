@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { wrongLoginSideMessage, type LoginAudience } from "@findit/domain";
 import { Button } from "@/components/ui/button";
+import { GlassNotice } from "@/components/ui/glass";
 import { isSafeNextPath } from "@/lib/auth/home-path";
 import { useMarketingHomeHref, useSurfaceHref } from "@/components/host/host-surface";
 import { cn } from "@/lib/utils";
@@ -42,6 +44,29 @@ function storeLoginPath(next?: string | null) {
     return `/login/business?next=${encodeURIComponent(next)}`;
   }
   return "/login/business";
+}
+
+export function WrongLoginSideNotice({
+  requiredAudience,
+  next,
+}: {
+  requiredAudience: LoginAudience;
+  next?: string | null;
+}) {
+  const shopperHref = useSurfaceHref("dashboard", shopperLoginPath(next));
+  const storeHref = useSurfaceHref("store", storeLoginPath(next));
+  const href = requiredAudience === "store" ? storeHref : shopperHref;
+  const label =
+    requiredAudience === "store" ? "Go to Store sign in" : "Go to Shopper sign in";
+
+  return (
+    <div className="space-y-3">
+      <GlassNotice tone="muted">{wrongLoginSideMessage(requiredAudience)}</GlassNotice>
+      <Button asChild className="w-full" size="lg">
+        <Link href={href}>{label}</Link>
+      </Button>
+    </div>
+  );
 }
 
 export function AuthAudienceSwitch({

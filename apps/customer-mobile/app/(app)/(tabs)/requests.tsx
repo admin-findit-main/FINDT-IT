@@ -25,7 +25,7 @@ export default function RequestsScreen() {
   useFocusEffect(
     useCallback(() => {
       load();
-      const t = setInterval(load, 20000);
+      const t = setInterval(load, 4000);
       return () => clearInterval(t);
     }, [load])
   );

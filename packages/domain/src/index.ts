@@ -20,6 +20,7 @@ export * from "./place";
 export * from "./notify";
 export * from "./age-restricted";
 export * from "./auth-email";
+export * from "./login-side";
 export * from "./account-deletion";
 export * from "./catalog";
 export * from "./classify";

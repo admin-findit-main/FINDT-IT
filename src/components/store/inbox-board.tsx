@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/ui/dialog";
-import { Card, EmptyState, Input, Label, Skeleton, Textarea } from "@/components/ui/primitives";
+import { Card, EmptyState, Input, Label, Textarea } from "@/components/ui/primitives";
 import {
   GlassCard,
   GlassChip,
@@ -16,6 +16,7 @@ import {
   toneForResponse,
 } from "@/components/ui/glass";
 import { StatusBadge } from "@/components/shared/status";
+import { FindProgress } from "@/components/shared/load-progress";
 import { AVAILABILITY_OPTIONS, HOLD_OPTIONS, STOCK_AMOUNT_OPTIONS } from "@/lib/config/constants";
 import {
   getCurrentProfile,
@@ -25,7 +26,7 @@ import {
   getUserStoresAction,
   respondToRequestAction,
 } from "@/lib/services/actions";
-import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
+import { LIVE_POLL_MS, useStoreInboxRealtime } from "@/lib/supabase/realtime";
 import { isAgeRestrictedFind } from "@findit/domain";
 import {
   displayName,
@@ -106,12 +107,12 @@ export function StoreInboxBoard() {
       load(storeId);
       const t = setInterval(() => {
         if (document.visibilityState === "visible") loadInbox(storeId);
-      }, 20000);
+      }, LIVE_POLL_MS);
       return () => clearInterval(t);
     }
   }, [storeId, load, loadInbox]);
 
-  useStoreInboxRealtime(storeId, { onChange: () => loadInbox(storeId) });
+  useStoreInboxRealtime(storeId, { onChange: loadInbox });
 
   async function respond(
     type: "in_stock" | "out_of_stock" | "can_order" | "not_relevant",
@@ -319,10 +320,7 @@ export function StoreInboxBoard() {
 
       <div className="mt-4 space-y-3">
         {loading ? (
-          <>
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-40 w-full" />
-          </>
+          <FindProgress percent={36} label="Checking for Finds" />
         ) : items.length === 0 ? (
           <EmptyState
             title="No asks in this view"

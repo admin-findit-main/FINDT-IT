@@ -31,7 +31,7 @@ function LoginForm() {
           </GlassNotice>
         </div>
       ) : null}
-      <EmailSignIn next={next} />
+      <EmailSignIn next={next} audience="shopper" />
       <AuthPageLinks audience="shopper" next={next} />
     </Card>
   );

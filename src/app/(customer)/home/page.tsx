@@ -30,6 +30,12 @@ import {
   planLimitReachedMessage,
 } from "@/lib/config/constants";
 import {
+  FindSendOverlay,
+  sendStageLabel,
+  useClimbingPercent,
+} from "@/components/shared/load-progress";
+import { writePendingFind } from "@/lib/customer/pending-find";
+import {
   createCustomerRequestAction,
   getCustomerPlanUsageAction,
   updateProfileAction,
@@ -71,6 +77,7 @@ export default function CustomerHomePage() {
   const [ageGateOpen, setAgeGateOpen] = useState(false);
   const [pendingCategory, setPendingCategory] = useState("");
   const [uploading, setUploading] = useState(false);
+  const sendPercent = useClimbingPercent(loading, 92);
 
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
@@ -289,7 +296,9 @@ export default function CustomerHomePage() {
       toast.error("Add your city so we can ask nearby stores.");
       return;
     }
-    const result = await createCustomerRequestAction({
+    let result;
+    try {
+      result = await createCustomerRequestAction({
       productName: productName.trim() || "Item in photo",
       description,
       category: category || guessed.productCategory || "",
@@ -306,14 +315,20 @@ export default function CustomerHomePage() {
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
       ageRestrictedConfirmed: !restricted || ageOk,
-    });
-    setLoading(false);
+      });
+    } catch {
+      setLoading(false);
+      toast.error("Couldn't send your Find. Please try again.");
+      return;
+    }
     if (result.duplicateOf && !forceDuplicate) {
+      setLoading(false);
       setDuplicateId(result.duplicateOf);
       toast.message("You already have an active request for this.");
       return;
     }
     if (result.error) {
+      setLoading(false);
       if (result.needsAuth) {
         router.push("/login?next=/home");
         return;
@@ -333,7 +348,20 @@ export default function CustomerHomePage() {
       toast.error(result.error);
       return;
     }
-    router.push(`/requests/${result.request!.id}`);
+    const created = result.request!;
+    writePendingFind({
+      id: created.id,
+      productName: created.product_name,
+      city: created.city,
+      state: created.state,
+      postalCode: created.postal_code,
+      imageUrl: created.image_url,
+      createdAt: created.created_at,
+      expiresAt: created.expires_at,
+      storesTargeted: result.storesTargeted ?? created.stores_targeted ?? 0,
+      startedAt: Date.now(),
+    });
+    router.push(`/requests/${created.id}`);
     if (profile) {
       void updateProfileAction({
         firstName: profile.first_name || "",
@@ -665,7 +693,7 @@ export default function CustomerHomePage() {
               disabled={loading || Boolean(upgrade)}
               onClick={() => submitRequest()}
             >
-              {loading ? "Sending…" : "Find it"}
+              {loading ? sendStageLabel(sendPercent) : "Find it"}
             </Button>
             <p className="mt-3 text-center text-xs leading-relaxed text-ink-subtle">
               We’ll ask participating stores near your ZIP. Your contact stays private.
@@ -673,6 +701,9 @@ export default function CustomerHomePage() {
           </div>
         )}
       </div>
+      {loading ? (
+        <FindSendOverlay percent={sendPercent} label={sendStageLabel(sendPercent)} />
+      ) : null}
       <GlassSheet
         open={ageGateOpen}
         onOpenChange={onAgeGateOpenChange}

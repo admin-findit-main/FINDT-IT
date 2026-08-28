@@ -97,7 +97,11 @@ function SignupForm() {
           FINDIT does not create a second login for the same email. Sign in with
           your password, or email a one-time login.
         </p>
-        <EmailSignIn next={next} initialEmail={staffEmail || email} />
+        <EmailSignIn
+          next={next}
+          initialEmail={staffEmail || email}
+          audience="shopper"
+        />
         <p className="mt-6 text-center text-sm text-ink-muted">
           <Link
             href={homeHref}
@@ -213,6 +217,7 @@ function SignupForm() {
             email={email}
             onEmailChange={setEmail}
             autoFocus
+            audience="shopper"
             onNoAccount={() => {
               setMethod("password");
               setNoAccountHint(true);

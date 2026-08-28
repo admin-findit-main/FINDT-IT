@@ -96,6 +96,11 @@ export async function respondToRequest(input: {
 }
 
 export function subscribeStoreInbox(storeId: string, onChange: () => void) {
+  void supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session?.access_token && typeof supabase.realtime.setAuth === "function") {
+      void supabase.realtime.setAuth(session.access_token);
+    }
+  });
   const channel = supabase
     .channel(`employee-inbox:${storeId}`)
     .on(

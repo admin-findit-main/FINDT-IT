@@ -20,7 +20,7 @@ function BusinessLoginForm() {
         Owners, staff, and the FINDIT operator. Wrong screen? Use Shopper sign
         in below.
       </p>
-      <EmailSignIn next={next} emailId="store-signin-email" />
+      <EmailSignIn next={next} emailId="store-signin-email" audience="store" />
       <AuthPageLinks audience="store" next={next} />
     </Card>
   );
