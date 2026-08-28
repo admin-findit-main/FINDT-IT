@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { GlassNotice } from "@/components/ui/glass";
 import { Card, Input, Label } from "@/components/ui/primitives";
 import { authEmailErrorMessage } from "@/lib/auth/email-error";
+import { useSurfaceHref } from "@/components/host/host-surface";
 
 export default function ForgotPasswordPage() {
+  const shopperLogin = useSurfaceHref("dashboard", "/login");
+  const storeLogin = useSurfaceHref("store", "/login/business");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -65,7 +68,10 @@ export default function ForgotPasswordPage() {
             password.
           </GlassNotice>
           <Button asChild className="w-full" variant="outline">
-            <Link href="/login">Back to login</Link>
+            <Link href={shopperLogin}>Shopper sign in</Link>
+          </Button>
+          <Button asChild className="w-full" variant="ghost">
+            <Link href={storeLogin}>Store sign in</Link>
           </Button>
         </div>
       ) : (
@@ -85,7 +91,10 @@ export default function ForgotPasswordPage() {
             {loading ? "Sending…" : "Send reset link"}
           </Button>
           <Button asChild className="w-full" variant="outline">
-            <Link href="/login">Back to login</Link>
+            <Link href={shopperLogin}>Shopper sign in</Link>
+          </Button>
+          <Button asChild className="w-full" variant="ghost">
+            <Link href={storeLogin}>Store sign in</Link>
           </Button>
         </form>
       )}

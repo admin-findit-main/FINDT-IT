@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { GlassChip, GlassNotice, Overline } from "@/components/ui/glass";
@@ -14,23 +14,39 @@ import {
 import { BrandHomeLink } from "@/components/brand/logo";
 import { JOIN_REQUEST_CATEGORIES } from "@/lib/services/category-routing";
 import {
+  OTP_RESEND_SECONDS,
   formatEin,
   normalizeEin,
   passwordRejectReason,
   storeSelectionSuggestsCustomerId,
   US_STATES,
 } from "@findit/domain";
-import { submitStoreApplicationAction } from "@/lib/services/actions";
-import { marketingHomeHref } from "@/lib/config/product-hosts";
+import {
+  sendStoreJoinEmailCodeAction,
+  submitStoreApplicationAction,
+} from "@/lib/services/actions";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
+import { AuthAudienceSwitch } from "@/components/auth/auth-audience";
+import {
+  useMarketingHomeHref,
+  useSurfaceHref,
+} from "@/components/host/host-surface";
 
 const STEPS = ["Account", "Legal", "Location", "Products", "Review"] as const;
 
 export default function JoinAsStorePage() {
+  const homeHref = useMarketingHomeHref();
+  const shopperSignup = useSurfaceHref("dashboard", "/signup");
+  const shopperLogin = useSurfaceHref("dashboard", "/login");
+  const storeLogin = useSurfaceHref("store", "/login/business");
+  const joinHref = useSurfaceHref("www", "/join");
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
+  const [awaitingCode, setAwaitingCode] = useState(false);
+  const [emailCode, setEmailCode] = useState("");
+  const [resendSeconds, setResendSeconds] = useState(0);
 
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -60,6 +76,40 @@ export default function JoinAsStorePage() {
   const [requiresCustomerId, setRequiresCustomerId] = useState<boolean | null>(null);
   const [whyLegit, setWhyLegit] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return;
+    const id = window.setInterval(
+      () => setResendSeconds((s) => Math.max(0, s - 1)),
+      1000
+    );
+    return () => window.clearInterval(id);
+  }, [resendSeconds]);
+
+  function applicationPayload() {
+    return {
+      ownerName,
+      ownerEmail,
+      ownerPhone,
+      password,
+      confirmPassword,
+      legalName,
+      ein: normalizeEin(ein),
+      entityType,
+      businessName,
+      businessType,
+      streetAddress,
+      city,
+      state,
+      postalCode,
+      phone,
+      website,
+      whyLegit,
+      requestCategories,
+      requiresCustomerId: requiresCustomerId === true,
+      confirmedLegitimate: true as const,
+    };
+  }
 
   function setType(next: string) {
     setBusinessType(next);
@@ -180,27 +230,36 @@ export default function JoinAsStorePage() {
     }
     if (!validateStep(4)) return;
     setLoading(true);
+    const sent = await sendStoreJoinEmailCodeAction(ownerEmail);
+    setLoading(false);
+    if (sent.error) {
+      if ("code" in sent && sent.code === "existing_account") {
+        setExistingAccount(true);
+        return;
+      }
+      toast.error(sent.error);
+      return;
+    }
+    setEmailCode("");
+    setResendSeconds(OTP_RESEND_SECONDS);
+    setAwaitingCode(true);
+    toast.success(
+      "message" in sent && sent.message
+        ? sent.message
+        : "Check your email for a 6-digit code"
+    );
+  }
+
+  async function onConfirmCode(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (emailCode.replace(/\D/g, "").length !== 6) {
+      toast.error("Enter the 6-digit code from your email");
+      return;
+    }
+    setLoading(true);
     const result = await submitStoreApplicationAction({
-      ownerName,
-      ownerEmail,
-      ownerPhone,
-      password,
-      confirmPassword,
-      legalName,
-      ein: normalizeEin(ein),
-      entityType,
-      businessName,
-      businessType,
-      streetAddress,
-      city,
-      state,
-      postalCode,
-      phone,
-      website,
-      whyLegit,
-      requestCategories,
-      requiresCustomerId: requiresCustomerId === true,
-      confirmedLegitimate: true as const,
+      ...applicationPayload(),
+      emailCode,
     });
     setLoading(false);
     if (result.error) {
@@ -212,6 +271,23 @@ export default function JoinAsStorePage() {
       return;
     }
     setSubmitted(true);
+  }
+
+  async function resendCode() {
+    if (resendSeconds > 0) return;
+    setLoading(true);
+    const sent = await sendStoreJoinEmailCodeAction(ownerEmail);
+    setLoading(false);
+    if (sent.error) {
+      toast.error(sent.error);
+      return;
+    }
+    setResendSeconds(OTP_RESEND_SECONDS);
+    toast.success(
+      "message" in sent && sent.message
+        ? sent.message
+        : "We sent another code"
+    );
   }
 
   if (existingAccount) {
@@ -232,7 +308,13 @@ export default function JoinAsStorePage() {
               to askfindit.com.
             </p>
             <Button asChild className="mt-8" size="lg">
-              <Link href={marketingHomeHref()}>Go back to askfindit.com</Link>
+              <Link href={shopperLogin}>Shopper sign in</Link>
+            </Button>
+            <Button asChild variant="outline" className="mt-3" size="lg">
+              <Link href={storeLogin}>Store sign in</Link>
+            </Button>
+            <Button asChild variant="ghost" className="mt-3" size="lg">
+              <Link href={homeHref}>Go back to askfindit.com</Link>
             </Button>
           </Card>
         </main>
@@ -263,11 +345,89 @@ export default function JoinAsStorePage() {
               — no credit card.
             </p>
             <Button asChild className="mt-8" size="lg">
-              <Link href="/login/business">Store login</Link>
+              <Link href={storeLogin}>Store login</Link>
+            </Button>
+            <Button asChild variant="outline" className="mt-3" size="lg">
+              <Link href={shopperLogin}>Shopper sign in</Link>
             </Button>
             <Button asChild variant="ghost" className="mt-3" size="lg">
-              <Link href={marketingHomeHref()}>Go back to askfindit.com</Link>
+              <Link href={homeHref}>Go back to askfindit.com</Link>
             </Button>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  if (awaitingCode) {
+    return (
+      <div className="app-canvas min-h-screen">
+        <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
+          <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+            <BrandHomeLink href="/" />
+          </div>
+        </header>
+        <main className="mx-auto max-w-xl px-6 py-16">
+          <Card level="strong" sheen className="p-8">
+            <h1 className="text-2xl font-bold tracking-tight text-ink">
+              Confirm your email
+            </h1>
+            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+              We emailed a 6-digit code to{" "}
+              <span className="font-semibold text-ink">{ownerEmail}</span>.
+              Enter it here to create your store login and send the application.
+              Until you do, nothing is set up. Phone confirmation can come later.
+            </p>
+            <form onSubmit={onConfirmCode} className="mt-6 space-y-4">
+              <div>
+                <Label htmlFor="join-email-code">6-digit code</Label>
+                <Input
+                  id="join-email-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={emailCode}
+                  onChange={(e) =>
+                    setEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                  }
+                  required
+                  autoFocus
+                  className="mt-1 tracking-[0.4em]"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={loading || emailCode.length !== 6}
+              >
+                {loading ? "Sending application…" : "Confirm and send application"}
+              </Button>
+            </form>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-ink-muted">
+              <button
+                type="button"
+                className="font-semibold text-ink underline-offset-2 hover:underline disabled:opacity-50"
+                disabled={loading || resendSeconds > 0}
+                onClick={() => void resendCode()}
+              >
+                {resendSeconds > 0
+                  ? `Send another code in ${resendSeconds}s`
+                  : "Send another code"}
+              </button>
+              <button
+                type="button"
+                className="font-semibold text-ink underline-offset-2 hover:underline"
+                onClick={() => {
+                  setAwaitingCode(false);
+                  setEmailCode("");
+                  setStep(0);
+                }}
+              >
+                Use a different email
+              </button>
+            </div>
           </Card>
         </main>
       </div>
@@ -279,21 +439,31 @@ export default function JoinAsStorePage() {
       <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <BrandHomeLink href="/" />
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/login/business">Already accepted? Log in</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={shopperLogin}>Shopper sign in</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href={storeLogin}>Already accepted? Log in</Link>
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-2xl px-6 pb-20 pt-6 md:pt-10">
-        <Overline>Stores</Overline>
+        <AuthAudienceSwitch
+          audience="store"
+          shopperHref={shopperSignup}
+          storeHref={joinHref}
+        />
+        <Overline className="mt-6">Stores</Overline>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink md:text-4xl">
           Apply your business
         </h1>
         <p className="mt-3 max-w-xl leading-relaxed text-ink-muted">
-          Complete each step so we can verify you. After FINDIT accepts the
-          application, you get a blue verified badge for shoppers, then you can
-          open the dashboard and connect Hub. Employees join later with an invite.
+          Complete each step so we can verify you. We email a code to confirm
+          this address before we create a store login or send the application.
+          Phone confirmation can wait until Twilio is set up.
         </p>
         <GlassNotice tone="accent" className="mt-4 font-semibold">
           {STORE_TRIAL_DAYS} DAYS FREE · NO CREDIT CARD REQUIRED
@@ -646,10 +816,12 @@ export default function JoinAsStorePage() {
               ) : null}
               <Button type="submit" className="flex-1" size="xl" disabled={loading}>
                 {loading
-                  ? "Submitting…"
+                  ? step < STEPS.length - 1
+                    ? "Continuing…"
+                    : "Sending code…"
                   : step < STEPS.length - 1
                     ? "Continue"
-                    : "Submit application"}
+                    : "Email me a code"}
               </Button>
             </div>
           </form>

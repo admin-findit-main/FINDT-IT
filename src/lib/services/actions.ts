@@ -80,6 +80,14 @@ import {
   signupSchema,
 } from "@findit/domain";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
+import {
+  generateJoinEmailCode,
+  hashJoinEmailCode,
+  JOIN_EMAIL_CODE_MAX_ATTEMPTS,
+  JOIN_EMAIL_CODE_TTL_MS,
+  joinEmailCodesMatch,
+  normalizeJoinEmailCode,
+} from "@/lib/security/join-email-code";
 import { toPublicError } from "@/lib/security/public-error";
 import { selectEligibleStores } from "@/lib/services/routing";
 import { resolvePoint, resolvePointsByZip } from "@/lib/services/zip-centroids";
@@ -2188,22 +2196,179 @@ export async function isDemoModeAction() {
   return isDemoMode();
 }
 
+async function storeJoinEmailBlocked(
+  admin: Awaited<ReturnType<typeof import("@/lib/supabase/admin").createServiceClient>>,
+  ownerEmail: string
+) {
+  if (isSoloAdminEmail(ownerEmail)) {
+    return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
+  }
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", ownerEmail)
+    .maybeSingle();
+  if (existing?.id) {
+    return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
+  }
+  const { data: existingApp } = await admin
+    .from("store_applications")
+    .select("id")
+    .eq("owner_email", ownerEmail)
+    .in("status", ["pending", "needs_info", "approved"])
+    .limit(1)
+    .maybeSingle();
+  if (existingApp?.id) {
+    return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
+  }
+  return null;
+}
+
+async function consumeStoreJoinEmailCode(
+  admin: Awaited<ReturnType<typeof import("@/lib/supabase/admin").createServiceClient>>,
+  ownerEmail: string,
+  codeRaw: string
+) {
+  const code = normalizeJoinEmailCode(codeRaw);
+  if (code.length !== 6) {
+    return { error: "Enter the 6-digit code we emailed you." };
+  }
+  const { data: row } = await admin
+    .from("store_join_email_codes")
+    .select("email, code_hash, expires_at, attempt_count")
+    .eq("email", ownerEmail)
+    .maybeSingle();
+  if (!row) {
+    return { error: "Request a new code, then enter it here." };
+  }
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    await admin.from("store_join_email_codes").delete().eq("email", ownerEmail);
+    return { error: "That code expired. Request a new one." };
+  }
+  const attempts = Number(row.attempt_count || 0);
+  if (attempts >= JOIN_EMAIL_CODE_MAX_ATTEMPTS) {
+    await admin.from("store_join_email_codes").delete().eq("email", ownerEmail);
+    return { error: "Too many tries. Request a new code." };
+  }
+  const expected = hashJoinEmailCode(ownerEmail, code);
+  if (!joinEmailCodesMatch(String(row.code_hash), expected)) {
+    await admin
+      .from("store_join_email_codes")
+      .update({ attempt_count: attempts + 1 })
+      .eq("email", ownerEmail);
+    return { error: "That code didn’t match. Try again." };
+  }
+  await admin.from("store_join_email_codes").delete().eq("email", ownerEmail);
+  return { ok: true as const };
+}
+
+/** Email a 6-digit code. Does not create an account or application. */
+export async function sendStoreJoinEmailCodeAction(emailRaw: string) {
+  const email = emailRaw.trim().toLowerCase();
+  if (!email || !email.includes("@")) {
+    return { error: "Enter a valid email." };
+  }
+  const limited = await consumeRateLimit({
+    bucket: "store-join-email-code",
+    limit: 5,
+    windowMs: 60 * 60_000,
+    key: email,
+  });
+  if (!limited.ok) return { error: limited.error };
+  if (isDemoMode()) {
+    return {
+      ok: true as const,
+      message: "Demo mode: enter 000000 to confirm this email.",
+    };
+  }
+
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const admin = createServiceClient();
+    const blocked = await storeJoinEmailBlocked(admin, email);
+    if (blocked) return blocked;
+
+    const code = generateJoinEmailCode();
+    const { error: writeError } = await admin.from("store_join_email_codes").upsert(
+      {
+        email,
+        code_hash: hashJoinEmailCode(email, code),
+        expires_at: new Date(Date.now() + JOIN_EMAIL_CODE_TTL_MS).toISOString(),
+        attempt_count: 0,
+        created_at: new Date().toISOString(),
+      },
+      { onConflict: "email" }
+    );
+    if (writeError) {
+      return { error: "Could not start email confirmation. Try again in a moment." };
+    }
+
+    const copy = authEmailCopy("store_join");
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM || "FINDIT <hello@askfindit.com>";
+    if (!apiKey) {
+      await admin.from("store_join_email_codes").delete().eq("email", email);
+      return { error: "Email sending is not configured. Try again later." };
+    }
+
+    const sent = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: copy.subject,
+        html: renderFinditEmailHtml({
+          heading: copy.heading,
+          body: copy.body,
+          footnote: copy.footnote,
+          code,
+        }),
+        text: renderFinditEmailText({
+          heading: copy.heading,
+          body: copy.body,
+          footnote: copy.footnote,
+          code,
+        }),
+      }),
+    });
+    if (!sent.ok) {
+      await admin.from("store_join_email_codes").delete().eq("email", email);
+      const detail = await sent.text();
+      return { error: authEmailErrorMessage(detail || "Could not send the code.") };
+    }
+    return {
+      ok: true as const,
+      message: "Check your email for a 6-digit code. It expires in about 10 minutes.",
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.toLowerCase().includes("service role")) {
+      return { error: "Email confirmation is not configured. Try again later." };
+    }
+    return { error: authEmailErrorMessage(message) };
+  }
+}
+
 export async function submitStoreApplicationAction(raw: unknown) {
   const parsed = storeJoinApplicationSchema.safeParse(raw);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message || "Invalid application" };
   }
-  const limited = await consumeRateLimit({
-    bucket: "store-apply",
-    limit: 3,
-    windowMs: 24 * 60 * 60_000,
-    key: parsed.data.ownerEmail.toLowerCase(),
-  });
-  if (!limited.ok) return { error: limited.error };
-  const profile = await getCurrentProfile();
   const ownerEmail = parsed.data.ownerEmail.toLowerCase();
+  const emailCode =
+    raw && typeof raw === "object" && "emailCode" in raw
+      ? String((raw as { emailCode?: unknown }).emailCode || "")
+      : "";
 
   if (isDemoMode()) {
+    if (normalizeJoinEmailCode(emailCode) !== "000000") {
+      return { error: "Demo mode: enter 000000 to confirm this email." };
+    }
+    const profile = await getCurrentProfile();
     const application = demoSubmitStoreApplication({
       businessName: parsed.data.businessName,
       businessType: parsed.data.businessType,
@@ -2228,56 +2393,49 @@ export async function submitStoreApplicationAction(raw: unknown) {
     return { application };
   }
 
+  const profile = await getCurrentProfile();
+
   // Service role after validation — public /join is often anonymous; INSERT…RETURNING
   // fails SELECT RLS for anon even when the insert policy allows the row.
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  let applicantUserId = profile?.id || null;
-  if (!isSoloAdminEmail(ownerEmail)) {
-    const ownerName = parsed.data.ownerName.trim();
-    const firstName = ownerName.split(" ")[0] || ownerName;
-    const lastName = ownerName.split(" ").slice(1).join(" ");
-    const { data: existing } = await admin
-      .from("profiles")
-      .select("id")
-      .eq("email", ownerEmail)
-      .maybeSingle();
-    if (existing?.id) {
+  const blocked = await storeJoinEmailBlocked(admin, ownerEmail);
+  if (blocked) return blocked;
+
+  const consumed = await consumeStoreJoinEmailCode(admin, ownerEmail, emailCode);
+  if ("error" in consumed && consumed.error) return consumed;
+
+  const limited = await consumeRateLimit({
+    bucket: "store-apply",
+    limit: 3,
+    windowMs: 24 * 60 * 60_000,
+    key: ownerEmail,
+  });
+  if (!limited.ok) return { error: limited.error };
+
+  const ownerName = parsed.data.ownerName.trim();
+  const firstName = ownerName.split(" ")[0] || ownerName;
+  const lastName = ownerName.split(" ").slice(1).join(" ");
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email: ownerEmail,
+    password: parsed.data.password,
+    email_confirm: true,
+    user_metadata: {
+      first_name: firstName,
+      last_name: lastName,
+      account_type: "business",
+      default_city: parsed.data.city,
+      default_state: parsed.data.state,
+      default_postal_code: parsed.data.postalCode,
+    },
+  });
+  if (createError || !created.user) {
+    if (createError && alreadyHasAccount(createError.message)) {
       return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
     }
-    const { data: existingApp } = await admin
-      .from("store_applications")
-      .select("id")
-      .eq("owner_email", ownerEmail)
-      .in("status", ["pending", "needs_info", "approved"])
-      .limit(1)
-      .maybeSingle();
-    if (existingApp?.id) {
-      return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
-    }
-    const { data: created, error: createError } = await admin.auth.admin.createUser({
-      email: ownerEmail,
-      password: parsed.data.password,
-      email_confirm: true,
-      user_metadata: {
-        first_name: firstName,
-        last_name: lastName,
-        account_type: "business",
-        default_city: parsed.data.city,
-        default_state: parsed.data.state,
-        default_postal_code: parsed.data.postalCode,
-      },
-    });
-    if (createError || !created.user) {
-      if (createError && alreadyHasAccount(createError.message)) {
-        return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
-      }
-      return { error: createError?.message || "Could not create the store login." };
-    }
-    applicantUserId = created.user.id;
-  } else {
-    return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
+    return { error: createError?.message || "Could not create the store login." };
   }
+  const applicantUserId = created.user.id;
   const { data, error } = await admin
     .from("store_applications")
     .insert({

@@ -10,6 +10,10 @@ import { GlassNotice } from "@/components/ui/glass";
 import { destinationAfterAuth, isSafeNextPath } from "@/lib/auth/home-path";
 import { CustomerEmailSignupForm } from "@/components/auth/customer-email-form";
 import {
+  AuthAudienceSwitch,
+  AuthSignupLinks,
+} from "@/components/auth/auth-audience";
+import {
   AuthMethodSwitch,
   EmailSignIn,
   OneTimeLoginPanel,
@@ -17,12 +21,15 @@ import {
 } from "@/components/auth/email-sign-in";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { signUpAction } from "@/lib/services/actions";
-import { marketingHomeHref } from "@/lib/config/product-hosts";
+import { useMarketingHomeHref, useSurfaceHref } from "@/components/host/host-surface";
 import { passwordStrength } from "@findit/domain";
 
 function SignupForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const joinHref = useSurfaceHref("www", "/join");
+  const signupHref = useSurfaceHref("dashboard", "/signup");
+  const homeHref = useMarketingHomeHref();
   const [loading, setLoading] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
   const [method, setMethod] = useState<AuthMethod>("password");
@@ -93,7 +100,7 @@ function SignupForm() {
         <EmailSignIn next={next} initialEmail={staffEmail || email} />
         <p className="mt-6 text-center text-sm text-ink-muted">
           <Link
-            href={marketingHomeHref()}
+            href={homeHref}
             className="font-semibold text-ink underline-offset-2 hover:underline"
           >
             Go back to askfindit.com
@@ -173,13 +180,19 @@ function SignupForm() {
 
   return (
     <Card className="p-6 sm:p-8">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">
-        {method === "onetime" ? "One-time login" : "Create account"}
+      <AuthAudienceSwitch
+        audience="shopper"
+        next={next}
+        shopperHref={signupHref}
+        storeHref={joinHref}
+      />
+      <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink">
+        {method === "onetime" ? "One-time login" : "Create a shopper account"}
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
         {method === "onetime"
           ? "Already have FINDIT? We’ll email a link that signs you in once. New here? Switch to Password."
-          : "New shopper? Create an account with a password. Already on FINDIT? Use a one-time login."}
+          : "Shopper accounts only. Stores apply from the Store tab. Use a password, or a one-time login if you already have FINDIT."}
       </p>
       <div className="mt-6 space-y-5">
         <AuthMethodSwitch
@@ -218,25 +231,7 @@ function SignupForm() {
           />
         )}
       </div>
-      <div className="mt-6 border-t border-hairline-strong pt-5">
-        <p className="text-center text-sm text-ink-muted">
-          Already have an account?{" "}
-          <Link
-            href={loginHref}
-            className="font-semibold text-ink underline-offset-2 hover:underline"
-          >
-            Sign in
-          </Link>
-        </p>
-        <p className="mt-3 text-center text-sm text-ink-muted">
-          <Link
-            href={marketingHomeHref()}
-            className="font-semibold text-ink underline-offset-2 hover:underline"
-          >
-            Go back to askfindit.com
-          </Link>
-        </p>
-      </div>
+      <AuthSignupLinks next={next} />
     </Card>
   );
 }

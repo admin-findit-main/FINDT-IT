@@ -29,6 +29,8 @@ describe("auth email", () => {
   it("uses a confirm subject customers can trust", () => {
     expect(authEmailCopy("signup").subject).toBe("Confirm your FINDIT email");
     expect(authEmailCopy("recovery").button).toBe("Choose a new password");
+    expect(authEmailCopy("store_join").button).toBeNull();
+    expect(authEmailCopy("store_join").body).toMatch(/6-digit code/i);
   });
 
   it("escapes names inside HTML", () => {

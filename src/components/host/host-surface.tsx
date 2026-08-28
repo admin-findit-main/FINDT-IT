@@ -2,7 +2,9 @@
 
 import { createContext, useContext } from "react";
 import {
+  marketingHomeHrefForSurface,
   matchProductSurface,
+  surfaceHref,
   toInternalPath,
   toPublicPath,
   type ProductSurface,
@@ -34,6 +36,17 @@ export function usePublicHref(internalPath: string): string {
     return toPublicPath(matchProductSurface(window.location.host), internalPath);
   }
   return toPublicPath(surface, internalPath);
+}
+
+export function useMarketingHomeHref(): string {
+  return marketingHomeHrefForSurface(useHostSurface());
+}
+
+export function useSurfaceHref(
+  target: Exclude<ProductSurface, "local">,
+  pathname: string
+): string {
+  return surfaceHref(target, pathname, useHostSurface());
 }
 
 export function useInternalPathname(pathname: string): string {

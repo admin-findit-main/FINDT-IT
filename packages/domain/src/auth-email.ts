@@ -97,6 +97,15 @@ export function authEmailCopy(
         button: null,
         footnote: "If you didn’t request this code, you can ignore this email.",
       };
+    case "store_join":
+      return {
+        subject: "Your FINDIT store application code",
+        heading: "Confirm this email",
+        body: "Enter this 6-digit code on the apply page. We only create your store login and send the application after this email is confirmed.",
+        button: null,
+        footnote:
+          "If you didn’t apply to FINDIT, you can ignore this email. Phone confirmation can come later.",
+      };
     case "signup":
     case "email":
     default:

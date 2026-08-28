@@ -181,6 +181,8 @@ export function surfaceForAppPath(pathname: string): Exclude<ProductSurface, "lo
   return "www";
 }
 
+export const MARKETING_ORIGIN = `https://${CANONICAL_PRODUCT_HOSTS.www}`;
+
 export function productUrl(
   surface: Exclude<ProductSurface, "local">,
   pathname: string,
@@ -189,14 +191,74 @@ export function productUrl(
   const pretty = toPublicPath(surface, pathname);
   const host = currentHostHeader ? hostnameOf(currentHostHeader) : "";
   if (currentHostHeader && isLocalHostname(host)) return pretty;
-  return `${productOrigin(surface)}${pretty}`;
+  return pretty === "/"
+    ? productOrigin(surface)
+    : `${productOrigin(surface)}${pretty}`;
 }
 
-/** Marketing homepage. Relative on localhost so local testing stays in-app. */
+function splitHref(input: string): { path: string; search: string } {
+  const q = input.indexOf("?");
+  if (q === -1) return { path: input || "/", search: "" };
+  return { path: input.slice(0, q) || "/", search: input.slice(q) };
+}
+
+const KNOWN_SURFACES = new Set<ProductSurface | "apex">([
+  "www",
+  "dashboard",
+  "store",
+  "app",
+  "local",
+  "apex",
+]);
+
+function asSurface(
+  hostOrSurface: string | ProductSurface | "apex"
+): ProductSurface | "apex" {
+  if (KNOWN_SURFACES.has(hostOrSurface as ProductSurface | "apex")) {
+    return hostOrSurface as ProductSurface | "apex";
+  }
+  return matchProductSurface(hostOrSurface);
+}
+
+/**
+ * Href for a path that lives on a product host. Relative on localhost and when
+ * already on that host; absolute otherwise so a click actually leaves.
+ */
+export function surfaceHref(
+  target: Exclude<ProductSurface, "local">,
+  pathname: string,
+  hostOrSurface: string | ProductSurface | "apex"
+): string {
+  const { path, search } = splitHref(pathname);
+  const surface = asSurface(hostOrSurface);
+
+  if (surface === "local") {
+    let local = path;
+    if (target === "store") local = toInternalPath("store", path);
+    else if (target === "dashboard" && path === "/") local = "/home";
+    return `${local}${search}`;
+  }
+
+  const pretty = toPublicPath(target, path);
+  const current = surface === "apex" ? "www" : surface;
+  if (current === target) return `${pretty}${search}`;
+  if (pretty === "/") return `${productOrigin(target)}${search}`;
+  return `${productOrigin(target)}${pretty}${search}`;
+}
+
+/** Public website. Never a relative `/` on dashboard/store — that stays in-app. */
 export function marketingHomeHref(hostHeader?: string): string {
-  const host = hostHeader || (typeof window !== "undefined" ? window.location.host : "");
-  if (!host || isLocalHostname(host)) return "/";
-  return "https://www.askfindit.com";
+  const host =
+    hostHeader ||
+    (typeof window !== "undefined" ? window.location.host : "");
+  if (host && isLocalHostname(host)) return "/";
+  return MARKETING_ORIGIN;
+}
+
+export function marketingHomeHrefForSurface(
+  surface: ProductSurface | "apex"
+): string {
+  return surface === "local" ? "/" : MARKETING_ORIGIN;
 }
 
 /** Absolute post-login location. Relative on localhost. */
@@ -237,7 +299,6 @@ export function resolveBrandHomeHref(input: {
 }): string {
   const path = input.pathname.split("?")[0] || "/";
   const surface = input.surface === "apex" ? "www" : input.surface;
-  const host = input.hostHeader;
 
   if (
     path.startsWith("/login") ||
@@ -255,7 +316,7 @@ export function resolveBrandHomeHref(input: {
     path.startsWith("/pricing") ||
     path.startsWith("/stores")
   ) {
-    return marketingHomeHref(host);
+    return marketingHomeHrefForSurface(surface);
   }
 
   const app = surface === "local" ? surfaceForAppPath(path) : surface;
@@ -268,6 +329,6 @@ export function resolveBrandHomeHref(input: {
     return surface === "local" ? dest : toPublicPath("store", dest);
   }
 
-  return marketingHomeHref(host);
+  return marketingHomeHrefForSurface(surface);
 }
 
