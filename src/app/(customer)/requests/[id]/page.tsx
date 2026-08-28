@@ -98,7 +98,9 @@ export default function RequestDetailPage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 20000);
     return () => clearInterval(t);
   }, [load]);
 

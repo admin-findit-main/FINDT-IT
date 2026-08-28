@@ -61,7 +61,7 @@ export default function RequestDetailScreen() {
     load();
     if (!id) return;
     const unsub = subscribeRequestRealtime(id, load);
-    const poll = setInterval(load, 12000);
+    const poll = setInterval(load, 20000);
     return () => {
       unsub();
       clearInterval(poll);

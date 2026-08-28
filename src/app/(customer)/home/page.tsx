@@ -9,6 +9,7 @@ import { Input, Textarea } from "@/components/ui/primitives";
 import { GlassSheet } from "@/components/ui/dialog";
 import { GlassChip, GlassNotice } from "@/components/ui/glass";
 import { PlusUpgradeCard } from "@/components/customer/plus-upgrade";
+import { useCustomerProfile } from "@/components/customer/session";
 import { PlaceFields } from "@/components/customer/place-fields";
 import { LocateMeButton } from "@/components/customer/locate-me-button";
 import { geolocateUsPlace } from "@/lib/customer/geolocate";
@@ -28,7 +29,6 @@ import {
 } from "@/lib/config/constants";
 import {
   createCustomerRequestAction,
-  getCurrentProfile,
   getCustomerPlanUsageAction,
   updateProfileAction,
 } from "@/lib/services/actions";
@@ -54,7 +54,8 @@ type Step = "query" | "radius";
 
 export default function CustomerHomePage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const sessionProfile = useCustomerProfile();
+  const [profile, setProfile] = useState<Profile | null>(sessionProfile);
   const [step, setStep] = useState<Step>("query");
   const [loading, setLoading] = useState(false);
   const [usageLabel, setUsageLabel] = useState<string | null>(null);
@@ -89,10 +90,10 @@ export default function CustomerHomePage() {
   const ageGateAfterClose = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    getCurrentProfile().then((p) => {
-      setProfile(p);
-      setPlace(shortPlaceFromProfile(p));
-    });
+    if (sessionProfile) {
+      setProfile(sessionProfile);
+      setPlace(shortPlaceFromProfile(sessionProfile));
+    }
     getCustomerPlanUsageAction().then((u) => {
       if (!u || u.bypassed) return;
       const word = u.entitlements.planId === "plus" ? "FINDIT+ Finds" : "free Finds";

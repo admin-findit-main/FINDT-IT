@@ -29,11 +29,18 @@ async function resolveHomeForUser(
   user: { id: string; email?: string | null },
   next?: string | null
 ): Promise<string> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("account_type, email, first_name")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: profile }, { count }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("account_type, email, first_name")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("store_members")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "active"),
+  ]);
 
   const resolved = coerceSoloAdminProfile(
     {
@@ -42,11 +49,6 @@ async function resolveHomeForUser(
     },
     user.email
   );
-  const { count } = await supabase
-    .from("store_members")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .eq("status", "active");
 
   return resolvePostAuthDestination({
     profile: resolved,
@@ -77,6 +79,9 @@ function copyCookies(from: NextResponse, to: NextResponse) {
 export async function updateSession(request: NextRequest) {
   const hostHeader = request.headers.get("host") || "";
   const path = request.nextUrl.pathname;
+  if (path === "/sw.js" || path === "/offline.html") {
+    return NextResponse.next();
+  }
   const surface = matchProductSurface(hostHeader);
 
   const authCode = request.nextUrl.searchParams.get("code");
@@ -170,11 +175,20 @@ export async function updateSession(request: NextRequest) {
   let memberRole: string | null = null;
 
   if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("account_type, email, first_name")
-      .eq("id", user.id)
-      .maybeSingle();
+    const [{ data: profile }, { data: membership }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("account_type, email, first_name")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("store_members")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle(),
+    ]);
     resolvedProfile = coerceSoloAdminProfile(
       {
         email: profile?.email,
@@ -183,13 +197,6 @@ export async function updateSession(request: NextRequest) {
       },
       user.email
     );
-    const { data: membership } = await supabase
-      .from("store_members")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .limit(1)
-      .maybeSingle();
     memberRole = membership?.role ?? null;
     actor = classifyStoreActor({
       isAdmin: isSoloAdmin(resolvedProfile),

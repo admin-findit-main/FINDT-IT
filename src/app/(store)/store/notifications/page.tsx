@@ -23,7 +23,9 @@ export default function StoreNotificationsPage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 4000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 20000);
     return () => clearInterval(t);
   }, []);
 

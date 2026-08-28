@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bell, MapPin, Menu, PackageSearch, Search, Sparkles, User, X } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
@@ -13,9 +13,8 @@ import {
 } from "@findit/domain";
 import { BrandLogo } from "@/components/brand/logo";
 import { usePublicHref } from "@/components/host/host-surface";
-import { getCurrentProfile } from "@/lib/services/actions";
+import { useCustomerProfile } from "@/components/customer/session";
 import { cn } from "@/lib/utils";
-import type { Profile } from "@/types/database";
 
 const ITEMS = [
   { href: "/home", label: "Find", icon: Search },
@@ -33,7 +32,7 @@ function isActive(pathname: string, href: string) {
 
 export function CustomerMenuButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const profile = useCustomerProfile();
   const pathname = usePathname();
   const router = useRouter();
   const homeHref = usePublicHref("/home");
@@ -46,11 +45,6 @@ export function CustomerMenuButton({ className }: { className?: string }) {
     state: profile?.default_state,
     postalCode: profile?.default_postal_code,
   });
-
-  useEffect(() => {
-    if (!open) return;
-    getCurrentProfile().then(setProfile);
-  }, [open]);
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>

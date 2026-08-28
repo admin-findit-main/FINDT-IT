@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
 import { coerceSoloAdminProfile, isSoloAdmin, isSoloAdminEmail } from "@/lib/auth/admin";
 import { authEmailErrorMessage } from "@/lib/auth/email-error";
@@ -114,16 +115,16 @@ async function setDemoSessionCookie(sessionId: string | null) {
   });
 }
 
-async function getSupabaseUser() {
+const getSupabaseUser = cache(async () => {
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return { supabase, user };
-}
+});
 
-export async function getCurrentProfile(): Promise<Profile | null> {
+export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   if (isDemoMode()) {
     const sessionId = await getDemoSessionId();
     const profile = demoCurrentUser(sessionId);
@@ -137,7 +138,7 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   const profile = data as Profile | null;
   if (!profile) return null;
   return coerceSoloAdminProfile(profile, user.email) as Profile;
-}
+});
 
 type StoreActor =
   | { kind: "member"; userId: string; role: string; storeId: string }
@@ -751,30 +752,48 @@ export async function createCustomerRequestAction(raw: unknown) {
   const { supabase, user } = await getSupabaseUser();
   if (!user) return { error: "Please sign in", needsAuth: true };
 
-  // Rate limit + duplicate check
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count: recentCount } = await supabase
-    .from("customer_requests")
-    .select("*", { count: "exact", head: true })
-    .eq("customer_id", user.id)
-    .gte("created_at", hourAgo)
-    .in("status", ["active", "partially_answered", "answered", "draft"]);
-  if ((recentCount || 0) >= 10) {
+  const monthStart = monthlyFindWindowStart().toISOString();
+  const checkMonthly = !bypassConsumerPlanLimits();
+  const [recentResult, existingActive, monthlyResult, point] = await Promise.all([
+    supabase
+      .from("customer_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("customer_id", user.id)
+      .gte("created_at", hourAgo)
+      .in("status", ["active", "partially_answered", "answered", "draft"]),
+    parsed.data.forceDuplicate
+      ? Promise.resolve({ data: [] as { id: string; normalized_product_name: string; category: string | null; status: string; created_at: string }[] })
+      : supabase
+          .from("customer_requests")
+          .select("id, normalized_product_name, category, status, created_at")
+          .eq("customer_id", user.id)
+          .in("status", ["active", "partially_answered", "answered"])
+          .order("created_at", { ascending: false })
+          .limit(20),
+    checkMonthly
+      ? supabase
+          .from("customer_requests")
+          .select("*", { count: "exact", head: true })
+          .eq("customer_id", user.id)
+          .gte("created_at", monthStart)
+      : Promise.resolve({ count: 0 }),
+    resolvePoint({
+      postalCode: parsed.data.postalCode,
+      latitude: parsed.data.latitude,
+      longitude: parsed.data.longitude,
+    }),
+  ]);
+
+  if ((recentResult.count || 0) >= 10) {
     return { error: "You can create up to 10 requests per hour." };
   }
 
   if (!parsed.data.forceDuplicate) {
-    const { data: existingActive } = await supabase
-      .from("customer_requests")
-      .select("id, normalized_product_name, category, status, created_at")
-      .eq("customer_id", user.id)
-      .in("status", ["active", "partially_answered", "answered"])
-      .order("created_at", { ascending: false })
-      .limit(20);
     const dup = isNearDuplicateRequest({
       normalizedProductName: normalizeProductName(parsed.data.productName),
       category: resolvedCategory,
-      existing: existingActive || [],
+      existing: existingActive.data || [],
     });
     if (dup.duplicate && dup.existingId) {
       return {
@@ -784,14 +803,9 @@ export async function createCustomerRequestAction(raw: unknown) {
     }
   }
 
-  if (!bypassConsumerPlanLimits()) {
+  if (checkMonthly) {
     const entitlements = getConsumerEntitlements(profile.subscription_plan);
-    const { count } = await supabase
-      .from("customer_requests")
-      .select("*", { count: "exact", head: true })
-      .eq("customer_id", user.id)
-      .gte("created_at", monthlyFindWindowStart().toISOString());
-    if ((count || 0) >= entitlements.monthlyRequestLimit) {
+    if ((monthlyResult.count || 0) >= entitlements.monthlyRequestLimit) {
       return {
         error: planLimitReachedMessage(entitlements),
         code: "plan_limit" as const,
@@ -817,12 +831,6 @@ export async function createCustomerRequestAction(raw: unknown) {
   const expiresAt = new Date(
     Date.now() + parsed.data.expirationHours * 60 * 60 * 1000
   ).toISOString();
-
-  const point = await resolvePoint({
-    postalCode: parsed.data.postalCode,
-    latitude: parsed.data.latitude,
-    longitude: parsed.data.longitude,
-  });
 
   // Service role insert after auth checks — avoids brittle INSERT RLS during pilot
   const { createServiceClient } = await import("@/lib/supabase/admin");
@@ -870,7 +878,7 @@ export async function createCustomerRequestAction(raw: unknown) {
     return { error: "Couldn't create your request. Please try again." };
   }
 
-  await trackEvent("request_created", {
+  void trackEvent("request_created", {
     userId: user.id,
     requestId: request.id,
   });
@@ -905,6 +913,9 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
   if (!stores?.length) return 0;
 
   const storeIds = stores.map((s) => s.id);
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
   const [
     { data: cats },
     { data: areas },
@@ -913,44 +924,41 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
     { data: catalogCats },
     { data: catalogKeys },
     { data: customKeys },
-  ] =
-    await Promise.all([
-      admin.from("store_categories").select("store_id, category").in("store_id", storeIds),
-      admin.from("store_service_areas").select("store_id, postal_code").in("store_id", storeIds),
-      admin
-        .from("store_hours")
-        .select("store_id, day_of_week, open_time, close_time, is_closed")
-        .in("store_id", storeIds),
-      admin.from("request_targets").select("store_id").eq("request_id", requestId),
-      admin.from("store_catalog_categories").select("store_id, category_id").in("store_id", storeIds),
-      admin.from("store_catalog_keywords").select("store_id, keyword_id").in("store_id", storeIds),
-      admin.from("store_custom_keywords").select("store_id, normalized_keyword").in("store_id", storeIds),
-    ]);
-
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const { data: monthTargets } = await admin
-    .from("request_targets")
-    .select("store_id")
-    .in("store_id", storeIds)
-    .gte("created_at", monthStart.toISOString());
+    { data: monthTargets },
+    requestPoint,
+    storeZipPoints,
+  ] = await Promise.all([
+    admin.from("store_categories").select("store_id, category").in("store_id", storeIds),
+    admin.from("store_service_areas").select("store_id, postal_code").in("store_id", storeIds),
+    admin
+      .from("store_hours")
+      .select("store_id, day_of_week, open_time, close_time, is_closed")
+      .in("store_id", storeIds),
+    admin.from("request_targets").select("store_id").eq("request_id", requestId),
+    admin.from("store_catalog_categories").select("store_id, category_id").in("store_id", storeIds),
+    admin.from("store_catalog_keywords").select("store_id, keyword_id").in("store_id", storeIds),
+    admin.from("store_custom_keywords").select("store_id, normalized_keyword").in("store_id", storeIds),
+    admin
+      .from("request_targets")
+      .select("store_id")
+      .in("store_id", storeIds)
+      .gte("created_at", monthStart.toISOString()),
+    resolvePoint({
+      postalCode: request.postal_code,
+      latitude: request.latitude,
+      longitude: request.longitude,
+    }),
+    resolvePointsByZip(
+      stores
+        .filter((store) => store.latitude == null || store.longitude == null)
+        .map((store) => store.postal_code)
+    ),
+  ]);
 
   const monthCounts = new Map<string, number>();
   for (const t of monthTargets || []) {
     monthCounts.set(t.store_id, (monthCounts.get(t.store_id) || 0) + 1);
   }
-
-  const requestPoint = await resolvePoint({
-    postalCode: request.postal_code,
-    latitude: request.latitude,
-    longitude: request.longitude,
-  });
-  const storeZipPoints = await resolvePointsByZip(
-    stores
-      .filter((store) => store.latitude == null || store.longitude == null)
-      .map((store) => store.postal_code)
-  );
 
   const candidates = stores.map((store) => {
     const fromZip = storeZipPoints.get(
@@ -1100,16 +1108,14 @@ export async function getCustomerRequestAction(requestId: string) {
 
   const { supabase, user } = await getSupabaseUser();
   if (!user) return null;
-  const { data: request } = await supabase
-    .from("customer_requests")
-    .select("*")
-    .eq("id", requestId)
-    .single();
+  const [{ data: request }, { data: responses }] = await Promise.all([
+    supabase.from("customer_requests").select("*").eq("id", requestId).single(),
+    supabase
+      .from("store_responses")
+      .select("*, store:stores(*)")
+      .eq("request_id", requestId),
+  ]);
   if (!request) return null;
-  const { data: responses } = await supabase
-    .from("store_responses")
-    .select("*, store:stores(*)")
-    .eq("request_id", requestId);
   return {
     ...(request as CustomerRequest),
     responses: (responses || []) as (StoreResponse & { store?: Store })[],
@@ -1222,19 +1228,26 @@ export async function respondToRequestAction(input: {
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
 
-  const { data: target } = await admin
-    .from("request_targets")
-    .select("*")
-    .eq("request_id", input.requestId)
-    .eq("store_id", input.storeId)
-    .maybeSingle();
+  const [{ data: target }, { data: requestRow }, { data: existing }] = await Promise.all([
+    admin
+      .from("request_targets")
+      .select("*")
+      .eq("request_id", input.requestId)
+      .eq("store_id", input.storeId)
+      .maybeSingle(),
+    admin
+      .from("customer_requests")
+      .select("id, status, expires_at, customer_id, product_name, stores_targeted")
+      .eq("id", input.requestId)
+      .single(),
+    admin
+      .from("store_responses")
+      .select("id")
+      .eq("request_id", input.requestId)
+      .eq("store_id", input.storeId)
+      .maybeSingle(),
+  ]);
   if (!target) return { error: "Request was not sent to this store" };
-
-  const { data: requestRow } = await admin
-    .from("customer_requests")
-    .select("id, status, expires_at, customer_id, product_name, stores_targeted")
-    .eq("id", input.requestId)
-    .single();
   if (!requestRow) return { error: "Request not found" };
   if (requestRow.status === "cancelled" || requestRow.status === "fulfilled") {
     return { error: "This request is no longer accepting responses" };
@@ -1245,13 +1258,6 @@ export async function respondToRequestAction(input: {
   ) {
     return { error: "This request has expired" };
   }
-
-  const { data: existing } = await admin
-    .from("store_responses")
-    .select("id")
-    .eq("request_id", input.requestId)
-    .eq("store_id", input.storeId)
-    .maybeSingle();
 
   const respondedAt = new Date().toISOString();
   const payload = {
@@ -1281,39 +1287,46 @@ export async function respondToRequestAction(input: {
   if (error) return { error: "Couldn't save your response. Please try again." };
 
   const secs = responseTimeSeconds(target.route_sent_at || target.created_at, respondedAt);
-  await admin
-    .from("request_targets")
-    .update({
-      responded_at: respondedAt,
-      response_time_seconds: secs,
-      opened_at: target.opened_at || respondedAt,
-      viewed_at: target.viewed_at || respondedAt,
-      relevant: input.responseType === "not_relevant" ? false : true,
-    })
-    .eq("id", target.id);
-
-  const { count } = await admin
-    .from("store_responses")
-    .select("*", { count: "exact", head: true })
-    .eq("request_id", input.requestId);
+  const notifyCustomer =
+    input.responseType === "in_stock" || input.responseType === "can_order";
+  const [, countResult, storeResult, customerResult] = await Promise.all([
+    admin
+      .from("request_targets")
+      .update({
+        responded_at: respondedAt,
+        response_time_seconds: secs,
+        opened_at: target.opened_at || respondedAt,
+        viewed_at: target.viewed_at || respondedAt,
+        relevant: input.responseType === "not_relevant" ? false : true,
+      })
+      .eq("id", target.id),
+    admin
+      .from("store_responses")
+      .select("*", { count: "exact", head: true })
+      .eq("request_id", input.requestId),
+    notifyCustomer
+      ? admin.from("stores").select("name").eq("id", input.storeId).single()
+      : Promise.resolve({ data: null as { name?: string } | null }),
+    notifyCustomer
+      ? admin
+          .from("profiles")
+          .select("notify_in_stock, notify_can_order")
+          .eq("id", requestRow.customer_id)
+          .maybeSingle()
+      : Promise.resolve({
+          data: null as { notify_in_stock?: boolean; notify_can_order?: boolean } | null,
+        }),
+  ]);
 
   const status = deriveRequestStatus({
-    responseCount: count || 0,
+    responseCount: countResult.count || 0,
     targetCount: requestRow.stores_targeted || 0,
   });
   await admin.from("customer_requests").update({ status }).eq("id", input.requestId);
 
-  if (input.responseType === "in_stock" || input.responseType === "can_order") {
-    const { data: store } = await admin
-      .from("stores")
-      .select("name")
-      .eq("id", input.storeId)
-      .single();
-    const { data: customer } = await admin
-      .from("profiles")
-      .select("notify_in_stock, notify_can_order")
-      .eq("id", requestRow.customer_id)
-      .maybeSingle();
+  if (notifyCustomer) {
+    const store = storeResult.data;
+    const customer = customerResult.data;
     const copy = customerReplyAlertCopy({
       responseType: input.responseType,
       storeName: store?.name,
@@ -1351,7 +1364,7 @@ export async function respondToRequestAction(input: {
     }
   }
 
-  await trackEvent("store_response_created", {
+  void trackEvent("store_response_created", {
     userId: actor.userId,
     storeId: input.storeId,
     requestId: input.requestId,
@@ -1429,13 +1442,17 @@ export async function getStoreIncomingRequestsAction(
 
   // request_targets has no FK to store_responses, so PostgREST cannot embed
   // both in one select (PGRST200). Load replies in a second query.
-  const { data, error } = await supabase
+  let inboxQuery = supabase
     .from("request_targets")
     .select("*, request:customer_requests(*)")
     .eq("store_id", storeId)
     .gte("created_at", start.toISOString())
     .order("created_at", { ascending: false })
     .limit(100);
+  if (filter === "unanswered") {
+    inboxQuery = inboxQuery.is("responded_at", null);
+  }
+  const { data, error } = await inboxQuery;
 
   if (error) {
     console.error("[FINDIT] store inbox query failed", error.message);
@@ -1450,13 +1467,14 @@ export async function getStoreIncomingRequestsAction(
     })
     .filter((id): id is string => Boolean(id));
 
-  const { data: responses } = requestIds.length
-    ? await supabase
-        .from("store_responses")
-        .select("*")
-        .eq("store_id", storeId)
-        .in("request_id", requestIds)
-    : { data: [] as StoreResponse[] };
+  const { data: responses } =
+    requestIds.length && filter !== "unanswered"
+      ? await supabase
+          .from("store_responses")
+          .select("*")
+          .eq("store_id", storeId)
+          .in("request_id", requestIds)
+      : { data: [] as StoreResponse[] };
 
   const responseByRequest = new Map(
     (responses || []).map((response) => [response.request_id, response as StoreResponse])
@@ -1490,7 +1508,7 @@ export async function getStoreIncomingRequestsAction(
   })[];
 }
 
-export async function getUserStoresAction(): Promise<(Store & { role: string })[]> {
+export const getUserStoresAction = cache(async (): Promise<(Store & { role: string })[]> => {
   const profile = await getCurrentProfile();
   if (!profile) return [];
 
@@ -1518,7 +1536,7 @@ export async function getUserStoresAction(): Promise<(Store & { role: string })[
       const store = Array.isArray(d.store) ? d.store[0] : d.store;
       return { ...(store as Store), role: d.role };
     });
-}
+});
 
 export async function createStoreAction(raw: unknown) {
   const parsed = storeOnboardingSchema.safeParse(raw);

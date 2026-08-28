@@ -32,7 +32,9 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 15000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 20000);
     return () => clearInterval(t);
   }, []);
 

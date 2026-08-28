@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import type { Store, StoreDevice, StoreMemberRole } from "@/types/database";
 import { isDemoMode, appUrl } from "@/lib/config/env";
 import { isSoloAdmin } from "@/lib/auth/admin";
@@ -53,7 +54,7 @@ async function requireStoreManager(storeId?: string) {
   return { profile, storeId: id };
 }
 
-export async function getHubRuntimeAction(): Promise<HubRuntime | null> {
+export const getHubRuntimeAction = cache(async (): Promise<HubRuntime | null> => {
   const workspace = await getStoreWorkspaceAction();
   if (workspace?.store) {
     return {
@@ -77,7 +78,7 @@ export async function getHubRuntimeAction(): Promise<HubRuntime | null> {
     };
   }
   return null;
-}
+});
 
 export async function createHubPairingAction(): Promise<
   { code: string; expiresAt: string; pairUrl: string } | { error: string }

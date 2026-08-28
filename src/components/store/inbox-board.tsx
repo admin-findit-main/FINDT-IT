@@ -23,7 +23,6 @@ import {
   getStoreMetricsAction,
   getStoreWorkspaceAction,
   getUserStoresAction,
-  markStoreRequestOpenedAction,
   respondToRequestAction,
 } from "@/lib/services/actions";
 import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
@@ -63,16 +62,22 @@ export function StoreInboxBoard() {
   const [stockAmount, setStockAmount] = useState<"plenty" | "few_left" | "last_one" | "">("");
   const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async (sid = storeId) => {
+  const loadInbox = useCallback(async (sid = storeId) => {
     if (!sid) return;
-    const [m, list] = await Promise.all([
-      getStoreMetricsAction(sid),
-      getStoreIncomingRequestsAction(sid, filter, range),
-    ]);
-    setMetrics(m);
+    const list = await getStoreIncomingRequestsAction(sid, filter, range);
     setItems(list);
     setLoading(false);
   }, [storeId, filter, range]);
+
+  const loadMetrics = useCallback(async (sid = storeId) => {
+    if (!sid) return;
+    setMetrics(await getStoreMetricsAction(sid));
+  }, [storeId]);
+
+  const load = useCallback(async (sid = storeId) => {
+    if (!sid) return;
+    await Promise.all([loadInbox(sid), loadMetrics(sid)]);
+  }, [loadInbox, loadMetrics]);
 
   useEffect(() => {
     Promise.all([
@@ -99,12 +104,14 @@ export function StoreInboxBoard() {
     if (storeId) {
       setLoading(true);
       load(storeId);
-      const t = setInterval(() => load(storeId), 8000);
+      const t = setInterval(() => {
+        if (document.visibilityState === "visible") loadInbox(storeId);
+      }, 20000);
       return () => clearInterval(t);
     }
-  }, [storeId, load]);
+  }, [storeId, load, loadInbox]);
 
-  useStoreInboxRealtime(storeId, { onChange: () => load(storeId) });
+  useStoreInboxRealtime(storeId, { onChange: () => loadInbox(storeId) });
 
   async function respond(
     type: "in_stock" | "out_of_stock" | "can_order" | "not_relevant",
@@ -122,7 +129,6 @@ export function StoreInboxBoard() {
     if (!request || !storeId) return;
     setActiveRequest(request);
     setSubmitting(true);
-    await markStoreRequestOpenedAction(storeId, request.id);
     const result = await respondToRequestAction({
       requestId: request.id,
       storeId,
