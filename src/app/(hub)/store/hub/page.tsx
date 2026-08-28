@@ -282,7 +282,7 @@ export default function FinditHubPage() {
   const priceInvalid = price.trim() !== "" && (!Number.isFinite(parsedPrice) || Number(parsedPrice) < 0);
 
   return (
-    <div className="hub-root relative flex min-h-dvh flex-col overflow-hidden bg-black text-white select-none">
+    <div className="hub-root relative flex h-dvh flex-col overflow-hidden bg-black text-white select-none">
       {newFlash ? (
         <div
           aria-hidden
@@ -290,7 +290,7 @@ export default function FinditHubPage() {
         />
       ) : null}
 
-      <header className="flex items-center justify-between px-6 py-4 md:px-10">
+      <header className="flex shrink-0 items-center justify-between px-5 py-3 md:px-8">
         <div className="flex items-center gap-3">
           <BrandLogo kind="business" tone="dark" className="h-5 w-auto" />
           <span className="hidden text-white/25 sm:inline">·</span>
@@ -332,7 +332,7 @@ export default function FinditHubPage() {
         </div>
       ) : null}
 
-      <main className="relative flex flex-1 flex-col px-6 pb-8 md:px-12">
+      <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-5 md:px-8">
         {sentFlash ? (
           <div className="flex flex-1 flex-col items-center justify-center text-center">
             <p className="text-6xl font-bold text-emerald-400">✓</p>
@@ -356,11 +356,11 @@ export default function FinditHubPage() {
             </p>
           </div>
         ) : (
-          <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-sm font-bold tracking-[0.2em] text-[#E5231B]">NEW REQUEST</p>
-                <p className="mt-1 text-white/60">{distanceLabel}</p>
+          <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden">
+            <div className="flex shrink-0 items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-xs font-bold tracking-[0.2em] text-[#E5231B]">NEW REQUEST</p>
+                <p className="mt-0.5 truncate text-sm text-white/60">{distanceLabel}</p>
               </div>
               {queue.length > 1 ? (
                 <div className="flex items-center gap-3 text-sm text-white/60">
@@ -385,50 +385,55 @@ export default function FinditHubPage() {
               ) : null}
             </div>
 
-            <div className="mt-6 grid flex-1 gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-              <div className="flex min-h-0 min-w-0 flex-col">
+            <div className="mt-3 grid min-h-0 flex-1 grid-cols-[minmax(0,1.15fr)_minmax(14rem,0.85fr)] gap-4 overflow-hidden md:gap-6">
+              <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
                 {active.image_url ? (
-                  <figure className="mb-6 flex max-h-[min(36vh,22rem)] min-h-40 w-full items-center justify-center overflow-hidden rounded-3xl bg-[#111113] ring-1 ring-inset ring-white/10 md:max-h-[min(52vh,36rem)]">
+                  <figure className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-3xl bg-[#111113] ring-1 ring-inset ring-white/10">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={active.image_url}
                       alt={active.product_name}
                       draggable={false}
-                      className="h-auto w-auto max-h-[min(36vh,22rem)] max-w-full object-contain md:max-h-[min(52vh,36rem)]"
+                      className="h-full w-full object-contain"
                     />
                   </figure>
                 ) : null}
-                <p className="text-sm uppercase tracking-[0.18em] text-white/40">Product</p>
-                <h1
-                  className={
-                    active.image_url
-                      ? "mt-2 text-4xl font-bold leading-tight tracking-tight md:text-5xl"
-                      : "mt-2 text-5xl font-bold leading-none tracking-tight md:text-7xl"
-                  }
-                >
-                  {active.product_name}
-                </h1>
-                {active.description ? (
-                  <>
-                    <p className="mt-6 text-sm uppercase tracking-[0.18em] text-white/40">
-                      Variant
+                <div className={`min-w-0 shrink-0 ${active.image_url ? "mt-3" : "flex-1"}`}>
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/40">Product</p>
+                  <h1
+                    className={
+                      active.image_url
+                        ? "mt-1 truncate text-2xl font-bold tracking-tight md:text-4xl"
+                        : "mt-2 text-5xl font-bold leading-none tracking-tight md:text-7xl"
+                    }
+                  >
+                    {active.product_name}
+                  </h1>
+                  {active.description ? (
+                    <p
+                      className={
+                        active.image_url
+                          ? "mt-1 truncate text-base text-white/80 md:text-xl"
+                          : "mt-4 text-3xl font-semibold text-white/90"
+                      }
+                    >
+                      {active.description}
                     </p>
-                    <p className="mt-2 text-3xl font-semibold text-white/90">{active.description}</p>
-                  </>
-                ) : null}
-                <p className="mt-6 text-white/50" data-clock={clock}>
-                  {formatRequestedAgo(active.created_at)}
-                </p>
+                  ) : null}
+                  <p className="mt-2 text-sm text-white/50" data-clock={clock}>
+                    {formatRequestedAgo(active.created_at)}
+                  </p>
+                </div>
               </div>
 
-              <div className="flex flex-col justify-end gap-4">
+              <div className="flex min-h-0 flex-col justify-stretch gap-3 overflow-hidden">
                 {panel === "actions" ? (
                   <>
                     <button
                       type="button"
                       disabled={busy || !online}
                       onClick={() => setPanel("in_stock")}
-                      className="min-h-24 rounded-3xl bg-[#0E9F6E] text-3xl font-bold tracking-tight text-white disabled:opacity-40"
+                      className="flex min-h-0 flex-1 items-center justify-center rounded-3xl bg-[#0E9F6E] text-2xl font-bold tracking-tight text-white disabled:opacity-40 md:text-3xl"
                     >
                       IN STOCK
                     </button>
@@ -436,7 +441,7 @@ export default function FinditHubPage() {
                       type="button"
                       disabled={busy || !online}
                       onClick={() => void send("out_of_stock")}
-                      className="min-h-24 rounded-3xl bg-white/12 text-3xl font-bold tracking-tight text-white disabled:opacity-40"
+                      className="flex min-h-0 flex-1 items-center justify-center rounded-3xl bg-white/12 text-2xl font-bold tracking-tight text-white disabled:opacity-40 md:text-3xl"
                     >
                       OUT OF STOCK
                     </button>
@@ -444,7 +449,7 @@ export default function FinditHubPage() {
                       type="button"
                       disabled={busy || !online}
                       onClick={() => setPanel("can_order")}
-                      className="min-h-24 rounded-3xl bg-[#C77700] text-3xl font-bold tracking-tight text-white disabled:opacity-40"
+                      className="flex min-h-0 flex-1 items-center justify-center rounded-3xl bg-[#C77700] text-2xl font-bold tracking-tight text-white disabled:opacity-40 md:text-3xl"
                     >
                       CAN ORDER
                     </button>
@@ -452,7 +457,7 @@ export default function FinditHubPage() {
                 ) : null}
 
                 {panel === "in_stock" ? (
-                  <div className="rounded-3xl bg-white/8 p-6">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-3xl bg-white/8 p-5">
                     <p className="text-lg font-semibold">Optional details</p>
                     <label className="mt-4 block text-sm text-white/50">Price</label>
                     <input
@@ -505,7 +510,7 @@ export default function FinditHubPage() {
                 ) : null}
 
                 {panel === "can_order" ? (
-                  <div className="rounded-3xl bg-white/8 p-6">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-3xl bg-white/8 p-5">
                     <p className="text-lg font-semibold">Estimated availability</p>
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       {HUB_AVAILABILITY.map((option) => (
