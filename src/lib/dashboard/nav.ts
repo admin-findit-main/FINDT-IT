@@ -29,7 +29,6 @@ export const ownerDashItems: DashItem[] = [
   { href: "/store/team", label: "Staff", icon: "staff" },
   { href: "/store/hub", label: "FINDIT Hub", icon: "hub" },
   { href: "/store/devices", label: "Devices", icon: "devices" },
-  { href: "/store/settings", label: "Store profile", icon: "store" },
   { href: "/store/subscription", label: "Subscription", icon: "plan" },
   { href: "/store/notifications", label: "Notifications", icon: "alerts" },
 ];
@@ -86,3 +85,10 @@ export function dashItemActive(pathname: string, href: string) {
   if (href === "/store" || href === "/admin") return pathname === href;
   return pathname === href || pathname.startsWith(href + "/");
 }
+
+export const STORE_PROFILE_MENU = [
+  { href: "/store/settings#profile", label: "Business Profile" },
+  { href: "/store/settings#hours", label: "Business Hours" },
+  { href: "/store/settings#area", label: "Service Area" },
+  { href: "/store/settings#categories", label: "Request Categories" },
+] as const;

@@ -55,9 +55,6 @@ export default async function StoreLayout({
                     {access.pendingApplication.admin_notes}
                   </p>
                 ) : null}
-                <Button asChild variant="ghost" className="mt-8">
-                  <Link href="/home">Browse as a customer</Link>
-                </Button>
               </>
             ) : (
               <>
@@ -88,6 +85,7 @@ export default async function StoreLayout({
       email={profile.email}
       items={canManage ? ownerDashItems : employeeDashItems}
       accountHref="/store/account"
+      storeProfileHref="/store/settings"
       logoutHref="/login/business"
     >
       {children}

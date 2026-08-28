@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
-import { GlassBadge, GlassChip, GlassNotice, VerifiedStoreBadge } from "@/components/ui/glass";
+import {
+  GlassChip,
+  GlassNotice,
+  GlassSelect,
+  VerifiedStoreBadge,
+} from "@/components/ui/glass";
 import {
   DAYS_OF_WEEK,
   PILOT_STORE_BANNER,
@@ -24,19 +30,110 @@ import {
   defaultCategoryIdsForType,
 } from "@findit/domain";
 import { IosSwitch } from "@/components/ui/ios-switch";
+import { cn } from "@/lib/utils";
 import type { Store } from "@/types/database";
+
+type HourRow = {
+  day_of_week: number;
+  open_time: string | null;
+  close_time: string | null;
+  is_closed: boolean;
+};
+
+type OpenSection = "profile" | "hours" | "area" | "categories" | "plan" | null;
+
+function clockLabel(hhmm: string) {
+  const [hStr, mStr] = hhmm.slice(0, 5).split(":");
+  const h = Number(hStr);
+  const m = Number(mStr) || 0;
+  if (!Number.isFinite(h)) return hhmm;
+  const suffix = h >= 12 ? "PM" : "AM";
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${suffix}`;
+}
+
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
+  const minutes = i * 15;
+  const value = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(
+    minutes % 60
+  ).padStart(2, "0")}`;
+  return { value, label: clockLabel(value) };
+});
+
+function toHm(value: string | null | undefined, fallback: string) {
+  const sliced = (value || "").slice(0, 5);
+  return /^\d{2}:\d{2}$/.test(sliced) ? sliced : fallback;
+}
+
+function normalizeHours(rows: HourRow[]): HourRow[] {
+  return Array.from({ length: 7 }, (_, day) => {
+    const existing = rows.find((h) => h.day_of_week === day);
+    if (existing) {
+      return {
+        day_of_week: day,
+        is_closed: existing.is_closed,
+        open_time: toHm(existing.open_time, "09:00"),
+        close_time: toHm(existing.close_time, "21:00"),
+      };
+    }
+    return {
+      day_of_week: day,
+      open_time: "09:00",
+      close_time: "21:00",
+      is_closed: day === 0,
+    };
+  });
+}
+
+function timeChoices(value: string) {
+  if (TIME_OPTIONS.some((o) => o.value === value)) return TIME_OPTIONS;
+  return [{ value, label: clockLabel(value) }, ...TIME_OPTIONS];
+}
+
+function SectionCard({
+  title,
+  body,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  body: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="overflow-hidden p-0">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-4 p-5 text-left"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span>
+          <span className="block font-semibold text-ink">{title}</span>
+          <span className="mt-1 block text-sm text-ink-muted">{body}</span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-5 w-5 shrink-0 text-ink-muted transition-transform",
+            open && "rotate-180"
+          )}
+        />
+      </button>
+      {open ? (
+        <div className="border-t border-hairline-strong p-5 sm:p-6">
+          {children}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
 
 export default function StoreSettingsPage() {
   const [store, setStore] = useState<(Store & { role: string }) | null>(null);
   const [role, setRole] = useState<string>("employee");
-  const [hours, setHours] = useState<
-    {
-      day_of_week: number;
-      open_time: string | null;
-      close_time: string | null;
-      is_closed: boolean;
-    }[]
-  >([]);
+  const [hours, setHours] = useState<HourRow[]>(() => normalizeHours([]));
   const [categories, setCategories] = useState<string[]>([]);
   const [catalogCategoryIds, setCatalogCategoryIds] = useState<string[]>([]);
   const [customKeywords, setCustomKeywords] = useState("");
@@ -55,8 +152,27 @@ export default function StoreSettingsPage() {
   const [pilotBanner, setPilotBanner] = useState(false);
   const [saving, setSaving] = useState(false);
   const [requiresCustomerId, setRequiresCustomerId] = useState(false);
+  const [openSection, setOpenSection] = useState<OpenSection>(null);
 
   const canManage = role === "owner" || role === "manager";
+
+  useEffect(() => {
+    function applyHash() {
+      const id = window.location.hash.replace("#", "");
+      if (
+        id === "profile" ||
+        id === "hours" ||
+        id === "area" ||
+        id === "categories" ||
+        id === "plan"
+      ) {
+        setOpenSection(id);
+      }
+    }
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
 
   useEffect(() => {
     getUserStoresAction()
@@ -67,16 +183,7 @@ export default function StoreSettingsPage() {
         const settings = await getStoreSettingsAction(first.id);
         if (!settings) return;
         setRole(settings.role);
-        setHours(
-          settings.hours.length
-            ? settings.hours
-            : Array.from({ length: 7 }, (_, day) => ({
-                day_of_week: day,
-                open_time: day === 0 ? null : "09:00",
-                close_time: day === 0 ? null : "21:00",
-                is_closed: day === 0,
-              }))
-        );
+        setHours(normalizeHours(settings.hours));
         setCategories(settings.categories);
         setCatalogCategoryIds(settings.catalogCategoryIds || []);
         setCustomKeywords((settings.customKeywords || []).join(", "));
@@ -101,6 +208,23 @@ export default function StoreSettingsPage() {
       });
   }, []);
 
+  function toggleSection(id: Exclude<OpenSection, null>) {
+    setOpenSection((cur) => {
+      const next = cur === id ? null : id;
+      const path = window.location.pathname;
+      window.history.replaceState(null, "", next ? `${path}#${next}` : path);
+      return next;
+    });
+  }
+
+  function patchHour(idx: number, patch: Partial<HourRow>) {
+    setHours((prev) =>
+      normalizeHours(prev).map((row) =>
+        row.day_of_week === idx ? { ...row, ...patch } : row
+      )
+    );
+  }
+
   async function saveCoverage() {
     if (!store || !canManage) return;
     setSaving(true);
@@ -119,7 +243,11 @@ export default function StoreSettingsPage() {
         .split(/[,\n]+/)
         .map((k) => k.trim())
         .filter(Boolean),
-      hours,
+      hours: hours.map((h) => ({
+        ...h,
+        open_time: h.is_closed ? null : toHm(h.open_time, "09:00"),
+        close_time: h.is_closed ? null : toHm(h.close_time, "21:00"),
+      })),
     });
     setSaving(false);
     if (result.error) {
@@ -151,22 +279,8 @@ export default function StoreSettingsPage() {
     else toast.success("Store profile saved");
   }
 
-  const plan = STORE_PLANS[(store?.subscription_plan as keyof typeof STORE_PLANS) || "free"];
-
-  const sections = [
-    { href: "/store/settings#profile", title: "Business Profile", body: "Name, address, phone, website" },
-    { href: "/store/settings#hours", title: "Business Hours", body: "Configure each day of the week" },
-    { href: "/store/settings#area", title: "Service Area", body: "ZIP codes and radius you serve" },
-    { href: "/store/settings#categories", title: "Request Categories", body: "What requests you receive" },
-    ...(canManage
-      ? [{ href: "/store/team", title: "Team", body: "Invite employees and managers" }]
-      : []),
-    { href: "/store/notifications", title: "Notifications", body: "New request and demand alerts" },
-    ...(role === "owner" || role === "manager"
-      ? [{ href: "/store/settings#plan", title: "Plan", body: "Pilot trial, Starter, and Pro" }]
-      : []),
-    { href: "/store/account", title: "Account", body: "Your login and role for this store" },
-  ];
+  const plan =
+    STORE_PLANS[(store?.subscription_plan as keyof typeof STORE_PLANS) || "free"];
 
   return (
     <div>
@@ -183,316 +297,433 @@ export default function StoreSettingsPage() {
         </GlassNotice>
       ) : null}
 
-      <Card sheen id="profile" className="mt-6 space-y-4 p-5 sm:p-6">
-        <h2 className="font-semibold text-ink">Business profile</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Label>Store name</Label>
-            <Input value={name} disabled={!canManage} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="sm:col-span-2">
-            <Label>Description</Label>
-            <Input value={description} disabled={!canManage} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div>
-            <Label>Phone</Label>
-            <Input value={phone} disabled={!canManage} onChange={(e) => setPhone(e.target.value)} />
-          </div>
-          <div>
-            <Label>Website</Label>
-            <Input value={website} disabled={!canManage} onChange={(e) => setWebsite(e.target.value)} />
-          </div>
-          <div className="sm:col-span-2">
-            <Label>Street</Label>
-            <Input value={street} disabled={!canManage} onChange={(e) => setStreet(e.target.value)} />
-          </div>
-          <div>
-            <Label>City</Label>
-            <Input value={city} disabled={!canManage} onChange={(e) => setCity(e.target.value)} />
-          </div>
-          <div>
-            <Label>State</Label>
-            <Input value={region} disabled={!canManage} onChange={(e) => setRegion(e.target.value)} />
-          </div>
-          <div>
-            <Label>ZIP</Label>
-            <Input value={postal} disabled={!canManage} onChange={(e) => setPostal(e.target.value)} />
-          </div>
-        </div>
-        {canManage ? (
-          <Button onClick={saveProfile} disabled={saving}>
-            Save profile
-          </Button>
-        ) : null}
-      </Card>
-
       <div className="mt-6 space-y-3">
-        {sections.map((s) => (
-          <Link key={s.href} href={s.href}>
-            <Card interactive className="mb-3 p-5">
-              <p className="font-semibold text-ink">{s.title}</p>
-              <p className="mt-1 text-sm text-ink-muted">{s.body}</p>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      <Card sheen id="hours" className="mt-8 scroll-mt-8 p-5 sm:p-6">
-        <h2 className="font-semibold text-ink">Business hours</h2>
-        <div className="mt-4 space-y-3">
-          {DAYS_OF_WEEK.map((day, idx) => {
-            const row = hours.find((h) => h.day_of_week === idx) || {
-              day_of_week: idx,
-              open_time: "09:00",
-              close_time: "21:00",
-              is_closed: false,
-            };
-            return (
-              <div key={day} className="grid grid-cols-[4.5rem_1fr] items-center gap-3 text-sm">
-                <span className="font-medium text-ink">{day.slice(0, 3)}</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="flex items-center gap-2 text-xs text-ink-muted">
-                    <input
-                      type="checkbox"
-                      disabled={!canManage}
-                      checked={row.is_closed}
-                      onChange={(e) => {
-                        setHours((prev) => {
-                          const next = prev.filter((h) => h.day_of_week !== idx);
-                          next.push({
-                            ...row,
-                            is_closed: e.target.checked,
-                            open_time: e.target.checked ? null : row.open_time || "09:00",
-                            close_time: e.target.checked ? null : row.close_time || "21:00",
-                          });
-                          return next;
-                        });
-                      }}
-                    />
-                    Closed
-                  </label>
-                  {!row.is_closed ? (
-                    <>
-                      <Input
-                        type="time"
-                        className="h-10 w-[7.5rem]"
-                        disabled={!canManage}
-                        value={(row.open_time || "09:00").slice(0, 5)}
-                        onChange={(e) => {
-                          setHours((prev) => {
-                            const next = prev.filter((h) => h.day_of_week !== idx);
-                            next.push({ ...row, open_time: e.target.value });
-                            return next;
-                          });
-                        }}
-                      />
-                      <span className="text-ink-subtle">to</span>
-                      <Input
-                        type="time"
-                        className="h-10 w-[7.5rem]"
-                        disabled={!canManage}
-                        value={(row.close_time || "21:00").slice(0, 5)}
-                        onChange={(e) => {
-                          setHours((prev) => {
-                            const next = prev.filter((h) => h.day_of_week !== idx);
-                            next.push({ ...row, close_time: e.target.value });
-                            return next;
-                          });
-                        }}
-                      />
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      <Card sheen id="area" className="mt-4 scroll-mt-8 p-5 sm:p-6">
-        <h2 className="font-semibold text-ink">Service coverage</h2>
-        <div className="mt-4">
-          <Label>Service radius</Label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {STORE_SERVICE_RADIUS_OPTIONS.map((o) => (
-              <GlassChip
-                key={o.miles}
-                disabled={!canManage}
-                selected={radius === o.miles}
-                onClick={() => setRadius(o.miles)}
-                className="disabled:opacity-50"
-              >
-                {o.label}
-              </GlassChip>
-            ))}
-          </div>
-        </div>
-        <div className="mt-4">
-          <Label htmlFor="zips">Service ZIP codes</Label>
-          <Input
-            id="zips"
-            disabled={!canManage}
-            value={serviceZips}
-            onChange={(e) => setServiceZips(e.target.value)}
-            placeholder="22044, 22042, 22046"
-          />
-        </div>
-      </Card>
-
-      <Card sheen id="categories" className="mt-4 scroll-mt-8 p-5 sm:p-6">
-        <h2 className="font-semibold text-ink">What you sell</h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Pick your business type, then the categories you want FINDIT requests for.
-          Keywords are predefined — add a custom tag only for unusual brands.
-        </p>
-        <div className="mt-4">
-          <Label htmlFor="business-type">Business type</Label>
-          <select
-            id="business-type"
-            disabled={!canManage}
-            value={businessType}
-            onChange={(e) => {
-              const next = e.target.value;
-              setBusinessType(next);
-              setCatalogCategoryIds(defaultCategoryIdsForType(next));
-              const type = catalogTypeById(next);
-              if (type) {
-                setCategories((prev) =>
-                  prev.includes(type.productCategory)
-                    ? prev
-                    : [...prev, type.productCategory]
-                );
-              }
+        <SectionCard
+          title="Business Profile"
+          body="Name, address, phone, website"
+          open={openSection === "profile"}
+          onToggle={() => toggleSection("profile")}
+        >
+          <form
+            autoComplete="off"
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveProfile();
             }}
-            className="mt-1 h-12 w-full rounded-glass-lg border border-hairline-strong bg-white px-3 text-base text-ink"
           >
-            <option value="">Select type</option>
-            {FINDIT_CATALOG.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-ink">Accepting FINDIT requests</p>
-            <p className="mt-1 text-xs text-ink-muted">
-              Off means nearby Finds will not be sent to this store.
-            </p>
-          </div>
-          <IosSwitch
-            label="Accepting FINDIT requests"
-            checked={acceptingRequests}
-            onCheckedChange={setAcceptingRequests}
-            disabled={!canManage}
-          />
-        </div>
-        {catalogTypeById(businessType) ? (
-          <div className="mt-4">
-            <p className="text-sm font-medium text-ink">Categories</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {catalogTypeById(businessType)!.categories.map((c) => (
-                <GlassChip
-                  key={c.id}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Label htmlFor="store-name">Store name</Label>
+                <Input
+                  id="store-name"
+                  name="store-name"
+                  autoComplete="off"
+                  value={name}
                   disabled={!canManage}
-                  selected={catalogCategoryIds.includes(c.id)}
-                  onClick={() =>
-                    setCatalogCategoryIds((prev) =>
-                      prev.includes(c.id)
-                        ? prev.filter((id) => id !== c.id)
-                        : [...prev, c.id]
-                    )
-                  }
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="store-description">Description</Label>
+                <Input
+                  id="store-description"
+                  name="store-description"
+                  autoComplete="off"
+                  value={description}
+                  disabled={!canManage}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="store-phone">Phone</Label>
+                <Input
+                  id="store-phone"
+                  name="store-phone"
+                  autoComplete="off"
+                  value={phone}
+                  disabled={!canManage}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="store-website">Website</Label>
+                <Input
+                  id="store-website"
+                  name="store-website"
+                  autoComplete="off"
+                  value={website}
+                  disabled={!canManage}
+                  onChange={(e) => setWebsite(e.target.value)}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="store-street">Street</Label>
+                <Input
+                  id="store-street"
+                  name="store-street"
+                  autoComplete="off"
+                  value={street}
+                  disabled={!canManage}
+                  onChange={(e) => setStreet(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="store-city">City</Label>
+                <Input
+                  id="store-city"
+                  name="store-city"
+                  autoComplete="off"
+                  value={city}
+                  disabled={!canManage}
+                  onChange={(e) => setCity(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="store-state">State</Label>
+                <Input
+                  id="store-state"
+                  name="store-state"
+                  autoComplete="off"
+                  value={region}
+                  disabled={!canManage}
+                  onChange={(e) => setRegion(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="store-zip">ZIP</Label>
+                <Input
+                  id="store-zip"
+                  name="store-zip"
+                  autoComplete="off"
+                  value={postal}
+                  disabled={!canManage}
+                  onChange={(e) => setPostal(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-ink-muted">Verified</span>
+              {store?.is_verified ? (
+                <VerifiedStoreBadge label="Verified FINDIT store" />
+              ) : (
+                <span className="text-ink">Pending FINDIT review</span>
+              )}
+            </div>
+            {canManage ? (
+              <Button type="submit" disabled={saving}>
+                Save profile
+              </Button>
+            ) : null}
+          </form>
+        </SectionCard>
+
+        <SectionCard
+          title="Business Hours"
+          body="Open days and open–close times"
+          open={openSection === "hours"}
+          onToggle={() => toggleSection("hours")}
+        >
+          <div className="space-y-3">
+            {DAYS_OF_WEEK.map((day, idx) => {
+              const row = hours[idx] || normalizeHours([])[idx];
+              const openValue = toHm(row.open_time, "09:00");
+              const closeValue = toHm(row.close_time, "21:00");
+              return (
+                <div
+                  key={day}
+                  className="rounded-glass-md bg-glass-1 p-3 sm:p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-ink">{day}</p>
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-hairline-strong"
+                        disabled={!canManage}
+                        checked={!row.is_closed}
+                        onChange={(e) =>
+                          patchHour(idx, {
+                            is_closed: !e.target.checked,
+                            open_time: e.target.checked
+                              ? openValue
+                              : row.open_time,
+                            close_time: e.target.checked
+                              ? closeValue
+                              : row.close_time,
+                          })
+                        }
+                      />
+                      Open
+                    </label>
+                  </div>
+                  {!row.is_closed ? (
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div>
+                        <Label htmlFor={`hours-open-${idx}`}>Open</Label>
+                        <GlassSelect
+                          id={`hours-open-${idx}`}
+                          name={`hours-open-${idx}`}
+                          autoComplete="off"
+                          disabled={!canManage}
+                          value={openValue}
+                          onChange={(e) =>
+                            patchHour(idx, { open_time: e.target.value })
+                          }
+                        >
+                          {timeChoices(openValue).map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </GlassSelect>
+                      </div>
+                      <div>
+                        <Label htmlFor={`hours-close-${idx}`}>Close</Label>
+                        <GlassSelect
+                          id={`hours-close-${idx}`}
+                          name={`hours-close-${idx}`}
+                          autoComplete="off"
+                          disabled={!canManage}
+                          value={closeValue}
+                          onChange={(e) =>
+                            patchHour(idx, { close_time: e.target.value })
+                          }
+                        >
+                          {timeChoices(closeValue).map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </GlassSelect>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-ink-muted">Closed</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {canManage ? (
+            <Button
+              className="mt-4"
+              disabled={saving}
+              onClick={() => void saveCoverage()}
+            >
+              {saving ? "Saving…" : "Save hours"}
+            </Button>
+          ) : null}
+        </SectionCard>
+
+        <SectionCard
+          title="Service Area"
+          body="ZIP codes and radius you serve"
+          open={openSection === "area"}
+          onToggle={() => toggleSection("area")}
+        >
+          <div>
+            <Label>Service radius</Label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {STORE_SERVICE_RADIUS_OPTIONS.map((o) => (
+                <GlassChip
+                  key={o.miles}
+                  disabled={!canManage}
+                  selected={radius === o.miles}
+                  onClick={() => setRadius(o.miles)}
                   className="disabled:opacity-50"
                 >
-                  {c.name}
+                  {o.label}
                 </GlassChip>
               ))}
             </div>
           </div>
-        ) : null}
-        <div className="mt-4">
-          <Label htmlFor="custom-keywords">Custom keywords (optional)</Label>
-          <Input
-            id="custom-keywords"
-            disabled={!canManage}
-            value={customKeywords}
-            onChange={(e) => setCustomKeywords(e.target.value)}
-            placeholder="Rare brand, comma separated"
-          />
-        </div>
-        <div className="mt-5 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-ink">Require a government ID</p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-              Tobacco, vape, and similar products. Customers confirm they are 21+
-              before FINDIT sends the ask. You still check ID in the store.
-            </p>
+          <div className="mt-4">
+            <Label htmlFor="store-zips">Service ZIP codes</Label>
+            <Input
+              id="store-zips"
+              name="store-zips"
+              autoComplete="off"
+              disabled={!canManage}
+              value={serviceZips}
+              onChange={(e) => setServiceZips(e.target.value)}
+              placeholder="22044, 22042, 22046"
+            />
           </div>
-          <IosSwitch
-            label="Require a government ID"
-            checked={requiresCustomerId}
-            disabled={!canManage}
-            onCheckedChange={setRequiresCustomerId}
-          />
-        </div>
-      </Card>
-
-      {canManage ? (
-        <Button className="mt-4 w-full" disabled={saving} onClick={saveCoverage}>
-          {saving ? "Saving…" : "Save hours & coverage"}
-        </Button>
-      ) : null}
-
-      {(role === "owner" || role === "manager") && (
-        <Card sheen id="plan" className="mt-8 scroll-mt-8 p-5 sm:p-6">
-          <h2 className="font-semibold text-ink">Current plan</h2>
-          <div className="mt-2">
-            <GlassBadge
-              tone="stock"
-              className="text-[11px] font-bold uppercase tracking-wide"
+          {canManage ? (
+            <Button
+              className="mt-4"
+              disabled={saving}
+              onClick={() => void saveCoverage()}
             >
-              Pilot · no credit card required
-            </GlassBadge>
-          </div>
-          <p className="mt-3 text-2xl font-bold text-ink">{plan.name}</p>
-          <p className="mt-1 text-sm text-ink-muted">{plan.tagline}</p>
-          {store?.trial_ends_at ? (
-            <p className="mt-2 text-sm text-ink-muted">
-              Pilot ends {new Date(store.trial_ends_at).toLocaleDateString()}
-            </p>
+              {saving ? "Saving…" : "Save service area"}
+            </Button>
           ) : null}
-        </Card>
-      )}
+        </SectionCard>
 
-      <Card sheen id="profile" className="mt-4 scroll-mt-8 p-5 sm:p-6">
-        <h2 className="font-semibold text-ink">Business profile</h2>
-        <dl className="mt-4 space-y-2 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-ink-muted">Address</dt>
-            <dd className="text-right text-ink">
-              {store
-                ? `${store.street_address}, ${store.city}, ${store.state} ${store.postal_code}`
-                : "—"}
-            </dd>
+        <SectionCard
+          title="Request Categories"
+          body="What requests you receive"
+          open={openSection === "categories"}
+          onToggle={() => toggleSection("categories")}
+        >
+          <p className="text-sm text-ink-muted">
+            Pick your business type, then the categories you want FINDIT requests
+            for. Keywords are predefined — add a custom tag only for unusual
+            brands.
+          </p>
+          <div className="mt-4">
+            <Label htmlFor="business-type">Business type</Label>
+            <GlassSelect
+              id="business-type"
+              name="store-business-type"
+              autoComplete="off"
+              disabled={!canManage}
+              value={businessType}
+              onChange={(e) => {
+                const next = e.target.value;
+                setBusinessType(next);
+                setCatalogCategoryIds(defaultCategoryIdsForType(next));
+                const type = catalogTypeById(next);
+                if (type) {
+                  setCategories((prev) =>
+                    prev.includes(type.productCategory)
+                      ? prev
+                      : [...prev, type.productCategory]
+                  );
+                }
+              }}
+            >
+              <option value="">Select type</option>
+              {FINDIT_CATALOG.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </GlassSelect>
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-ink-muted">Phone</dt>
-            <dd className="text-ink">{store?.phone || "—"}</dd>
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink">Accepting FINDIT requests</p>
+              <p className="mt-1 text-xs text-ink-muted">
+                Off means nearby Finds will not be sent to this store.
+              </p>
+            </div>
+            <IosSwitch
+              label="Accepting FINDIT requests"
+              checked={acceptingRequests}
+              onCheckedChange={setAcceptingRequests}
+              disabled={!canManage}
+            />
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-ink-muted">Verified</dt>
-            <dd className="text-right text-ink">
-              {store?.is_verified ? (
-                <VerifiedStoreBadge label="Verified FINDIT store" />
-              ) : (
-                "Pending FINDIT review"
-              )}
-            </dd>
+          {catalogTypeById(businessType) ? (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-ink">Categories</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {catalogTypeById(businessType)!.categories.map((c) => (
+                  <GlassChip
+                    key={c.id}
+                    disabled={!canManage}
+                    selected={catalogCategoryIds.includes(c.id)}
+                    onClick={() =>
+                      setCatalogCategoryIds((prev) =>
+                        prev.includes(c.id)
+                          ? prev.filter((id) => id !== c.id)
+                          : [...prev, c.id]
+                      )
+                    }
+                    className="disabled:opacity-50"
+                  >
+                    {c.name}
+                  </GlassChip>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <div className="mt-4">
+            <Label htmlFor="custom-keywords">Custom keywords (optional)</Label>
+            <Input
+              id="custom-keywords"
+              name="store-custom-keywords"
+              autoComplete="off"
+              disabled={!canManage}
+              value={customKeywords}
+              onChange={(e) => setCustomKeywords(e.target.value)}
+              placeholder="Rare brand, comma separated"
+            />
           </div>
-        </dl>
-      </Card>
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink">Require a government ID</p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                Tobacco, vape, and similar products. Customers confirm they are 21+
+                before FINDIT sends the ask. You still check ID in the store.
+              </p>
+            </div>
+            <IosSwitch
+              label="Require a government ID"
+              checked={requiresCustomerId}
+              disabled={!canManage}
+              onCheckedChange={setRequiresCustomerId}
+            />
+          </div>
+          {canManage ? (
+            <Button
+              className="mt-4"
+              disabled={saving}
+              onClick={() => void saveCoverage()}
+            >
+              {saving ? "Saving…" : "Save categories"}
+            </Button>
+          ) : null}
+        </SectionCard>
+
+        {canManage ? (
+          <Link href="/store/team">
+            <Card interactive className="p-5">
+              <p className="font-semibold text-ink">Team</p>
+              <p className="mt-1 text-sm text-ink-muted">
+                Invite employees and managers
+              </p>
+            </Card>
+          </Link>
+        ) : null}
+
+        <Link href="/store/notifications">
+          <Card interactive className="p-5">
+            <p className="font-semibold text-ink">Notifications</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              New request and demand alerts
+            </p>
+          </Card>
+        </Link>
+
+        {role === "owner" || role === "manager" ? (
+          <SectionCard
+            title="Plan"
+            body="Pilot trial, Starter, and Pro"
+            open={openSection === "plan"}
+            onToggle={() => toggleSection("plan")}
+          >
+            <p className="text-2xl font-bold text-ink">{plan.name}</p>
+            <p className="mt-1 text-sm text-ink-muted">{plan.tagline}</p>
+            {store?.trial_ends_at ? (
+              <p className="mt-2 text-sm text-ink-muted">
+                Pilot ends {new Date(store.trial_ends_at).toLocaleDateString()}
+              </p>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        <Link href="/store/account">
+          <Card interactive className="p-5">
+            <p className="font-semibold text-ink">Account</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              Your login and role for this store
+            </p>
+          </Card>
+        </Link>
+      </div>
     </div>
   );
 }

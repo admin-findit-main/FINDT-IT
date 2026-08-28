@@ -36,9 +36,6 @@ export default async function StoreOnboardingPage() {
         <Button asChild className="mt-8" size="lg">
           <Link href="/join">Go to application</Link>
         </Button>
-        <Button asChild variant="ghost" className="mt-3">
-          <Link href="/home">Customer app</Link>
-        </Button>
       </Card>
     </div>
   );

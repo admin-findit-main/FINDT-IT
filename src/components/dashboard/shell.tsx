@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BarChart3,
   Bell,
   Building2,
+  ChevronDown,
+  ChevronRight,
   ClipboardList,
   Cpu,
   CreditCard,
@@ -31,6 +33,7 @@ import { toPublicPath, toInternalPath, matchProductSurface } from "@/lib/config/
 import {
   dashItemActive,
   dashTitle,
+  STORE_PROFILE_MENU,
   type DashItem,
 } from "@/lib/dashboard/nav";
 
@@ -61,6 +64,7 @@ export function DashboardShell({
   email,
   items,
   accountHref,
+  storeProfileHref,
   logoutHref = "/login/business",
   children,
 }: {
@@ -70,6 +74,7 @@ export function DashboardShell({
   email: string | null;
   items: DashItem[];
   accountHref: string;
+  storeProfileHref?: string;
   logoutHref?: string;
   children: React.ReactNode;
 }) {
@@ -83,10 +88,21 @@ export function DashboardShell({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [drawer, setDrawer] = useState(false);
+  const onStoreProfile = Boolean(
+    storeProfileHref && internalPath.startsWith("/store/settings")
+  );
+  const [profileMenuOpen, setProfileMenuOpen] = useState(onStoreProfile);
   const { title, subtitle } = dashTitle(internalPath);
   const isAdmin = tone === "admin";
   const publicAccountHref = toPublicPath(surface, accountHref);
   const publicLogoutHref = toPublicPath(surface, logoutHref);
+  const publicStoreProfileHref = storeProfileHref
+    ? toPublicPath(surface, storeProfileHref)
+    : "";
+
+  useEffect(() => {
+    if (onStoreProfile) setProfileMenuOpen(true);
+  }, [onStoreProfile]);
 
   async function logout() {
     await signOutAction();
@@ -182,6 +198,65 @@ export function DashboardShell({
             "mt-auto border-t border-hairline-strong p-3",
           )}
         >
+          {storeProfileHref ? (
+            collapsed ? (
+              <Link
+                href={publicStoreProfileHref}
+                title="Store profile"
+                onClick={() => setDrawer(false)}
+                className={cn(
+                  "mb-1 grid h-10 place-items-center rounded-xl hover:bg-black/[0.04]",
+                  onStoreProfile && "bg-black/[0.06]"
+                )}
+              >
+                <Store className="h-4 w-4" />
+              </Link>
+            ) : (
+              <div className="mb-1">
+                <button
+                  type="button"
+                  aria-expanded={profileMenuOpen}
+                  onClick={() => setProfileMenuOpen((open) => !open)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 rounded-xl px-2 py-2 text-left hover:bg-black/[0.04]",
+                    onStoreProfile && "bg-black/[0.06]"
+                  )}
+                >
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink">
+                    Store profile
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 text-ink-muted transition-transform",
+                      profileMenuOpen && "rotate-180"
+                    )}
+                  />
+                </button>
+                {profileMenuOpen ? (
+                  <div className="mt-0.5 space-y-0.5 pb-1">
+                    {STORE_PROFILE_MENU.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={toPublicPath(surface, item.href)}
+                        onClick={() => {
+                          setDrawer(false);
+                          if (internalPath.startsWith("/store/settings")) {
+                            requestAnimationFrame(() => {
+                              window.dispatchEvent(new Event("hashchange"));
+                            });
+                          }
+                        }}
+                        className="flex min-h-9 items-center justify-between gap-2 rounded-xl px-3 text-sm text-ink-muted hover:bg-black/[0.04] hover:text-ink"
+                      >
+                        {item.label}
+                        <ChevronRight className="h-4 w-4 shrink-0 text-ink-subtle" />
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          ) : null}
           <Link
             href={publicAccountHref}
             className={cn(

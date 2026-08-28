@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -39,8 +38,7 @@ export default function StoreAccountPage() {
       <BackLink href="/store" label="Store home" className="mb-2 md:hidden" />
       <h1 className="text-2xl font-bold tracking-tight text-ink">Account</h1>
       <p className="mt-1 text-sm text-ink-muted">
-        Your login for this store. Same FINDIT account can also ask as a
-        customer.
+        Your login for this store.
       </p>
 
       <Card sheen className="mt-6 space-y-4 p-5 sm:p-6">
@@ -65,9 +63,6 @@ export default function StoreAccountPage() {
       </Card>
 
       <Card className="mt-4 space-y-3 p-5">
-        <Button asChild variant="outline" className="w-full">
-          <Link href="/home">Ask as a customer</Link>
-        </Button>
         <Button
           variant="outline"
           className="w-full"
