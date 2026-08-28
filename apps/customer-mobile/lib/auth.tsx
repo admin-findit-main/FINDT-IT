@@ -139,7 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         if (error) return { error: error.message };
         if (data.user && (data.user.identities?.length ?? 1) === 0) {
-          return { error: "That email already has an account. Sign in instead." };
+          return {
+            error:
+              "That email already has an account. Go back to askfindit.com.",
+          };
         }
         if (data.user) {
           await supabase

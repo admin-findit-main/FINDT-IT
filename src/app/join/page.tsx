@@ -20,6 +20,7 @@ import {
   US_STATES,
 } from "@findit/domain";
 import { submitStoreApplicationAction } from "@/lib/services/actions";
+import { marketingHomeHref } from "@/lib/config/product-hosts";
 
 const STEPS = ["Account", "Legal", "Location", "Products", "Review"] as const;
 
@@ -27,6 +28,7 @@ export default function JoinAsStorePage() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
 
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -195,10 +197,40 @@ export default function JoinAsStorePage() {
     });
     setLoading(false);
     if (result.error) {
+      if ("code" in result && result.code === "existing_account") {
+        setExistingAccount(true);
+        return;
+      }
       toast.error(result.error);
       return;
     }
     setSubmitted(true);
+  }
+
+  if (existingAccount) {
+    return (
+      <div className="app-canvas min-h-screen">
+        <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
+          <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
+            <BrandHomeLink href="/" />
+          </div>
+        </header>
+        <main className="mx-auto max-w-xl px-6 py-16">
+          <Card level="strong" sheen className="p-8 text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-ink">
+              That email already has an account
+            </h1>
+            <p className="mt-4 leading-relaxed text-ink-muted">
+              FINDIT does not create a second login for the same email. Go back
+              to askfindit.com.
+            </p>
+            <Button asChild className="mt-8" size="lg">
+              <Link href={marketingHomeHref()}>Go back to askfindit.com</Link>
+            </Button>
+          </Card>
+        </main>
+      </div>
+    );
   }
 
   if (submitted) {
@@ -227,7 +259,7 @@ export default function JoinAsStorePage() {
               <Link href="/login/business">Store login</Link>
             </Button>
             <Button asChild variant="ghost" className="mt-3" size="lg">
-              <Link href="/">Back to FINDIT</Link>
+              <Link href={marketingHomeHref()}>Go back to askfindit.com</Link>
             </Button>
           </Card>
         </main>

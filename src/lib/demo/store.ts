@@ -510,7 +510,9 @@ export function demoSignup(input: {
       (p) => p.email && p.email.toLowerCase() === input.email.toLowerCase()
     )
   ) {
-    throw new Error("An account with this email already exists.");
+    throw new Error(
+      "That email already has an account. Go back to askfindit.com."
+    );
   }
   const profile: Profile = {
     id: randomUUID(),

@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/primitives";
 import { CustomerEmailLoginForm } from "@/components/auth/customer-email-form";
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
 import { GlassNotice } from "@/components/ui/glass";
+import { marketingHomeHref } from "@/lib/config/product-hosts";
 
 function LoginForm() {
   const params = useSearchParams();
@@ -43,18 +44,8 @@ function LoginForm() {
       </p>
       <div className="mt-6 border-t border-hairline-strong pt-5">
         <p className="text-center text-sm text-ink-muted">
-          No account?{" "}
-          <Link
-            href="/signup"
-            className="font-semibold text-ink underline-offset-2 hover:underline"
-          >
-            Create one
-          </Link>
-        </p>
-        <p className="mt-3 text-center text-sm text-ink-muted">
-          Store or staff?{" "}
-          <Link href="/login/business" className="font-semibold text-ink">
-            Business login
+          <Link href={marketingHomeHref()} className="font-semibold text-ink underline-offset-2 hover:underline">
+            Go back to askfindit.com
           </Link>
         </p>
       </div>

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
 import { loginEmailPassword } from "@/lib/auth/client-login";
 import { PlaceFields } from "@/components/customer/place-fields";
 import { signUpAction } from "@/lib/services/actions";
+import { marketingHomeHref } from "@/lib/config/product-hosts";
 import type { ShortPlace } from "@findit/domain";
 import type { AppHomePath } from "@/lib/auth/home-path";
 
@@ -67,10 +69,13 @@ export function CustomerEmailLoginForm({
 
 export function CustomerEmailSignupForm({
   onFinished,
+  onExistingAccount,
 }: {
   onFinished: (result: Finished) => void;
+  onExistingAccount?: () => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
   const [place, setPlace] = useState<ShortPlace>({
     city: "",
     state: "VA",
@@ -92,6 +97,14 @@ export function CustomerEmailSignupForm({
         postalCode: place.postalCode,
       });
       if ("error" in result && result.error) {
+        if ("code" in result && result.code === "existing_account") {
+          if (onExistingAccount) {
+            onExistingAccount();
+          } else {
+            setExistingAccount(true);
+          }
+          return;
+        }
         toast.error(result.error);
         return;
       }
@@ -109,6 +122,21 @@ export function CustomerEmailSignupForm({
     } finally {
       setLoading(false);
     }
+  }
+
+  if (existingAccount) {
+    return (
+      <div className="mt-6 text-center">
+        <p className="font-semibold text-ink">That email already has an account</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+          FINDIT does not create a second login for the same email. Go back to
+          askfindit.com.
+        </p>
+        <Button asChild className="mt-6" size="lg">
+          <Link href={marketingHomeHref()}>Go back to askfindit.com</Link>
+        </Button>
+      </div>
+    );
   }
 
   return (

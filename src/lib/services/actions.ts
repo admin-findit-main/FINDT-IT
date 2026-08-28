@@ -538,24 +538,8 @@ function alreadyHasAccount(message: string): boolean {
   );
 }
 
-async function recoverExistingSignup(
-  admin: ReturnType<typeof import("@/lib/supabase/admin").createServiceClient>,
-  email: string,
-  password: string
-) {
-  const existing = await signInCreatedUser(email, password);
-  if (!("error" in existing) || !existing.error) return existing;
-
-  const { data } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
-  const match = data?.users.find((user) => user.email?.toLowerCase() === email);
-  if (!match || match.email_confirmed_at) return null;
-
-  await admin.auth.admin.updateUserById(match.id, {
-    password,
-    email_confirm: true,
-  });
-  return signInCreatedUser(email, password);
-}
+const EXISTING_ACCOUNT_HOME =
+  "That email already has an account. Go back to askfindit.com.";
 
 async function signInCreatedUser(email: string, password: string) {
   const { createClient } = await import("@/lib/supabase/server");
@@ -609,7 +593,11 @@ export async function signUpAction(input: {
       await setDemoSessionCookie(result.sessionId);
       return { ok: true as const, homePath: "/home" as const };
     } catch (e) {
-      return { error: e instanceof Error ? e.message : "Sign up failed" };
+      const message = e instanceof Error ? e.message : "Sign up failed";
+      if (message.toLowerCase().includes("already has an account")) {
+        return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
+      }
+      return { error: message };
     }
   }
   try {
@@ -631,9 +619,7 @@ export async function signUpAction(input: {
     });
     if (error) {
       if (alreadyHasAccount(error.message)) {
-        const recovered = await recoverExistingSignup(admin, email, input.password);
-        if (recovered && !("error" in recovered && recovered.error)) return recovered;
-        return { error: "That email already has an account. Sign in instead." };
+        return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
       }
       return { error: authEmailErrorMessage(error.message) };
     }
@@ -2160,48 +2146,40 @@ export async function submitStoreApplicationAction(raw: unknown) {
       .eq("email", ownerEmail)
       .maybeSingle();
     if (existing?.id) {
-      const { error: updateError } = await admin.auth.admin.updateUserById(existing.id, {
-        password: parsed.data.password,
-        email_confirm: true,
-        user_metadata: {
-          first_name: firstName,
-          last_name: lastName,
-          account_type: "business",
-          default_city: parsed.data.city,
-          default_state: parsed.data.state,
-          default_postal_code: parsed.data.postalCode,
-        },
-      });
-      if (updateError) return { error: updateError.message };
-      await admin
-        .from("profiles")
-        .update({
-          account_type: "business",
-          default_city: parsed.data.city,
-          default_state: parsed.data.state,
-          default_postal_code: parsed.data.postalCode,
-        })
-        .eq("id", existing.id);
-      applicantUserId = existing.id;
-    } else {
-      const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email: ownerEmail,
-        password: parsed.data.password,
-        email_confirm: true,
-        user_metadata: {
-          first_name: firstName,
-          last_name: lastName,
-          account_type: "business",
-          default_city: parsed.data.city,
-          default_state: parsed.data.state,
-          default_postal_code: parsed.data.postalCode,
-        },
-      });
-      if (createError || !created.user) {
-        return { error: createError?.message || "Could not create the store login." };
-      }
-      applicantUserId = created.user.id;
+      return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
     }
+    const { data: existingApp } = await admin
+      .from("store_applications")
+      .select("id")
+      .eq("owner_email", ownerEmail)
+      .in("status", ["pending", "needs_info", "approved"])
+      .limit(1)
+      .maybeSingle();
+    if (existingApp?.id) {
+      return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
+    }
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: ownerEmail,
+      password: parsed.data.password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        account_type: "business",
+        default_city: parsed.data.city,
+        default_state: parsed.data.state,
+        default_postal_code: parsed.data.postalCode,
+      },
+    });
+    if (createError || !created.user) {
+      if (createError && alreadyHasAccount(createError.message)) {
+        return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
+      }
+      return { error: createError?.message || "Could not create the store login." };
+    }
+    applicantUserId = created.user.id;
+  } else {
+    return { error: EXISTING_ACCOUNT_HOME, code: "existing_account" as const };
   }
   const { data, error } = await admin
     .from("store_applications")

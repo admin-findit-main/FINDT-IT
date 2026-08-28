@@ -192,6 +192,13 @@ export function productUrl(
   return `${productOrigin(surface)}${pretty}`;
 }
 
+/** Marketing homepage. Relative on localhost so local testing stays in-app. */
+export function marketingHomeHref(hostHeader?: string): string {
+  const host = hostHeader || (typeof window !== "undefined" ? window.location.host : "");
+  if (!host || isLocalHostname(host)) return "/";
+  return "https://www.askfindit.com";
+}
+
 /** Absolute post-login location. Relative on localhost. */
 export function postAuthLocation(
   internalPath: string,

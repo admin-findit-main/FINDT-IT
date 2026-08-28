@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
 import { loginEmailPassword } from "@/lib/auth/client-login";
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { marketingHomeHref } from "@/lib/config/product-hosts";
 
 function BusinessLoginForm() {
   const params = useSearchParams();
@@ -75,19 +76,9 @@ function BusinessLoginForm() {
         </Link>
       </p>
       <div className="mt-6 border-t border-hairline-strong pt-5 text-center text-sm text-ink-muted">
-        <p>
-          Looking for something nearby?{" "}
-          <Link href="/login" className="font-semibold text-ink">
-            Customer login
-          </Link>
-        </p>
-        <p className="mt-3 text-xs leading-relaxed">
-          Own a business?{" "}
-          <Link href="/join" className="font-semibold text-ink">
-            Apply as a store
-          </Link>
-          . Staff: use the invite link from your owner.
-        </p>
+        <Link href={marketingHomeHref()} className="font-semibold text-ink">
+          Go back to askfindit.com
+        </Link>
       </div>
     </Card>
   );

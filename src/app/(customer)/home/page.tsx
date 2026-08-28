@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Camera, ChevronLeft, MapPin } from "lucide-react";
@@ -13,6 +14,7 @@ import { useCustomerProfile } from "@/components/customer/session";
 import { PlaceFields } from "@/components/customer/place-fields";
 import { LocateMeButton } from "@/components/customer/locate-me-button";
 import { geolocateUsPlace } from "@/lib/customer/geolocate";
+import { marketingHomeHref } from "@/lib/config/product-hosts";
 import {
   AGE_RESTRICTED_FIND_HINT,
   AGE_RESTRICTED_ID_BODY,
@@ -651,12 +653,8 @@ export default function CustomerHomePage() {
                   >
                     View existing request
                   </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => submitRequest(true)}
-                    disabled={loading || Boolean(upgrade)}
-                  >
-                    Create another anyway
+                  <Button size="sm" asChild>
+                    <Link href={marketingHomeHref()}>Go back to askfindit.com</Link>
                   </Button>
                 </div>
               </GlassNotice>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   hostnameOf,
   isLocalHostname,
+  marketingHomeHref,
   matchProductSurface,
   postAuthLocation,
   productUrl,
@@ -86,5 +87,12 @@ describe("post-auth locations", () => {
   it("does not treat local hostnames as dedicated", () => {
     expect(isLocalHostname("localhost")).toBe(true);
     expect(isLocalHostname("www.askfindit.com")).toBe(false);
+  });
+
+  it("sends people home to askfindit.com off localhost", () => {
+    expect(marketingHomeHref("localhost:3002")).toBe("/");
+    expect(marketingHomeHref("www.askfindit.com")).toBe(
+      "https://www.askfindit.com"
+    );
   });
 });

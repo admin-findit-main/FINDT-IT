@@ -9,11 +9,13 @@ import { Input, Label, Card } from "@/components/ui/primitives";
 import { destinationAfterAuth, isSafeNextPath } from "@/lib/auth/home-path";
 import { CustomerEmailSignupForm } from "@/components/auth/customer-email-form";
 import { signUpAction } from "@/lib/services/actions";
+import { marketingHomeHref } from "@/lib/config/product-hosts";
 
 function SignupForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
 
   useEffect(() => {
     if (params.get("type") === "business") {
@@ -40,6 +42,10 @@ function SignupForm() {
     });
     setLoading(false);
     if ("error" in result && result.error) {
+      if ("code" in result && result.code === "existing_account") {
+        setExistingAccount(true);
+        return;
+      }
       toast.error(result.error);
       return;
     }
@@ -55,6 +61,23 @@ function SignupForm() {
       })
     );
     router.refresh();
+  }
+
+  if (existingAccount) {
+    return (
+      <Card className="p-6 sm:p-8 text-center">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">
+          That email already has an account
+        </h1>
+        <p className="mt-4 text-sm leading-relaxed text-ink-muted">
+          FINDIT does not create a second login for the same email. Go back to
+          askfindit.com.
+        </p>
+        <Button asChild className="mt-8" size="lg">
+          <Link href={marketingHomeHref()}>Go back to askfindit.com</Link>
+        </Button>
+      </Card>
+    );
   }
 
   if (isStaffInvite) {
@@ -110,6 +133,7 @@ function SignupForm() {
           router.push(destinationAfterAuth({ homePath, next, needsName }));
           router.refresh();
         }}
+        onExistingAccount={() => setExistingAccount(true)}
       />
       <div className="mt-6 border-t border-hairline-strong pt-5">
         <p className="text-center text-sm text-ink-muted">
@@ -126,9 +150,8 @@ function SignupForm() {
           </Link>
         </p>
         <p className="mt-3 text-center text-sm text-ink-muted">
-          Own a store?{" "}
-          <Link href="/join" className="font-semibold text-ink">
-            Apply as a store
+          <Link href={marketingHomeHref()} className="font-semibold text-ink">
+            Go back to askfindit.com
           </Link>
         </p>
       </div>
