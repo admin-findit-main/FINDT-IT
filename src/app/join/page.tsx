@@ -15,6 +15,7 @@ import { BrandHomeLink } from "@/components/brand/logo";
 import { JOIN_REQUEST_CATEGORIES } from "@/lib/services/category-routing";
 import {
   formatEin,
+  normalizeEin,
   storeSelectionSuggestsCustomerId,
   US_STATES,
 } from "@findit/domain";
@@ -111,8 +112,8 @@ export default function JoinAsStorePage() {
         toast.error("Enter the legal business name on your EIN");
         return false;
       }
-      if (ein.replace(/\D/g, "").length !== 9) {
-        toast.error("Enter a 9-digit EIN");
+      if (!normalizeEin(ein) || normalizeEin(ein).length !== 9) {
+        toast.error("Enter the 9-digit EIN");
         return false;
       }
       if (businessName.trim().length < 2) {
@@ -177,7 +178,7 @@ export default function JoinAsStorePage() {
       password,
       confirmPassword,
       legalName,
-      ein,
+      ein: normalizeEin(ein),
       entityType,
       businessName,
       businessType,
@@ -364,13 +365,19 @@ export default function JoinAsStorePage() {
                     <Label htmlFor="ein">EIN</Label>
                     <Input
                       id="ein"
+                      name="ein"
+                      type="text"
                       inputMode="numeric"
                       autoComplete="off"
-                      value={formatEin(ein)}
-                      onChange={(e) => setEin(e.target.value)}
-                      placeholder="XX-XXXXXXX"
-                      required
+                      value={ein}
+                      onChange={(e) => setEin(normalizeEin(e.target.value))}
+                      placeholder="123456789"
                     />
+                    <p className="mt-1 text-xs text-ink-muted">
+                      {ein
+                        ? `Reading ${formatEin(ein)}${ein.length === 9 ? " · 9 digits" : ` · ${ein.length} of 9 digits`}`
+                        : "9 digits. Paste with or without the dash — FINDIT will read it."}
+                    </p>
                   </div>
                   <div>
                     <Label htmlFor="entityType">Entity type</Label>
