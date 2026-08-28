@@ -15,7 +15,7 @@ import {
   PLUS_MONTHLY_REQUEST_LIMIT,
   MAX_CUSTOMER_RADIUS_MILES,
 } from "../_shared/domain.ts";
-import { sendExpoPush } from "../_shared/push.ts";
+import { sendExpoPush, deliverStorePush } from "../_shared/push.ts";
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
@@ -432,6 +432,7 @@ Deno.serve(async (req) => {
           data: {
             type: "new_request",
             requestId: request.id,
+            url: `/store/requests/${request.id}`,
           },
         });
       }
@@ -479,20 +480,34 @@ async function fanoutEmployeePush(
     ...new Set(members.map((m) => m.user_id).filter(Boolean) as string[]),
   ];
   if (!userIds.length) return;
+  const delivered = await deliverStorePush({
+    userIds,
+    title: payload.title,
+    body: payload.body,
+    data: payload.data,
+  });
+  if (delivered) return;
+
   const { data: tokens } = await admin
     .from("device_push_tokens")
     .select("token, platform, user_id")
     .in("user_id", userIds)
-    .eq("app_surface", "employee");
+    .in("app_surface", ["employee", "web"]);
   if (!tokens?.length) return;
 
   await sendExpoPush(
-    tokens.map((t) => ({
-      to: t.token,
-      sound: "default",
-      title: payload.title,
-      body: payload.body,
-      data: payload.data,
-    }))
+    tokens
+      .filter(
+        (t) =>
+          t.token.startsWith("ExponentPushToken[") ||
+          t.token.startsWith("ExpoPushToken[")
+      )
+      .map((t) => ({
+        to: t.token,
+        sound: "default",
+        title: payload.title,
+        body: payload.body,
+        data: payload.data,
+      }))
   );
 }

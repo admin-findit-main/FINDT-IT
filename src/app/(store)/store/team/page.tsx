@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, Input, Label } from "@/components/ui/primitives";
 import { GlassBadge, GlassChip } from "@/components/ui/glass";
-import { BackLink } from "@/components/shared/app-header";
 import {
   getUserStoresAction,
   inviteEmployeeAction,
@@ -38,6 +37,7 @@ export default function TeamPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"manager" | "employee">("employee");
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function refresh(storeId: string) {
     const [rows, pending] = await Promise.all([
@@ -49,47 +49,52 @@ export default function TeamPage() {
   }
 
   useEffect(() => {
-    getUserStoresAction().then(async (stores) => {
-      const s = stores[0] || null;
-      setStore(s);
-      if (s) await refresh(s.id);
-    });
+    getUserStoresAction()
+      .then(async (stores) => {
+        const s = stores[0] || null;
+        setStore(s);
+        if (s) await refresh(s.id);
+      })
+      .finally(() => setLoading(false));
   }, []);
+
+  if (loading) {
+    return <p className="text-sm text-ink-muted">Loading team…</p>;
+  }
 
   if (store && store.role === "employee") {
     return (
-      <div className="px-5 pt-6 md:px-8 md:pt-8">
-        <BackLink href="/store" label="Store home" className="mb-4" />
-        <EmptyState
-          title="Team is for owners and managers"
-          description="Answer incoming requests from the Requests tab."
-        />
-      </div>
+      <EmptyState
+        title="Team is for owners and managers"
+        description="Answer incoming requests from Requests."
+      />
     );
   }
 
   return (
-    <div className="px-5 pt-6 md:px-8 md:pt-8">
-      <BackLink href="/store" label="Store home" className="mb-2" />
-      <h1 className="text-2xl font-bold tracking-tight text-ink">Team</h1>
-      <p className="mt-1 text-sm text-ink-muted">
+    <div>
+      <p className="text-sm text-ink-muted">
         Invite staff by name and email. They open the invite link, create an account
-        with that email, and join this store automatically — they never pick a store.
+        with that email, and join this store automatically.
       </p>
 
       <Card sheen className="mt-6 space-y-4 p-5 sm:p-6">
         <div>
-          <Label>Name</Label>
+          <Label htmlFor="team-name">Name</Label>
           <Input
+            id="team-name"
+            autoComplete="off"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Alex Rivera"
           />
         </div>
         <div>
-          <Label>Email</Label>
+          <Label htmlFor="team-email">Email</Label>
           <Input
+            id="team-email"
             type="email"
+            autoComplete="off"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="teammate@store.com"

@@ -16,5 +16,5 @@ export function authEmailErrorMessage(error: string | null | undefined): string 
   ) {
     return "Email delivery timed out. Try signing in with your password, or create the account again in a minute.";
   }
-  return error?.trim() || "Could not send email. Try again in a moment.";
+  return "Could not send email. Try again in a moment.";
 }

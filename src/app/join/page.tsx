@@ -16,11 +16,13 @@ import { JOIN_REQUEST_CATEGORIES } from "@/lib/services/category-routing";
 import {
   formatEin,
   normalizeEin,
+  passwordRejectReason,
   storeSelectionSuggestsCustomerId,
   US_STATES,
 } from "@findit/domain";
 import { submitStoreApplicationAction } from "@/lib/services/actions";
 import { marketingHomeHref } from "@/lib/config/product-hosts";
+import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 
 const STEPS = ["Account", "Legal", "Location", "Products", "Review"] as const;
 
@@ -102,6 +104,11 @@ export default function JoinAsStorePage() {
       }
       if (password.length < 8) {
         toast.error("Password must be at least 8 characters");
+        return false;
+      }
+      const weak = passwordRejectReason(password, ownerEmail);
+      if (weak) {
+        toast.error(weak);
         return false;
       }
       if (password !== confirmPassword) {
@@ -358,6 +365,7 @@ export default function JoinAsStorePage() {
                       required
                       autoComplete="new-password"
                     />
+                    <PasswordStrengthMeter password={password} email={ownerEmail} />
                   </div>
                   <div>
                     <Label htmlFor="confirmPassword">Confirm password</Label>

@@ -9,6 +9,8 @@ import { loginEmailPassword } from "@/lib/auth/client-login";
 import { PlaceFields } from "@/components/customer/place-fields";
 import { signUpAction } from "@/lib/services/actions";
 import { marketingHomeHref } from "@/lib/config/product-hosts";
+import { PasswordStrengthMeter } from "@/components/auth/password-strength";
+import { passwordStrength } from "@findit/domain";
 import type { ShortPlace } from "@findit/domain";
 import type { AppHomePath } from "@/lib/auth/home-path";
 
@@ -76,6 +78,8 @@ export function CustomerEmailSignupForm({
 }) {
   const [loading, setLoading] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
+  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
   const [place, setPlace] = useState<ShortPlace>({
     city: "",
     state: "VA",
@@ -147,7 +151,15 @@ export function CustomerEmailSignupForm({
       </div>
       <div>
         <Label htmlFor="email">Email</Label>
-        <Input id="email" name="email" type="email" required autoComplete="email" />
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
       </div>
       <div>
         <Label htmlFor="password">Password</Label>
@@ -158,13 +170,21 @@ export function CustomerEmailSignupForm({
           minLength={8}
           required
           autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
         />
+        <PasswordStrengthMeter password={password} email={email} />
       </div>
       <div>
         <Label>Place</Label>
         <PlaceFields value={place} onChange={setPlace} idPrefix="signup" />
       </div>
-      <Button type="submit" className="w-full" size="lg" disabled={loading}>
+      <Button
+        type="submit"
+        className="w-full"
+        size="lg"
+        disabled={loading || !passwordStrength(password, email).ok}
+      >
         {loading ? "Creating…" : "Create account"}
       </Button>
     </form>

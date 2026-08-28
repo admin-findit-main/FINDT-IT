@@ -163,7 +163,13 @@ export async function updateSession(request: NextRequest) {
     const result = await supabase.auth.getUser();
     user = result.data.user;
   } catch (err) {
-    console.error("[FINDIT] session refresh failed", err);
+    console.error("[FINDIT] session refresh failed", {
+      path,
+      ip:
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        request.headers.get("x-real-ip") ||
+        "unknown",
+    });
   }
 
   let actor: StoreActor = "anonymous";

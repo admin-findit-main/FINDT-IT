@@ -63,6 +63,28 @@ describe("decideHostRouting", () => {
     }
   });
 
+  it("pretty-redirects team and notifications on the store host", () => {
+    const team = decideHostRouting(req("store.askfindit.com", "/store/team"), "manager");
+    expect(team.kind).toBe("redirect");
+    if (team.kind === "redirect") {
+      expect(team.url.pathname).toBe("/team");
+    }
+    const notes = decideHostRouting(
+      req("store.askfindit.com", "/store/notifications"),
+      "manager"
+    );
+    expect(notes.kind).toBe("redirect");
+    if (notes.kind === "redirect") {
+      expect(notes.url.pathname).toBe("/notifications");
+    }
+    const prettyTeam = decideHostRouting(req("store.askfindit.com", "/team"), "manager");
+    expect(prettyTeam.kind).toBe("continue");
+    if (prettyTeam.kind === "continue") {
+      expect(prettyTeam.internalPath).toBe("/store/team");
+      expect(prettyTeam.rewrite).toBe(true);
+    }
+  });
+
   it("sends employees from / to /hub", () => {
     const decision = decideHostRouting(req("store.askfindit.com", "/"), "employee");
     expect(decision.kind).toBe("redirect");

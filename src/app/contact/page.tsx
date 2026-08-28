@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LegalShell } from "@/components/shared/legal-shell";
-import { SUPPORT_EMAIL } from "@/lib/auth/admin";
+import { MailLink, PhoneLink } from "@/components/shared/site-footer";
+import { PUBLIC_SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/config/support";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -11,15 +12,22 @@ export default function ContactPage() {
   return (
     <LegalShell title="Contact FINDIT" lastUpdated={null}>
       <p>
-        Shoppers, stores, and the FINDIT operator can reach support at{" "}
-        <a className="font-semibold text-ink underline" href={`mailto:${SUPPORT_EMAIL}`}>
-          {SUPPORT_EMAIL}
-        </a>
+        Shoppers, stores, and the FINDIT operator can reach support by email at{" "}
+        <MailLink email={PUBLIC_SUPPORT_EMAIL} />
+        {SUPPORT_PHONE ? (
+          <>
+            {" "}
+            or by phone at <PhoneLink phone={SUPPORT_PHONE} />
+          </>
+        ) : null}
         .
       </p>
       <p>
-        Store applications are submitted at <a className="font-semibold text-ink underline" href="/join">/join</a>.
-        Account login for shoppers is on dashboard.askfindit.com; store login is on
+        Store applications are submitted at{" "}
+        <a className="font-semibold text-ink underline" href="/join">
+          askfindit.com/join
+        </a>
+        . Shopper login is on dashboard.askfindit.com. Store login is on
         store.askfindit.com.
       </p>
     </LegalShell>

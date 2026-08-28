@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
@@ -12,15 +12,16 @@ import {
   GlassSelect,
   VerifiedStoreBadge,
 } from "@/components/ui/glass";
+import { usePublicHref } from "@/components/host/host-surface";
 import {
   DAYS_OF_WEEK,
   PILOT_STORE_BANNER,
   STORE_PLANS,
   STORE_SERVICE_RADIUS_OPTIONS,
 } from "@/lib/config/constants";
+import { LoadMark } from "@/components/shared/load-progress";
 import {
-  getStoreSettingsAction,
-  getUserStoresAction,
+  getMyStoreSettingsAction,
   updateStoreCoverageAction,
   updateStoreProfileAction,
 } from "@/lib/services/actions";
@@ -130,6 +131,29 @@ function SectionCard({
   );
 }
 
+function MenuLink({
+  href,
+  title,
+  body,
+}: {
+  href: string;
+  title: string;
+  body: string;
+}) {
+  const publicHref = usePublicHref(href);
+  return (
+    <Link href={publicHref}>
+      <Card interactive className="flex items-center justify-between gap-4 p-5">
+        <span>
+          <span className="block font-semibold text-ink">{title}</span>
+          <span className="mt-1 block text-sm text-ink-muted">{body}</span>
+        </span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-ink-muted" />
+      </Card>
+    </Link>
+  );
+}
+
 export default function StoreSettingsPage() {
   const [store, setStore] = useState<(Store & { role: string }) | null>(null);
   const [role, setRole] = useState<string>("employee");
@@ -151,6 +175,8 @@ export default function StoreSettingsPage() {
   const [postal, setPostal] = useState("");
   const [pilotBanner, setPilotBanner] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadPercent, setLoadPercent] = useState(8);
+  const [ready, setReady] = useState(false);
   const [requiresCustomerId, setRequiresCustomerId] = useState(false);
   const [openSection, setOpenSection] = useState<OpenSection>(null);
 
@@ -175,13 +201,17 @@ export default function StoreSettingsPage() {
   }, []);
 
   useEffect(() => {
-    getUserStoresAction()
-      .then(async (s) => {
-        const first = s[0] || null;
-        setStore(first);
-        if (!first) return;
-        const settings = await getStoreSettingsAction(first.id);
-        if (!settings) return;
+    let cancelled = false;
+    setLoadPercent(18);
+    getMyStoreSettingsAction()
+      .then((settings) => {
+        if (cancelled) return;
+        setLoadPercent(82);
+        if (!settings) {
+          setReady(true);
+          setLoadPercent(100);
+          return;
+        }
         setRole(settings.role);
         setHours(normalizeHours(settings.hours));
         setCategories(settings.categories);
@@ -202,10 +232,19 @@ export default function StoreSettingsPage() {
         setPostal(settings.store.postal_code || "");
         setRequiresCustomerId(Boolean(settings.store.age_restricted));
         setStore({ ...settings.store, role: settings.role });
+        setLoadPercent(100);
+        setReady(true);
       })
       .catch((err) => {
         console.error("[FINDIT] store settings load failed", err);
+        if (!cancelled) {
+          setReady(true);
+          setLoadPercent(100);
+        }
       });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function toggleSection(id: Exclude<OpenSection, null>) {
@@ -282,6 +321,10 @@ export default function StoreSettingsPage() {
   const plan =
     STORE_PLANS[(store?.subscription_plan as keyof typeof STORE_PLANS) || "free"];
 
+  if (!ready) {
+    return <LoadMark percent={loadPercent} label="Loading store profile" />;
+  }
+
   return (
     <div>
       <p className="text-sm text-ink-muted">{store?.name}</p>
@@ -340,6 +383,7 @@ export default function StoreSettingsPage() {
                 <Input
                   id="store-phone"
                   name="store-phone"
+                  type="tel"
                   autoComplete="off"
                   value={phone}
                   disabled={!canManage}
@@ -679,50 +723,32 @@ export default function StoreSettingsPage() {
         </SectionCard>
 
         {canManage ? (
-          <Link href="/store/team">
-            <Card interactive className="p-5">
-              <p className="font-semibold text-ink">Team</p>
-              <p className="mt-1 text-sm text-ink-muted">
-                Invite employees and managers
-              </p>
-            </Card>
-          </Link>
+          <MenuLink
+            href="/store/team"
+            title="Team"
+            body="Invite employees and managers"
+          />
         ) : null}
 
-        <Link href="/store/notifications">
-          <Card interactive className="p-5">
-            <p className="font-semibold text-ink">Notifications</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              New request and demand alerts
-            </p>
-          </Card>
-        </Link>
+        <MenuLink
+          href="/store/notifications"
+          title="Notifications"
+          body="Allow alerts and see new asks"
+        />
 
         {role === "owner" || role === "manager" ? (
-          <SectionCard
+          <MenuLink
+            href="/store/subscription"
             title="Plan"
-            body="Pilot trial, Starter, and Pro"
-            open={openSection === "plan"}
-            onToggle={() => toggleSection("plan")}
-          >
-            <p className="text-2xl font-bold text-ink">{plan.name}</p>
-            <p className="mt-1 text-sm text-ink-muted">{plan.tagline}</p>
-            {store?.trial_ends_at ? (
-              <p className="mt-2 text-sm text-ink-muted">
-                Pilot ends {new Date(store.trial_ends_at).toLocaleDateString()}
-              </p>
-            ) : null}
-          </SectionCard>
+            body={`${plan.name} — ${plan.tagline}`}
+          />
         ) : null}
 
-        <Link href="/store/account">
-          <Card interactive className="p-5">
-            <p className="font-semibold text-ink">Account</p>
-            <p className="mt-1 text-sm text-ink-muted">
-              Your login and role for this store
-            </p>
-          </Card>
-        </Link>
+        <MenuLink
+          href="/store/account"
+          title="Account"
+          body="Your login and role for this store"
+        />
       </div>
     </div>
   );

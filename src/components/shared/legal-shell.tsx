@@ -1,7 +1,8 @@
 import { BrandHomeLink } from "@/components/brand/logo";
+import { SiteFooter } from "@/components/shared/site-footer";
 import { GlassCard } from "@/components/ui/glass";
 
-const LEGAL_EFFECTIVE = "August 21, 2026";
+const LEGAL_EFFECTIVE = "August 28, 2026";
 
 export function LegalShell({
   title,
@@ -13,13 +14,13 @@ export function LegalShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="app-canvas min-h-screen">
+    <div className="app-canvas flex min-h-dvh flex-col overflow-x-clip">
       <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
         <div className="mx-auto max-w-2xl px-6 py-4">
-          <BrandHomeLink href="/" />
+          <BrandHomeLink />
         </div>
       </header>
-      <div className="mx-auto max-w-2xl px-6 py-10">
+      <div className="mx-auto w-full max-w-2xl flex-1 px-5 py-10 sm:px-6">
         <GlassCard sheen className="rounded-glass-2xl p-6 sm:p-9">
           <h1 className="text-3xl font-bold tracking-tight text-ink">{title}</h1>
           {lastUpdated ? (
@@ -30,6 +31,7 @@ export function LegalShell({
           </div>
         </GlassCard>
       </div>
+      <SiteFooter />
     </div>
   );
 }

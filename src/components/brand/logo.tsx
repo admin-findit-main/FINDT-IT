@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { matchProductSurface } from "@/lib/config/product-hosts";
+import { matchProductSurface, resolveBrandHomeHref } from "@/lib/config/product-hosts";
 import { useHostSurface } from "@/components/host/host-surface";
 
 const ASSETS = {
@@ -85,7 +85,7 @@ export function BrandLockup({
 }
 
 export function BrandHomeLink({
-  href = "/",
+  href,
   kind = "findit",
   tone = "light",
   className,
@@ -95,8 +95,21 @@ export function BrandHomeLink({
   tone?: BrandTone;
   className?: string;
 }) {
+  const pathname = usePathname() || "/";
+  const contextSurface = useHostSurface();
+  const surface =
+    typeof window !== "undefined"
+      ? matchProductSurface(window.location.host)
+      : contextSurface;
+  const destination =
+    href ??
+    resolveBrandHomeHref({
+      surface,
+      pathname,
+      hostHeader: typeof window !== "undefined" ? window.location.host : undefined,
+    });
   return (
-    <Link href={href} className={cn("inline-flex items-center", className)}>
+    <Link href={destination} className={cn("inline-flex items-center", className)}>
       {kind === "findit" ? (
         <BrandLockup tone={tone} />
       ) : kind === "plus" ? (
@@ -121,7 +134,6 @@ export function AuthBrandLink({ className }: { className?: string }) {
     (surface === "store" && pathname.startsWith("/login"));
   return (
     <BrandHomeLink
-      href={business ? (surface === "store" ? "/login" : "/login/business") : "/"}
       kind={business ? "business" : "findit"}
       className={className}
     />

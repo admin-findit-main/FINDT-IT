@@ -150,6 +150,8 @@
 
 html {
   -webkit-tap-highlight-color: transparent;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 body {
@@ -160,6 +162,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 /* Apple-style optical tracking: tighter as type gets larger. */

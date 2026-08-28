@@ -6,6 +6,7 @@ import { AuthLinkCatcher } from "@/components/auth/auth-link-catcher";
 import { HostSurfaceProvider } from "@/components/host/host-surface";
 import { matchProductSurface } from "@/lib/config/product-hosts";
 import { RegisterSW } from "@/components/shared/register-sw";
+import { LoadProgressHost } from "@/components/shared/load-progress";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,9 +31,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },
       { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/brand/findit-icon.png", sizes: "1024x1024", type: "image/png" },
     ],
     apple: [
       { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
@@ -66,12 +67,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full overflow-x-clip antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-canvas text-ink">
+      <body className="flex min-h-full flex-col overflow-x-clip bg-canvas text-ink">
         <HostSurfaceProvider surface={surface}>{children}</HostSurfaceProvider>
         <AuthLinkCatcher />
         <RegisterSW />
+        <LoadProgressHost />
         <Toaster
           position="top-center"
           closeButton
@@ -82,8 +84,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               description: "!text-ink-muted",
               actionButton: "!bg-accent !text-ink-inverse",
               cancelButton: "!bg-glass-2 !text-ink-muted",
-              error: "!text-accent-ink",
-              success: "!text-stock-ink",
+              error:
+                "!border-[var(--accent)] !bg-[var(--fd-red-50)] !text-[var(--fd-red-700)]",
+              success:
+                "!border-[var(--stock-border)] !bg-[var(--stock-tint)] !text-[var(--stock-ink)]",
             },
           }}
         />

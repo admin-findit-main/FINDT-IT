@@ -62,7 +62,11 @@ export default async function PublicStorePage({ params }: Props) {
             {store.city}, {store.state} {store.postal_code}
           </p>
           {store.phone ? (
-            <p className="mt-2 text-sm text-ink">{store.phone}</p>
+            <p className="mt-2 text-sm text-ink">
+              <a className="font-semibold underline underline-offset-2" href={`tel:${store.phone.replace(/[^\d+]/g, "")}`}>
+                {store.phone}
+              </a>
+            </p>
           ) : null}
           {store.website ? (
             <a

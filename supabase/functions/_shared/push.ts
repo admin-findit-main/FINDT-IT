@@ -61,6 +61,35 @@ export async function deliverCustomerPush(input: {
   body: string;
   data: Record<string, string>;
 }): Promise<boolean> {
+  return deliverPush({
+    customerId: input.customerId,
+    title: input.title,
+    body: input.body,
+    data: input.data,
+  });
+}
+
+export async function deliverStorePush(input: {
+  userIds: string[];
+  title: string;
+  body: string;
+  data: Record<string, string>;
+}): Promise<boolean> {
+  return deliverPush({
+    userIds: input.userIds,
+    title: input.title,
+    body: input.body,
+    data: input.data,
+  });
+}
+
+async function deliverPush(input: {
+  customerId?: string;
+  userIds?: string[];
+  title: string;
+  body: string;
+  data: Record<string, string>;
+}): Promise<boolean> {
   const secret = Deno.env.get("PUSH_INTERNAL_SECRET");
   if (!secret) return false;
   const url =

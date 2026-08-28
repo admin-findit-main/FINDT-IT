@@ -4,6 +4,9 @@ import type { Database } from "@/types/database";
 import { isSupabaseConfigured } from "@/lib/config/env";
 
 export function createServiceClient() {
+  if (typeof window !== "undefined") {
+    throw new Error("The admin database client cannot run in the browser.");
+  }
   if (!isSupabaseConfigured() || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Service role key is not configured.");
   }

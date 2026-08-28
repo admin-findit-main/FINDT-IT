@@ -11,6 +11,7 @@ import {
 import { APP_NAME, STORE_TRIAL_DAYS } from "@/lib/config/constants";
 import { iosAppStoreUrl, playStoreUrl } from "@/lib/config/env";
 import { BrandHomeLink, BrandLogo } from "@/components/brand/logo";
+import { SiteFooter } from "@/components/shared/site-footer";
 import {
   matchProductSurface,
   productUrl,
@@ -38,7 +39,7 @@ export default async function LandingPage() {
   const joinHref = siteHref(host, "www", "/join");
 
   return (
-    <div className="app-canvas min-h-screen">
+    <div className="app-canvas min-h-screen overflow-x-clip">
       <header className="sticky top-0 z-50 border-b border-white/10 bg-black/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <BrandHomeLink href="/" tone="dark" />
@@ -263,35 +264,7 @@ export default async function LandingPage() {
         </section>
       </main>
 
-      <footer className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-12 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between">
-        <p>© {new Date().getFullYear()} FINDIT</p>
-        <div className="flex flex-wrap gap-4">
-          <Link href="/contact" className="transition-colors hover:text-ink">
-            Support
-          </Link>
-          <Link href="/pricing" className="transition-colors hover:text-ink">
-            Pricing
-          </Link>
-          <Link href="/privacy" className="transition-colors hover:text-ink">
-            Privacy
-          </Link>
-          <Link href="/terms" className="transition-colors hover:text-ink">
-            Terms
-          </Link>
-          <Link
-            href="/acceptable-use"
-            className="transition-colors hover:text-ink"
-          >
-            Acceptable Use
-          </Link>
-          <Link
-            href="/business-terms"
-            className="transition-colors hover:text-ink"
-          >
-            Business Terms
-          </Link>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

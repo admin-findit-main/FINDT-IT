@@ -8,17 +8,34 @@ import {
   STORE_CATEGORIES,
 } from "./constants";
 import { normalizeEin } from "./business";
+import { passwordRejectReason } from "./password";
+import { sanitizeMultiline, sanitizeText } from "./sanitize";
 import { MAX_CUSTOMER_RADIUS_MILES } from "./routing";
 
+const nameField = (max: number, message: string) =>
+  z
+    .string()
+    .transform((value) => sanitizeText(value, max))
+    .pipe(z.string().min(1, message).max(max));
+
 export const signupSchema = z.object({
-  firstName: z.string().min(1, "First name is required").max(60),
-  lastName: z.string().max(60).optional().or(z.literal("")),
-  email: z.string().email("Enter a valid email"),
+  firstName: nameField(60, "First name is required"),
+  lastName: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => sanitizeText(value || "", 60)),
+  email: z.string().trim().email("Enter a valid email").transform((value) => value.toLowerCase()),
   password: z.string().min(8, "Password must be at least 8 characters"),
   accountType: z.enum(["customer", "business"]),
   city: z.string().max(80).optional().or(z.literal("")),
   state: z.string().max(2).optional().or(z.literal("")),
   postalCode: z.string().max(10).optional().or(z.literal("")),
+}).superRefine((value, ctx) => {
+  const reason = passwordRejectReason(value.password, value.email);
+  if (reason) {
+    ctx.addIssue({ code: "custom", path: ["password"], message: reason });
+  }
 });
 
 export const loginSchema = z.object({
@@ -29,9 +46,18 @@ export const loginSchema = z.object({
 export const createRequestSchema = z.object({
   productName: z
     .string()
-    .min(MIN_PRODUCT_NAME_LENGTH, "Enter a product name")
-    .max(MAX_PRODUCT_NAME_LENGTH),
-  description: z.string().max(MAX_DESCRIPTION_LENGTH).optional().or(z.literal("")),
+    .transform((value) => sanitizeText(value, MAX_PRODUCT_NAME_LENGTH))
+    .pipe(
+      z
+        .string()
+        .min(MIN_PRODUCT_NAME_LENGTH, "Enter a product name")
+        .max(MAX_PRODUCT_NAME_LENGTH)
+    ),
+  description: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => sanitizeMultiline(value || "", MAX_DESCRIPTION_LENGTH)),
   category: z.enum(PRODUCT_CATEGORIES).optional().or(z.literal("")),
   city: z.string().trim().min(2, "City is required").max(80),
   state: z.string().trim().min(2).max(2).default("VA"),
@@ -86,8 +112,11 @@ export const storeOnboardingSchema = z.object({
 });
 
 export const storeJoinApplicationSchema = z.object({
-  ownerName: z.string().min(2).max(100),
-  ownerEmail: z.string().email(),
+  ownerName: z
+    .string()
+    .transform((value) => sanitizeText(value, 100))
+    .pipe(z.string().min(2).max(100)),
+  ownerEmail: z.string().trim().email(),
   ownerPhone: z.string().max(30).optional().or(z.literal("")),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirmPassword: z.string().min(8, "Confirm your password"),
@@ -124,9 +153,18 @@ export const storeJoinApplicationSchema = z.object({
   confirmedLegitimate: z.boolean().refine((v) => v === true, {
     message: "Confirm you are a legitimate business",
   }),
-}).refine((value) => value.password === value.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
+}).superRefine((value, ctx) => {
+  if (value.password !== value.confirmPassword) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["confirmPassword"],
+      message: "Passwords do not match",
+    });
+  }
+  const reason = passwordRejectReason(value.password, value.ownerEmail);
+  if (reason) {
+    ctx.addIssue({ code: "custom", path: ["password"], message: reason });
+  }
 });
 
 export const inviteEmployeeSchema = z.object({

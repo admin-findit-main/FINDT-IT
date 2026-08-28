@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/shell";
-
-export const dynamic = "force-dynamic";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
 import { employeeDashItems, ownerDashItems } from "@/lib/dashboard/nav";
@@ -10,11 +9,19 @@ import { BrandHomeLink } from "@/components/brand/logo";
 import { roleLabel } from "@/lib/auth/store-role";
 import { STORE_TRIAL_DAYS } from "@/lib/config/constants";
 import { isSoloAdmin } from "@/lib/auth/admin";
+import { marketingHomeHref } from "@/lib/config/product-hosts";
 import {
   canAccessStoreDashboardAction,
   getCurrentProfile,
   getStoreWorkspaceAction,
 } from "@/lib/services/actions";
+import { StoreNotifyHost } from "@/components/store/notify-host";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "FINDIT Business",
+};
 
 export default async function StoreLayout({
   children,
@@ -30,7 +37,7 @@ export default async function StoreLayout({
     return (
       <div className="app-canvas min-h-screen bg-canvas">
         <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong px-6 py-4">
-          <BrandHomeLink href="/" kind="business" />
+          <BrandHomeLink href={marketingHomeHref()} kind="business" />
         </header>
         <main className="mx-auto max-w-lg px-6 py-16">
           <Card sheen className="p-8 text-center">
@@ -88,6 +95,7 @@ export default async function StoreLayout({
       storeProfileHref="/store/settings"
       logoutHref="/login/business"
     >
+      <StoreNotifyHost userId={profile.id} />
       {children}
     </DashboardShell>
   );

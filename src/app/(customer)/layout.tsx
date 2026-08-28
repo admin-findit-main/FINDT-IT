@@ -6,8 +6,13 @@ import { CustomerSessionProvider } from "@/components/customer/session";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getCurrentProfile } from "@/lib/services/actions";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Ask FINDIT",
+};
 
 export default async function CustomerLayout({
   children,
@@ -24,7 +29,7 @@ export default async function CustomerLayout({
 
   return (
     <CustomerSessionProvider profile={profile}>
-      <div className="app-canvas min-h-screen">
+      <div className="app-canvas min-h-screen overflow-x-clip">
         <CustomerAlertListener userId={profile.id} />
         <WebPushRegistrar />
         <CustomerTopBar />

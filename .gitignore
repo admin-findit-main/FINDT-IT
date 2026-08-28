@@ -49,6 +49,7 @@ yarn-error.log*
 # editor / agent local state
 .cursor/
 .agents/
+.mcp.json
 
 # vercel
 .vercel

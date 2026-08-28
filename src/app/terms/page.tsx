@@ -76,6 +76,44 @@ export default function TermsPage() {
         payment.
       </p>
 
+      <h2>Auto-renewal</h2>
+      <p>
+        Paid FINDIT subscriptions (when billing is live) renew automatically
+        at the end of each billing period until you cancel. Before we take a
+        payment we will show the price, the length of the period, and the date
+        of the next charge. During the unpaid pilot, nothing auto-renews and no
+        card is charged.
+      </p>
+
+      <h2>Apple App Store and Google Play billing</h2>
+      <p>
+        If you subscribe through Apple or Google, Apple or Google — not FINDIT —
+        charges you, renews the subscription, and handles refunds under their
+        terms. Cancel or change that subscription in your Apple ID subscriptions
+        (Settings → Apple ID → Subscriptions) or in Google Play → Payments &
+        subscriptions. FINDIT cannot cancel an Apple or Google subscription for
+        you. Web billing, when offered, is cancelled in FINDIT (Plan or
+        Subscription).
+      </p>
+
+      <h2>Simple cancellation</h2>
+      <p>
+        Cancel any time from Plan (shoppers) or Subscription (stores), or email{" "}
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. There is no
+        cancellation fee. Cancellation stops the next renewal; you keep access
+        through the period you already paid. If you subscribed through Apple or
+        Google, cancel there as described above.
+      </p>
+
+      <h2>Free trial</h2>
+      <p>
+        Approved stores receive a free trial of limited length (currently 30
+        days from approval). We will tell you when the trial ends and what the
+        paid price would be before any charge. Cancel before the trial ends if
+        you do not want to continue. While FINDIT is in unpaid pilot, the trial
+        does not convert into an automatic paid charge.
+      </p>
+
       <h2>Intellectual property</h2>
       <p>
         FINDIT, the FINDIT mark, and the product are owned by FINDIT. You keep

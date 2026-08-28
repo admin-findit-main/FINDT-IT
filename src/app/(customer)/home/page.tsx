@@ -239,7 +239,6 @@ export default function CustomerHomePage() {
     setUploading(true);
 
     const uploaded = await uploadRequestImage({
-      userId: profile.id,
       file: compressed,
       contentType: file.type === "image/png" ? "image/png" : "image/jpeg",
       fileNameHint: file.name,

@@ -111,17 +111,39 @@ export async function notifyEmployeeDevices(input: {
   const { data: tokens } = await asTokenTable(input.admin)
     .select("token")
     .in("user_id", ids)
-    .eq("app_surface", "employee");
+    .in("app_surface", ["employee", "web"]);
   if (!tokens?.length) return;
-  await sendExpoPush(
-    tokens.map((row) => ({
-      to: row.token,
-      sound: "default",
+
+  const expoTokens = tokens
+    .map((row) => row.token)
+    .filter((token) => isExpoPushToken(token));
+  const webTokens = tokens
+    .map((row) => row.token)
+    .filter((token) => !isExpoPushToken(token));
+
+  await Promise.all([
+    sendExpoPush(
+      expoTokens.map((token) => ({
+        to: token,
+        sound: "default",
+        title: input.title,
+        body: input.body,
+        data: input.data,
+        channelId: "findit-alerts",
+        priority: "high",
+      }))
+    ),
+    sendWebPush({
+      tokens: webTokens,
       title: input.title,
       body: input.body,
-      data: input.data,
-      channelId: "findit-alerts",
-      priority: "high",
-    }))
-  );
+      data: {
+        ...input.data,
+        url: input.data.url || "/store",
+      },
+      onGoneToken: async (token) => {
+        await asTokenTable(input.admin).delete().eq("token", token);
+      },
+    }),
+  ]);
 }

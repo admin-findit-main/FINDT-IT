@@ -225,3 +225,49 @@ export function isWwwPublicPath(pathname: string): boolean {
     path.startsWith("/stores")
   );
 }
+
+/**
+ * Where the FINDIT mark should send this visitor — marketing, shopper home,
+ * store overview, or admin — based on host + path.
+ */
+export function resolveBrandHomeHref(input: {
+  surface: ProductSurface | "apex";
+  pathname: string;
+  hostHeader?: string;
+}): string {
+  const path = input.pathname.split("?")[0] || "/";
+  const surface = input.surface === "apex" ? "www" : input.surface;
+  const host = input.hostHeader;
+
+  if (
+    path.startsWith("/login") ||
+    path.startsWith("/signup") ||
+    path.startsWith("/forgot-password") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/invite") ||
+    path === "/join" ||
+    path.startsWith("/join/") ||
+    path.startsWith("/privacy") ||
+    path.startsWith("/terms") ||
+    path.startsWith("/acceptable-use") ||
+    path.startsWith("/business-terms") ||
+    path.startsWith("/contact") ||
+    path.startsWith("/pricing") ||
+    path.startsWith("/stores")
+  ) {
+    return marketingHomeHref(host);
+  }
+
+  const app = surface === "local" ? surfaceForAppPath(path) : surface;
+
+  if (app === "dashboard") {
+    return surface === "local" ? "/home" : toPublicPath("dashboard", "/home");
+  }
+  if (app === "store") {
+    const dest = path.startsWith("/admin") ? "/admin" : "/store";
+    return surface === "local" ? dest : toPublicPath("store", dest);
+  }
+
+  return marketingHomeHref(host);
+}
+

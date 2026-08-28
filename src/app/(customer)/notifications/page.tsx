@@ -13,6 +13,7 @@ import {
   browserNotifyPermission,
   requestBrowserNotifyPermission,
 } from "@/lib/browser-notify";
+import { subscribeWebPush } from "@/lib/web-push-client";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Notification } from "@/types/database";
 
@@ -45,8 +46,18 @@ export default function NotificationsPage() {
   async function enableBrowserAlerts() {
     const next = await requestBrowserNotifyPermission();
     setBrowserPermission(next);
-    if (next === "granted") toast.success("Browser alerts are on for this device.");
-    else toast.message("You can still see alerts here.");
+    if (next !== "granted") {
+      toast.message("You can still see alerts here.");
+      return;
+    }
+    const subscribed = await subscribeWebPush();
+    if (subscribed.ok) {
+      toast.success("We’ll ping this phone even after you close FINDIT.");
+    } else if (subscribed.error === "ios-homescreen") {
+      toast.message("Add FINDIT to your Home Screen to get alerts after you close it.");
+    } else {
+      toast.success("Browser alerts are on for this device.");
+    }
   }
 
   return (
@@ -55,7 +66,7 @@ export default function NotificationsPage() {
       {browserPermission === "default" ? (
         <div className="mt-4">
           <Button type="button" variant="outline" className="w-full" onClick={enableBrowserAlerts}>
-            Turn on alerts on this device
+            Allow notifications
           </Button>
         </div>
       ) : null}

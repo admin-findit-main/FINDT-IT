@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { looksLikeServiceRoleKey } from "@findit/domain";
 
 const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional().or(z.literal("")),
@@ -38,6 +39,11 @@ const envSchema = z.object({
 export type AppEnv = z.infer<typeof envSchema>;
 
 export function getEnv(): AppEnv {
+  if (process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error(
+      "The service role key must never be named NEXT_PUBLIC_*. It would ship to the browser."
+    );
+  }
   return envSchema.parse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -72,7 +78,14 @@ export function getEnv(): AppEnv {
 /** Client/server public key: prefer classic anon JWT, fall back to publishable key. */
 export function getSupabasePublishableKey(): string | undefined {
   const env = getEnv();
-  return env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || undefined;
+  const key =
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    undefined;
+  if (looksLikeServiceRoleKey(key)) {
+    throw new Error("Refusing to use the service role key as the public client key.");
+  }
+  return key;
 }
 
 export function isSupabaseConfigured(): boolean {

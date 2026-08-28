@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { AuthBrandLink } from "@/components/brand/logo";
+
+export const metadata: Metadata = {
+  title: "Sign in",
+};
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

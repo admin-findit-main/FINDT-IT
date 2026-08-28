@@ -6,6 +6,7 @@ import {
   matchProductSurface,
   postAuthLocation,
   productUrl,
+  resolveBrandHomeHref,
   supabaseCookieDomain,
   toInternalPath,
   toPublicPath,
@@ -94,5 +95,24 @@ describe("post-auth locations", () => {
     expect(marketingHomeHref("www.askfindit.com")).toBe(
       "https://www.askfindit.com"
     );
+  });
+
+  it("points the logo at the surface the visitor is on", () => {
+    expect(
+      resolveBrandHomeHref({ surface: "local", pathname: "/home" })
+    ).toBe("/home");
+    expect(
+      resolveBrandHomeHref({ surface: "local", pathname: "/store/requests" })
+    ).toBe("/store");
+    expect(
+      resolveBrandHomeHref({ surface: "local", pathname: "/admin/stores" })
+    ).toBe("/admin");
+    expect(
+      resolveBrandHomeHref({
+        surface: "www",
+        pathname: "/terms",
+        hostHeader: "www.askfindit.com",
+      })
+    ).toBe("https://www.askfindit.com");
   });
 });

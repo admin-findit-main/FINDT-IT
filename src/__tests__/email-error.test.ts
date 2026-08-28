@@ -12,7 +12,7 @@ describe("authEmailErrorMessage", () => {
     expect(authEmailErrorMessage("504")).toMatch(/timed out/i);
   });
 
-  it("passes through other auth errors", () => {
-    expect(authEmailErrorMessage("User already registered")).toBe("User already registered");
+  it("does not pass provider traces through to the customer", () => {
+    expect(authEmailErrorMessage("User already registered")).toMatch(/try again/i);
   });
 });

@@ -1,10 +1,15 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/shell";
-
-export const dynamic = "force-dynamic";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { adminDashItems } from "@/lib/dashboard/nav";
 import { getCurrentProfile } from "@/lib/services/actions";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "FINDIT Admin",
+};
 
 export default async function AdminLayout({
   children,

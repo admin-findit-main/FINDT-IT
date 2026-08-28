@@ -51,12 +51,25 @@ export default function BusinessTermsPage() {
         circumvents that design.
       </p>
 
-      <h2>Plans and limits</h2>
+      <h2>Plans, trial, and auto-renewal</h2>
       <p>
         Store plans and routing caps may apply. The current pilot does not
         bill in-app. FINDIT may change plan limits with notice in the product
         or by email. FINDIT does not guarantee that paying later will produce
         a particular number of Finds or conversions.
+      </p>
+      <p>
+        Approved stores receive a free trial from the approval date. We will
+        disclose the trial length, the paid price, and the date a charge would
+        occur before collecting payment. Paid plans, when offered, auto-renew
+        until cancelled from Subscription or by emailing{" "}
+        <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. Cancel before
+        renewal to avoid the next charge. If you subscribed through Apple or
+        Google, cancel in that store&apos;s subscription settings.
+      </p>
+      <p>
+        Cancellation is available at any time, with no cancellation fee. You
+        keep access through the period already paid.
       </p>
 
       <h2>Demand information</h2>
@@ -72,7 +85,7 @@ export default function BusinessTermsPage() {
         devices, and asking FINDIT to close the store listing. The owner
         account cannot be self-deleted while it still owns a live store —
         transfer or close the store first, then delete the login from Account,
-        or email {SUPPORT_EMAIL}. FINDIT may also remove a store that violates
+        or email <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>. FINDIT may also remove a store that violates
         these terms or that we cannot support.
       </p>
     </LegalShell>

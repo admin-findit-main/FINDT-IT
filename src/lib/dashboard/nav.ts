@@ -26,18 +26,15 @@ export const ownerDashItems: DashItem[] = [
   { href: "/store/requests", label: "Requests", icon: "requests" },
   { href: "/store/responses", label: "Responses", icon: "responses" },
   { href: "/store/demand", label: "Demand", icon: "demand" },
-  { href: "/store/team", label: "Staff", icon: "staff" },
   { href: "/store/hub", label: "FINDIT Hub", icon: "hub" },
   { href: "/store/devices", label: "Devices", icon: "devices" },
   { href: "/store/subscription", label: "Subscription", icon: "plan" },
-  { href: "/store/notifications", label: "Notifications", icon: "alerts" },
 ];
 
 export const employeeDashItems: DashItem[] = [
   { href: "/store/hub", label: "FINDIT Hub", icon: "hub" },
   { href: "/store/requests", label: "Requests", icon: "requests" },
   { href: "/store/notifications", label: "Notifications", icon: "alerts" },
-  { href: "/store/account", label: "Account", icon: "account" },
 ];
 
 export const adminDashItems: DashItem[] = [
@@ -57,7 +54,7 @@ export function dashTitle(pathname: string): { title: string; subtitle: string }
     "/store/requests": { title: "Requests", subtitle: "Answer nearby asks" },
     "/store/responses": { title: "Responses", subtitle: "What your team already answered" },
     "/store/demand": { title: "Demand", subtitle: "What people nearby keep asking for" },
-    "/store/team": { title: "Staff", subtitle: "Who can answer on FINDIT" },
+    "/store/team": { title: "Team", subtitle: "Who can answer on FINDIT" },
     "/store/devices": { title: "Devices", subtitle: "Counter tablets connected to this store" },
     "/store/settings": { title: "Store profile", subtitle: "How this location appears" },
     "/store/subscription": { title: "Subscription", subtitle: "Plan for this location — no charges yet" },
@@ -91,4 +88,6 @@ export const STORE_PROFILE_MENU = [
   { href: "/store/settings#hours", label: "Business Hours" },
   { href: "/store/settings#area", label: "Service Area" },
   { href: "/store/settings#categories", label: "Request Categories" },
+  { href: "/store/team", label: "Team" },
+  { href: "/store/notifications", label: "Notifications" },
 ] as const;

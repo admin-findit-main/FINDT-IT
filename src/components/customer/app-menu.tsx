@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Bell, MapPin, Menu, PackageSearch, Search, Sparkles, User, X } from "lucide-react";
+import { Bell, MapPin, Menu, PackageSearch, Search, Sparkles, X } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   accountContactLabel,
@@ -21,7 +21,6 @@ const ITEMS = [
   { href: "/requests", label: "Requests", icon: PackageSearch },
   { href: "/notifications", label: "Alerts", icon: Bell },
   { href: "/plan", label: "Plan", icon: Sparkles },
-  { href: "/profile", label: "Profile", icon: User },
 ] as const;
 
 function isActive(pathname: string, href: string) {

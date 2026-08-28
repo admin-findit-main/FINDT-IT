@@ -36,6 +36,7 @@ import {
   STORE_PROFILE_MENU,
   type DashItem,
 } from "@/lib/dashboard/nav";
+import { resolveBrandHomeHref } from "@/lib/config/product-hosts";
 
 const ICONS: Record<DashItem["icon"], typeof LayoutDashboard> = {
   overview: LayoutDashboard,
@@ -158,7 +159,11 @@ export function DashboardShell({
       >
         <div className={cn("flex h-14 items-center gap-2 px-4", collapsed && "justify-center px-0")}>
           <Link
-            href={toPublicPath(surface, items[0]?.href || "/")}
+            href={resolveBrandHomeHref({
+              surface,
+              pathname: internalPath,
+              hostHeader: typeof window !== "undefined" ? window.location.host : undefined,
+            })}
             className={cn("flex min-w-0 items-center", collapsed && "justify-center")}
             aria-label={isAdmin ? "FINDIT Admin" : "FINDIT Business"}
           >

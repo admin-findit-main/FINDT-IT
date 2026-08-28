@@ -82,7 +82,6 @@ export async function compressImageFile(
 }
 
 export async function uploadRequestImage(input: {
-  userId: string;
   file: Blob;
   contentType: string;
   fileNameHint?: string;
@@ -94,13 +93,16 @@ export async function uploadRequestImage(input: {
   if (!validation.ok) return { error: validation.error };
 
   if (isDemoMode() || !isSupabaseConfigured()) {
-    // Demo: caller may fall back to object URL / data URL separately
     return { error: "DEMO_STORAGE" };
   }
 
   const { createClient } = await import("@/lib/supabase/client");
   const supabase = createClient();
-  const path = buildRequestImagePath(input.userId, input.fileNameHint);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in to attach a photo" };
+  const path = buildRequestImagePath(user.id, input.fileNameHint);
   const { error } = await supabase.storage
     .from(REQUEST_IMAGES_BUCKET)
     .upload(path, input.file, {
