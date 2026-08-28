@@ -2,7 +2,6 @@ import {
   BUSINESS_PRICE_MONTHLY,
   CUSTOMER_PLANS,
   RADIUS_OPTIONS,
-  STORE_TRIAL_DAYS,
   type CustomerPlanId,
 } from "./constants";
 
@@ -162,7 +161,7 @@ export function customerPlanCatalog(): {
     ],
     business: {
       name: "FINDIT+ Business",
-      priceLabel: `$${BUSINESS_PRICE_MONTHLY.toFixed(2)} / month after a ${STORE_TRIAL_DAYS}-day trial`,
+      priceLabel: `$${BUSINESS_PRICE_MONTHLY}/month. Every store feature.`,
       detail:
         "For stores, not customers. Owners apply separately. Floor staff join with an invite.",
     },

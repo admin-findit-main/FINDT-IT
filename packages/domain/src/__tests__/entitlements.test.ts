@@ -33,11 +33,11 @@ describe("product architecture config", () => {
     expect(CUSTOMER_PLANS.plus.priceMonthly).toBeNull();
   });
 
-  it("models FINDIT+ Business as 30 days then $49.99", () => {
+  it("models FINDIT+ Business as $99/month with every store feature", () => {
     expect(STORE_TRIAL_DAYS).toBe(30);
-    expect(BUSINESS_PRICE_MONTHLY).toBe(49.99);
-    expect(STORE_PLANS.starter.priceMonthly).toBe(49.99);
-    expect(STORE_PLANS.pro.priceMonthly).toBe(49.99);
+    expect(BUSINESS_PRICE_MONTHLY).toBe(99);
+    expect(STORE_PLANS.starter.priceMonthly).toBe(99);
+    expect(STORE_PLANS.pro.priceMonthly).toBe(99);
   });
 });
 
@@ -111,6 +111,6 @@ describe("getConsumerEntitlements", () => {
     expect(catalog.plans[1].cons.some((c) => /cannot be purchased/i.test(c))).toBe(
       true
     );
-    expect(catalog.business.priceLabel).toMatch(/\$49\.99/);
+    expect(catalog.business.priceLabel).toMatch(/\$99/);
   });
 });

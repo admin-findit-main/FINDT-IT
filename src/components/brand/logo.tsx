@@ -69,11 +69,11 @@ export function BrandLockup({
 }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <BrandLogo kind="mark" tone={tone} className="h-8 w-auto" alt="" />
+      <BrandLogo kind="mark" tone={tone} className="h-7 w-auto object-contain" alt="" />
       {wordmark ? (
         <span
           className={cn(
-            "text-xl font-bold tracking-tight",
+            "text-[1.35rem] font-bold leading-none tracking-tight",
             tone === "dark" ? "text-ink-inverse" : "text-ink"
           )}
         >

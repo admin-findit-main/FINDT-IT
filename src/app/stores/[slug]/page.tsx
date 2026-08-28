@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
-import { GlassNav, VerifiedStoreBadge } from "@/components/ui/glass";
-import { BrandHomeLink } from "@/components/brand/logo";
+import { VerifiedStoreBadge } from "@/components/ui/glass";
+import { MarketingHeader } from "@/components/marketing/site-header";
+import { SiteFooter } from "@/components/shared/site-footer";
 import { getStoreBySlugAction } from "@/lib/services/actions";
 import { DAYS_OF_WEEK } from "@/lib/config/constants";
 import { mapsDirectionsUrl } from "@/lib/utils";
@@ -32,19 +32,7 @@ export default async function PublicStorePage({ params }: Props) {
 
   return (
     <div className="app-canvas min-h-screen">
-      <GlassNav>
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-5 py-3">
-          <BrandHomeLink href="/" />
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/">Home</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/home">Find a product</Link>
-            </Button>
-          </div>
-        </div>
-      </GlassNav>
+      <MarketingHeader />
       <main className="mx-auto max-w-2xl px-5 pb-16 pt-6">
         <Card sheen className="p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-3">
@@ -112,6 +100,7 @@ export default async function PublicStorePage({ params }: Props) {
           </ul>
         </Card>
       </main>
+      <SiteFooter />
     </div>
   );
 }

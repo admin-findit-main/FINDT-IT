@@ -39,8 +39,8 @@ describe("plan config", () => {
   it("exposes customer and store pricing from config", () => {
     expect(CUSTOMER_PLANS.free.monthlyRequests).toBe(5);
     expect(CUSTOMER_PLANS.plus.priceMonthly).toBeNull();
-    expect(STORE_PLANS.starter.priceMonthly).toBe(49.99);
-    expect(STORE_PLANS.pro.priceMonthly).toBe(49.99);
+    expect(STORE_PLANS.starter.priceMonthly).toBe(99);
+    expect(STORE_PLANS.pro.priceMonthly).toBe(99);
   });
 });
 

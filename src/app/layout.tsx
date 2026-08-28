@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     template: "%s · FINDIT",
   },
   description:
-    "Tell FINDIT what you're looking for and nearby stores can tell you if they have it.",
+    "Ask nearby stores if they have the product you want. FINDIT is waitlisting — join from askfindit.com.",
   applicationName: "FINDIT",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "FINDIT — Find it locally.",
-    description: "Ask once. Nearby stores tell you if they have it.",
+    description: "Ask once. Nearby stores tell you if they have it. Join the waitlist.",
     type: "website",
   },
 };

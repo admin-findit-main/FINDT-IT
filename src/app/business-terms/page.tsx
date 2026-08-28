@@ -18,7 +18,8 @@ export default function BusinessTermsPage() {
         <Link href="/acceptable-use">Acceptable Use Policy</Link>.
       </p>
       <p>
-        Applications: <Link href="/join">/join</Link>. Support:{" "}
+        Applications open from the waitlist on <Link href="/join">askfindit.com/join</Link> when
+        we start taking stores. Support:{" "}
         <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 

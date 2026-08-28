@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrandHomeLink } from "@/components/brand/logo";
+import { MarketingHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
@@ -13,11 +13,7 @@ export const metadata: Metadata = {
 export default function NotFound() {
   return (
     <div className="app-canvas flex min-h-dvh flex-col overflow-x-clip">
-      <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
-        <div className="mx-auto max-w-2xl px-6 py-4">
-          <BrandHomeLink href={marketingHomeHref()} />
-        </div>
-      </header>
+      <MarketingHeader />
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-6 py-16">
         <Card sheen className="p-8 text-center sm:p-10">
           <p className="text-sm font-semibold text-accent-ink">404</p>

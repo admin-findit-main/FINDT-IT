@@ -51,8 +51,8 @@ export default function StoreSubscriptionPage() {
           <div>
             <dt className="text-ink-muted">After trial</dt>
             <dd className="mt-1">
-              ${STORE_PLANS.starter.priceMonthly.toFixed(2)}/month per location —
-              billing is not connected yet.
+              ${STORE_PLANS.starter.priceMonthly}/month per location, every
+              store feature — billing is not connected yet.
             </dd>
           </div>
         </dl>

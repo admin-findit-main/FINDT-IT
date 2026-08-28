@@ -12,23 +12,21 @@ export default function ContactPage() {
   return (
     <LegalShell title="Contact FINDIT" lastUpdated={null}>
       <p>
-        Shoppers, stores, and the FINDIT operator can reach support by email at{" "}
-        <MailLink email={PUBLIC_SUPPORT_EMAIL} />
+        Email <MailLink email={PUBLIC_SUPPORT_EMAIL} />
         {SUPPORT_PHONE ? (
           <>
             {" "}
-            or by phone at <PhoneLink phone={SUPPORT_PHONE} />
+            or call <PhoneLink phone={SUPPORT_PHONE} />
           </>
         ) : null}
         .
       </p>
       <p>
-        Store applications are submitted at{" "}
-        <a className="font-semibold text-ink underline" href="/join">
-          askfindit.com/join
+        FINDIT is waitlisting, so public sign-in is off. Join at{" "}
+        <a className="font-semibold text-ink underline" href="/#waitlist">
+          askfindit.com
         </a>
-        . Shopper login is on dashboard.askfindit.com. Store login is on
-        store.askfindit.com.
+        .
       </p>
     </LegalShell>
   );

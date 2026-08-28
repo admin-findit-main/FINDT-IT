@@ -122,7 +122,7 @@ export const FREE_MAX_RADIUS_MILES = 10;
 export const PLUS_MAX_RADIUS_MILES = 40;
 
 /** FINDIT+ Business price after trial. Billing is not connected yet. */
-export const BUSINESS_PRICE_MONTHLY = 49.99;
+export const BUSINESS_PRICE_MONTHLY = 99;
 
 /**
  * Consumer plans — FINDIT+ is a PLAN, not a role.
@@ -156,12 +156,12 @@ export const CUSTOMER_PLANS = {
 export type CustomerPlanId = keyof typeof CUSTOMER_PLANS;
 
 /**
- * FINDIT+ Business: 30-day trial, then $49.99/month per location.
+ * FINDIT+ Business: $99/month per location, every store feature.
  * `starter` / `pro` keys remain so existing store rows still resolve.
  */
 const FINDIT_PLUS_BUSINESS = {
   name: "FINDIT+ Business",
-  tagline: "30-day free trial, then $49.99/month",
+  tagline: "$99/month. Every store feature.",
   monthlyRequests: null as number | null,
   analytics: true,
   multipleLocations: false,

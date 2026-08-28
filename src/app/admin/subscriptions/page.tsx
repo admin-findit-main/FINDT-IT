@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { MetricCard, Panel } from "@/components/dashboard/shell";
 import { isSoloAdmin } from "@/lib/auth/admin";
-import { STORE_PLANS, STORE_TRIAL_DAYS } from "@/lib/config/constants";
+import { STORE_PLANS } from "@/lib/config/constants";
 import { getAdminStatsAction, getCurrentProfile } from "@/lib/services/actions";
 
 export default async function AdminSubscriptionsPage() {
@@ -45,9 +45,9 @@ export default async function AdminSubscriptionsPage() {
       </Panel>
       <Panel title="Catalog">
         <p className="text-sm text-ink-muted">
-          FINDIT+ Business is {STORE_TRIAL_DAYS} days free, then $
-          {STORE_PLANS.starter.priceMonthly.toFixed(2)}/month per location. Payments, past-due,
-          and invoices are not implemented — this page does not invent them.
+          FINDIT+ Business is ${STORE_PLANS.starter.priceMonthly}/month per
+          location, every store feature. Payments, past-due, and invoices are
+          not implemented — this page does not invent them.
         </p>
       </Panel>
     </div>
