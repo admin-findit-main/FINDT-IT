@@ -33,6 +33,8 @@ import { supabase } from "@/lib/supabase";
 
 type Detail = Awaited<ReturnType<typeof fetchRequestDetail>>;
 
+const STORES_PAGE_SIZE = 5;
+
 export default function RequestDetailScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -42,12 +44,17 @@ export default function RequestDetailScreen() {
   const [foundStep, setFoundStep] = useState<"idle" | "ask" | "done">("idle");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [visibleStoreCount, setVisibleStoreCount] = useState(STORES_PAGE_SIZE);
 
   const load = useCallback(async () => {
     if (!id) return;
     const data = await fetchRequestDetail(id);
     setDetail(data);
     setLoading(false);
+  }, [id]);
+
+  useEffect(() => {
+    setVisibleStoreCount(STORES_PAGE_SIZE);
   }, [id]);
 
   useEffect(() => {
@@ -87,6 +94,8 @@ export default function RequestDetailScreen() {
     };
     return (order[a.response_type] ?? 9) - (order[b.response_type] ?? 9);
   });
+  const visibleResponses = responses.slice(0, visibleStoreCount);
+  const hiddenStoreCount = Math.max(0, responses.length - visibleStoreCount);
 
   const run = async (fn: () => Promise<{ error?: string }>, ok: string) => {
     setBusy(true);
@@ -139,7 +148,7 @@ export default function RequestDetailScreen() {
             }
           />
         ) : (
-          responses.map((r) => {
+          visibleResponses.map((r) => {
             const store = r.store as
               | {
                   name?: string;
@@ -206,6 +215,16 @@ export default function RequestDetailScreen() {
             );
           })
         )}
+        {hiddenStoreCount > 0 ? (
+          <GlassButton
+            title="Show more stores"
+            variant="glass"
+            style={{ marginTop: spacing.sm }}
+            onPress={() =>
+              setVisibleStoreCount((count) => count + STORES_PAGE_SIZE)
+            }
+          />
+        ) : null}
 
         {foundStep === "ask" ? (
           <GlassCard style={styles.actions}>
@@ -254,61 +273,71 @@ export default function RequestDetailScreen() {
 
         <View style={styles.actions}>
           {!closed ? (
-            <GlassButton
-              title="I found it"
-              disabled={busy}
-              onPress={() => {
-                const stocked = responses.find((r) => r.response_type === "in_stock");
-                setSelectedStoreId(stocked?.store_id || null);
-                setFoundStep("ask");
-              }}
-            />
-          ) : null}
-          <View style={styles.footerLinks}>
-            {!closed ? (
-              <Text
-                style={[styles.link, { color: theme.inkMuted }]}
+            <>
+              <GlassButton
+                title="I found it"
+                disabled={busy}
+                onPress={() => {
+                  const stocked = responses.find((r) => r.response_type === "in_stock");
+                  setSelectedStoreId(stocked?.store_id || null);
+                  setFoundStep("ask");
+                }}
+              />
+              <GlassButton
+                title="Still looking"
+                variant="glass"
+                disabled={busy}
                 onPress={() => {
                   if (busy) return;
                   run(() => stillLooking(detail.id), "Stores will see you're still looking");
                 }}
-              >
-                Still looking
-              </Text>
-            ) : null}
-            <Text
-              style={[styles.link, { color: theme.inkMuted }]}
+              />
+              <View style={styles.footerRow}>
+                <GlassButton
+                  title="Save"
+                  variant="glass"
+                  style={styles.half}
+                  disabled={busy}
+                  onPress={() => {
+                    if (busy) return;
+                    run(() => saveRequest(detail.id), "Saved");
+                  }}
+                />
+                <GlassButton
+                  title="Cancel"
+                  variant="ghost"
+                  style={styles.half}
+                  disabled={busy}
+                  onPress={() => {
+                    if (busy) return;
+                    Alert.alert(
+                      "Cancel this Find?",
+                      "Stores will stop seeing it. This still counts as one of your Finds this month.",
+                      [
+                        { text: "Keep looking", style: "cancel" },
+                        {
+                          text: "Cancel",
+                          style: "destructive",
+                          onPress: () =>
+                            run(() => cancelRequest(detail.id), "Request cancelled"),
+                        },
+                      ]
+                    );
+                  }}
+                />
+              </View>
+            </>
+          ) : (
+            <GlassButton
+              title="Save"
+              variant="glass"
+              disabled={busy}
               onPress={() => {
                 if (busy) return;
                 run(() => saveRequest(detail.id), "Saved");
               }}
-            >
-              Save
-            </Text>
-            {!closed ? (
-              <Text
-                style={[styles.danger, { color: theme.accentInk }]}
-                onPress={() => {
-                  if (busy) return;
-                  Alert.alert(
-                    "Cancel this Find?",
-                    "Stores will stop seeing it. This still counts as one of your Finds this month.",
-                    [
-                      { text: "Keep looking", style: "cancel" },
-                      {
-                        text: "Cancel",
-                        style: "destructive",
-                        onPress: () =>
-                          run(() => cancelRequest(detail.id), "Request cancelled"),
-                      },
-                    ]
-                  );
-                }}
-              >
-                Cancel
-              </Text>
-            ) : null}
-          </View>
+            />
+          )}
         </View>
     </Screen>
   );
@@ -363,19 +392,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
     lineHeight: 44,
   },
-  danger: {
-    fontSize: typography.size.footnote,
-    fontWeight: typography.weight.medium,
-    minHeight: 44,
-    lineHeight: 44,
-  },
-  actions: { marginTop: spacing.xl },
-  footerLinks: {
+  actions: { marginTop: spacing.xl, gap: spacing.sm },
+  footerRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: spacing.lg,
-    marginTop: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
   askRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
   half: { flexGrow: 1, minWidth: 140, maxWidth: "100%" },

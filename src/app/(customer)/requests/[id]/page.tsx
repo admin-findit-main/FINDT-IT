@@ -42,6 +42,8 @@ type Detail = CustomerRequest & {
   targets_count?: number;
 };
 
+const STORES_PAGE_SIZE = 5;
+
 function SearchingStoresCard({
   storesContacted,
   placeLabel,
@@ -85,6 +87,7 @@ export default function RequestDetailPage() {
   const [foundStep, setFoundStep] = useState<"idle" | "ask" | "done">("idle");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [feedbackDone, setFeedbackDone] = useState(false);
+  const [visibleStoreCount, setVisibleStoreCount] = useState(STORES_PAGE_SIZE);
 
   const load = useCallback(async () => {
     const result = await getCustomerRequestAction(params.id);
@@ -98,6 +101,10 @@ export default function RequestDetailPage() {
     const t = setInterval(load, 8000);
     return () => clearInterval(t);
   }, [load]);
+
+  useEffect(() => {
+    setVisibleStoreCount(STORES_PAGE_SIZE);
+  }, [params.id]);
 
   useRequestRealtime(params.id, { onChange: load });
 
@@ -117,6 +124,8 @@ export default function RequestDetailPage() {
     [data]
   );
 
+  const visibleResponses = responses.slice(0, visibleStoreCount);
+  const hiddenStoreCount = Math.max(0, responses.length - visibleStoreCount);
   const storesContacted = data?.stores_targeted || data?.targets_count || 0;
   const openRequest =
     !expired &&
@@ -314,7 +323,7 @@ export default function RequestDetailPage() {
             </div>
           ) : (
             <div className="mt-4 space-y-3">
-              {responses.map((response) => {
+              {visibleResponses.map((response) => {
                 const store = response.store;
                 if (!store) return null;
                 const muted = response.response_type === "out_of_stock";
@@ -333,6 +342,9 @@ export default function RequestDetailPage() {
                   storeLatitude: store.latitude,
                   storeLongitude: store.longitude,
                 });
+                const canVisit = response.response_type !== "out_of_stock";
+                const canMarkFound =
+                  data.status !== "fulfilled" && response.response_type !== "out_of_stock";
                 return (
                   <Card
                     key={response.id}
@@ -383,12 +395,17 @@ export default function RequestDetailPage() {
                       Responded {formatRelativeTime(response.updated_at)} ·{" "}
                       {formatDurationSeconds(responseSecs)}
                     </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Button asChild variant="outline" size="sm">
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="lg"
+                        className={canVisit ? "w-full" : "col-span-2 w-full"}
+                      >
                         <Link href={`/stores/${store.slug}`}>View store</Link>
                       </Button>
-                      {response.response_type !== "out_of_stock" ? (
-                        <Button asChild size="sm" variant="secondary">
+                      {canVisit ? (
+                        <Button asChild size="lg" variant="secondary" className="w-full">
                           <a
                             href={mapsDirectionsUrl(store)}
                             target="_blank"
@@ -402,10 +419,10 @@ export default function RequestDetailPage() {
                           </a>
                         </Button>
                       ) : null}
-                      {data.status !== "fulfilled" &&
-                      response.response_type !== "out_of_stock" ? (
+                      {canMarkFound ? (
                         <Button
-                          size="sm"
+                          size="lg"
+                          className="col-span-2 w-full"
                           onClick={() => markFound(store.id)}
                         >
                           I found it here
@@ -415,6 +432,19 @@ export default function RequestDetailPage() {
                   </Card>
                 );
               })}
+              {hiddenStoreCount > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="w-full"
+                  onClick={() =>
+                    setVisibleStoreCount((count) => count + STORES_PAGE_SIZE)
+                  }
+                >
+                  Show more stores
+                </Button>
+              ) : null}
             </div>
           )}
         </div>
@@ -425,12 +455,13 @@ export default function RequestDetailPage() {
           <p className="font-semibold text-ink">
             Did FINDIT help you find this product?
           </p>
-          <div className="mt-4 flex gap-2">
-            <Button className="flex-1" onClick={() => confirmFound(true)}>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button size="lg" className="w-full" onClick={() => confirmFound(true)}>
               YES
             </Button>
             <Button
-              className="flex-1"
+              size="lg"
+              className="w-full"
               variant="outline"
               onClick={() => confirmFound(false)}
             >
@@ -445,9 +476,10 @@ export default function RequestDetailPage() {
           <p className="font-semibold text-ink">
             Was this request experience helpful?
           </p>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2">
             <Button
-              className="flex-1"
+              size="lg"
+              className="w-full"
               variant="outline"
               onClick={async () => {
                 await submitPilotFeedbackAction({
@@ -463,7 +495,8 @@ export default function RequestDetailPage() {
               Yes
             </Button>
             <Button
-              className="flex-1"
+              size="lg"
+              className="w-full"
               variant="ghost"
               onClick={async () => {
                 await submitPilotFeedbackAction({
@@ -481,20 +514,22 @@ export default function RequestDetailPage() {
         </Card>
       ) : null}
 
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+      <div className="mt-8 space-y-3">
         {!expired &&
         data.status !== "cancelled" &&
         data.status !== "fulfilled" ? (
           <>
             <Button
-              className="flex-1"
+              size="lg"
+              className="w-full"
               onClick={() => markFound(responses.find((r) => r.response_type === "in_stock")?.store_id)}
             >
               I found it
             </Button>
             <Button
               variant="outline"
-              className="flex-1"
+              size="lg"
+              className="w-full"
               onClick={async () => {
                 const result = await stillLookingAction(data.id);
                 if ("error" in result && result.error) {
@@ -507,31 +542,45 @@ export default function RequestDetailPage() {
             >
               Still looking
             </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                onClick={async () => {
+                  await saveRequestAction(data.id);
+                  toast.success("Saved");
+                }}
+              >
+                Save
+              </Button>
+              <Button
+                variant="ghost"
+                size="lg"
+                className="w-full text-accent-ink hover:text-accent"
+                onClick={async () => {
+                  await cancelRequestAction(data.id);
+                  toast.success("Cancelled. This still counts as one of your Finds this month.");
+                  load();
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
           </>
-        ) : null}
-        <Button
-          variant="outline"
-          className="flex-1"
-          onClick={async () => {
-            await saveRequestAction(data.id);
-            toast.success("Saved");
-          }}
-        >
-          Save
-        </Button>
-        {!expired && data.status !== "cancelled" && data.status !== "fulfilled" ? (
+        ) : (
           <Button
-            variant="ghost"
-            className="flex-1 text-accent-ink hover:text-accent"
+            variant="outline"
+            size="lg"
+            className="w-full"
             onClick={async () => {
-              await cancelRequestAction(data.id);
-              toast.success("Cancelled. This still counts as one of your Finds this month.");
-              load();
+              await saveRequestAction(data.id);
+              toast.success("Saved");
             }}
           >
-            Cancel
+            Save
           </Button>
-        ) : null}
+        )}
       </div>
     </div>
   );
