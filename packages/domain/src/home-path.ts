@@ -40,6 +40,17 @@ export function isPasswordUpdatePath(pathname: string): boolean {
   );
 }
 
+/** `/store` and `/store/...` — not `/stores` (public store directory). */
+export function isStoreAppPath(pathname: string): boolean {
+  const path = pathname.split("?")[0] || "/";
+  return path === "/store" || path.startsWith("/store/");
+}
+
+export function isAdminAppPath(pathname: string): boolean {
+  const path = pathname.split("?")[0] || "/";
+  return path === "/admin" || path.startsWith("/admin/");
+}
+
 export function isCustomerSurfacePath(pathname: string): boolean {
   const path = pathname.split("?")[0] || "/";
   return (
@@ -90,7 +101,7 @@ export function resolvePostAuthDestination(input: {
   if (home === STORE_HOME_PATH) {
     if (
       isSafeNextPath(input.next) &&
-      (input.next.startsWith("/store") || input.next.startsWith("/invite/"))
+      (isStoreAppPath(input.next) || input.next.startsWith("/invite/"))
     ) {
       return input.next;
     }

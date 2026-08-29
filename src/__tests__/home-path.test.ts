@@ -4,6 +4,7 @@ import {
   destinationAfterEmailLink,
   isCustomerSurfacePath,
   isSafeNextPath,
+  isStoreAppPath,
   resolveAppHome,
   resolvePostAuthDestination,
 } from "@/lib/auth/home-path";
@@ -32,6 +33,15 @@ describe("resolveAppHome", () => {
     expect(
       resolveAppHome({ accountType: "customer", hasActiveStoreMembership: false })
     ).toBe("/home");
+  });
+});
+
+describe("isStoreAppPath", () => {
+  it("does not treat public /stores pages as the store app", () => {
+    expect(isStoreAppPath("/store")).toBe(true);
+    expect(isStoreAppPath("/store/requests")).toBe(true);
+    expect(isStoreAppPath("/stores")).toBe(false);
+    expect(isStoreAppPath("/stores/acme")).toBe(false);
   });
 });
 

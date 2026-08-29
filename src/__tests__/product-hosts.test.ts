@@ -7,6 +7,7 @@ import {
   postAuthLocation,
   productUrl,
   resolveBrandHomeHref,
+  surfaceForAppPath,
   supabaseCookieDomain,
   toInternalPath,
   toPublicPath,
@@ -54,6 +55,12 @@ describe("pretty store and dashboard paths", () => {
     expect(toPublicPath("store", "/store/requests/abc")).toBe("/requests/abc");
     expect(toPublicPath("store", "/login/business")).toBe("/login");
     expect(toInternalPath("store", "/login")).toBe("/login/business");
+  });
+
+  it("keeps public /stores pages on the marketing site", () => {
+    expect(surfaceForAppPath("/stores/acme")).toBe("www");
+    expect(surfaceForAppPath("/store")).toBe("store");
+    expect(surfaceForAppPath("/store/requests")).toBe("store");
   });
 
   it("maps dashboard.askfindit.com/ to the existing /home page", () => {

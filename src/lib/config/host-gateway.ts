@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { canManageFromRole } from "@findit/domain";
+import { canManageFromRole, isAdminAppPath, isStoreAppPath } from "@findit/domain";
 import {
   CANONICAL_PRODUCT_HOSTS,
   isWwwPublicPath,
@@ -104,7 +104,7 @@ export function decideHostRouting(
         rewrite: false,
       };
     }
-    if (publicPath.startsWith("/admin") || publicPath.startsWith("/store")) {
+    if (isAdminAppPath(publicPath) || isStoreAppPath(publicPath)) {
       return { kind: "redirect", url: absolute(request, "store", publicPath) };
     }
     if (
@@ -134,7 +134,7 @@ export function decideHostRouting(
     if (publicPath.startsWith("/home") || publicPath.startsWith("/plan") || publicPath.startsWith("/profile") || publicPath.startsWith("/welcome") || publicPath.startsWith("/notifications")) {
       return { kind: "redirect", url: absolute(request, "dashboard", publicPath) };
     }
-    if (publicPath.startsWith("/store") || publicPath.startsWith("/admin") || publicPath.startsWith("/invite")) {
+    if (isStoreAppPath(publicPath) || isAdminAppPath(publicPath) || publicPath.startsWith("/invite")) {
       return { kind: "redirect", url: absolute(request, "store", publicPath) };
     }
     if (publicPath.startsWith("/forgot-password")) {
@@ -163,8 +163,8 @@ export function decideHostRouting(
       return { kind: "redirect", url: absolute(request, "www", publicPath) };
     }
     if (
-      publicPath.startsWith("/store") ||
-      publicPath.startsWith("/admin") ||
+      isStoreAppPath(publicPath) ||
+      isAdminAppPath(publicPath) ||
       publicPath === "/login/business" ||
       publicPath.startsWith("/invite")
     ) {

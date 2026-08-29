@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
 import { coerceSoloAdminProfile, isSoloAdmin } from "@/lib/auth/admin";
 import {
+  isAdminAppPath,
   isCustomerSurfacePath,
+  isStoreAppPath,
   resolvePostAuthDestination,
 } from "@/lib/auth/home-path";
 import { isOwnerOnlyStorePath } from "@/lib/auth/store-role";
@@ -237,8 +239,8 @@ export async function updateSession(request: NextRequest) {
     internalPath.startsWith("/notifications") ||
     internalPath.startsWith("/profile") ||
     internalPath.startsWith("/plan") ||
-    internalPath.startsWith("/store") ||
-    internalPath.startsWith("/admin") ||
+    isStoreAppPath(internalPath) ||
+    isAdminAppPath(internalPath) ||
     isWelcome;
 
   if (!user && isHubConnect) {
@@ -257,7 +259,7 @@ export async function updateSession(request: NextRequest) {
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname =
-      internalPath.startsWith("/store") || internalPath.startsWith("/admin")
+      isStoreAppPath(internalPath) || isAdminAppPath(internalPath)
         ? surface === "store"
           ? "/login"
           : "/login/business"
@@ -270,7 +272,7 @@ export async function updateSession(request: NextRequest) {
     const isOperator = isSoloAdmin(resolvedProfile);
     const onCustomerSurface = isCustomerSurfacePath(internalPath);
 
-    if (isOperator && (onCustomerSurface || internalPath.startsWith("/store"))) {
+    if (isOperator && (onCustomerSurface || isStoreAppPath(internalPath))) {
       if (!internalPath.startsWith("/store/hub")) {
         const url = request.nextUrl.clone();
         if (surface === "store") {

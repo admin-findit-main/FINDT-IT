@@ -4,6 +4,8 @@ export {
   destinationAfterAuth,
   destinationAfterEmailLink,
   isSafeNextPath,
+  isStoreAppPath,
+  isAdminAppPath,
   isCustomerSurfacePath,
   isPasswordUpdatePath,
   isRecoveryAuthType,

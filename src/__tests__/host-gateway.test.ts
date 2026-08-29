@@ -19,6 +19,18 @@ describe("decideHostRouting", () => {
     }
   });
 
+  it("keeps public /stores pages on www instead of treating them as /store", () => {
+    const decision = decideHostRouting(
+      req("www.askfindit.com", "/stores/acme"),
+      "anonymous"
+    );
+    expect(decision.kind).toBe("continue");
+    if (decision.kind === "continue") {
+      expect(decision.internalPath).toBe("/stores/acme");
+      expect(decision.rewrite).toBe(false);
+    }
+  });
+
   it("keeps the public website on www even for signed-in customers", () => {
     const decision = decideHostRouting(req("www.askfindit.com", "/"), "customer");
     expect(decision.kind).toBe("continue");

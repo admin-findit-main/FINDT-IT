@@ -127,7 +127,7 @@ export function toInternalPath(
     if (path === "/") return "/store";
     if (path === "/login") return "/login/business";
     if (path === "/hub" || path.startsWith("/hub/")) return `/store${path}`;
-    if (path.startsWith("/store")) return path;
+    if (path === "/store" || path.startsWith("/store/")) return path;
     if (isPassThroughPath(path)) return path;
     return `/store${path}`;
   }
@@ -157,7 +157,8 @@ export function toPublicPath(
 export function surfaceForAppPath(pathname: string): Exclude<ProductSurface, "local"> {
   const path = pathname.split("?")[0] || "/";
   if (
-    path.startsWith("/store") ||
+    path === "/store" ||
+    path.startsWith("/store/") ||
     path.startsWith("/admin") ||
     path.startsWith("/login/business") ||
     path.startsWith("/invite")
@@ -192,7 +193,7 @@ export function productUrl(
   const host = currentHostHeader ? hostnameOf(currentHostHeader) : "";
   if (currentHostHeader && isLocalHostname(host)) return pretty;
   return pretty === "/"
-    ? productOrigin(surface)
+    ? `${productOrigin(surface)}/`
     : `${productOrigin(surface)}${pretty}`;
 }
 

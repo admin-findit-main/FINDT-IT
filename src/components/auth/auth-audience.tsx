@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { wrongLoginSideMessage, type LoginAudience } from "@findit/domain";
+import {
+  isAdminAppPath,
+  isStoreAppPath,
+  wrongLoginSideMessage,
+  type LoginAudience,
+} from "@findit/domain";
 import { Button } from "@/components/ui/button";
 import { GlassNotice } from "@/components/ui/glass";
 import { isSafeNextPath } from "@/lib/auth/home-path";
@@ -13,9 +18,9 @@ export type AuthAudience = "shopper" | "store";
 function shopperLoginPath(next?: string | null) {
   if (
     isSafeNextPath(next) &&
-    !next.startsWith("/store") &&
+    !isStoreAppPath(next) &&
     !next.startsWith("/invite") &&
-    !next.startsWith("/admin")
+    !isAdminAppPath(next)
   ) {
     return `/login?next=${encodeURIComponent(next)}`;
   }
@@ -25,9 +30,9 @@ function shopperLoginPath(next?: string | null) {
 function shopperSignupPath(next?: string | null) {
   if (
     isSafeNextPath(next) &&
-    !next.startsWith("/store") &&
+    !isStoreAppPath(next) &&
     !next.startsWith("/invite") &&
-    !next.startsWith("/admin")
+    !isAdminAppPath(next)
   ) {
     return `/signup?next=${encodeURIComponent(next)}`;
   }
@@ -37,9 +42,9 @@ function shopperSignupPath(next?: string | null) {
 function storeLoginPath(next?: string | null) {
   if (
     isSafeNextPath(next) &&
-    (next.startsWith("/store") ||
+    (isStoreAppPath(next) ||
       next.startsWith("/invite") ||
-      next.startsWith("/admin"))
+      isAdminAppPath(next))
   ) {
     return `/login/business?next=${encodeURIComponent(next)}`;
   }
