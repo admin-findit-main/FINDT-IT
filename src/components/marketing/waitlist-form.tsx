@@ -36,11 +36,11 @@ export function WaitlistForm({
       company,
     });
     setLoading(false);
-    if ("error" in result && result.error) {
-      toast.error(result.error);
+    if ("ok" in result) {
+      setDone(result.already ? "already" : "new");
       return;
     }
-    setDone(result.already ? "already" : "new");
+    toast.error(result.error);
   }
 
   if (done) {
