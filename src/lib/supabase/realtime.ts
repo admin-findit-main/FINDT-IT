@@ -123,7 +123,6 @@ export function useRequestRealtime(
             if (cancelled) return;
             if (status === "SUBSCRIBED") {
               setSync({ state: "live", percent: 100 });
-              fire();
               return;
             }
             if (
@@ -214,7 +213,6 @@ export function useStoreInboxRealtime(
             if (cancelled) return;
             if (status === "SUBSCRIBED") {
               setSync({ state: "live", percent: 100 });
-              fire();
               return;
             }
             if (

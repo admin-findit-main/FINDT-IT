@@ -298,7 +298,8 @@ Deno.serve(async (req) => {
       "id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan, business_type, accepting_requests, latitude, longitude"
     )
     .eq("is_active", true)
-    .eq("is_suspended", false);
+    .eq("is_suspended", false)
+    .eq("accepting_requests", true);
 
   let storesTargeted = 0;
   if (stores?.length) {

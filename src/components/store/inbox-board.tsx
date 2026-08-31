@@ -26,6 +26,7 @@ import {
   respondToRequestAction,
 } from "@/lib/services/actions";
 import { LIVE_POLL_MS, useStoreInboxRealtime } from "@/lib/supabase/realtime";
+import { readCached, writeCached } from "@/lib/data/client-cache";
 import { isAgeRestrictedFind } from "@findit/domain";
 import {
   displayName,
@@ -67,6 +68,7 @@ export function StoreInboxBoard() {
     if (!sid) return;
     const list = await getStoreIncomingRequestsAction(sid, filter, range);
     setItems(list);
+    writeCached(`inbox:${sid}:${filter}:${range}`, list);
     setLoading(false);
   }, [storeId, filter, range]);
 
@@ -101,18 +103,27 @@ export function StoreInboxBoard() {
     }
   }, []);
 
-  useEffect(() => {
-    if (storeId) {
-      setLoading(true);
-      load(storeId);
-      const t = setInterval(() => {
-        if (document.visibilityState === "visible") loadInbox(storeId);
-      }, LIVE_POLL_MS);
-      return () => clearInterval(t);
-    }
-  }, [storeId, load, loadInbox]);
+  const inboxSync = useStoreInboxRealtime(storeId, { onChange: loadInbox });
 
-  useStoreInboxRealtime(storeId, { onChange: loadInbox });
+  useEffect(() => {
+    if (!storeId) return;
+    const cached = readCached<Incoming[]>(`inbox:${storeId}:${filter}:${range}`, 120_000);
+    if (cached?.length) {
+      setItems(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    void load(storeId);
+  }, [storeId, filter, range, load]);
+
+  useEffect(() => {
+    if (!storeId || inboxSync.state === "live") return;
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void loadInbox(storeId);
+    }, LIVE_POLL_MS);
+    return () => clearInterval(t);
+  }, [storeId, loadInbox, inboxSync.state]);
 
   async function respond(
     type: "in_stock" | "out_of_stock" | "can_order" | "not_relevant",
@@ -131,6 +142,8 @@ export function StoreInboxBoard() {
     inFlight.current = true;
     setActiveRequest(request);
     setSubmitting(true);
+    const previous = items;
+    setItems((rows) => rows.filter((row) => row.id !== request.id));
     const result = await respondToRequestAction({
       requestId: request.id,
       storeId,
@@ -140,6 +153,7 @@ export function StoreInboxBoard() {
     setSubmitting(false);
     inFlight.current = false;
     if (result.error) {
+      setItems(previous);
       toast.error(result.error);
       return;
     }

@@ -83,6 +83,7 @@ import {
   type LoginAudience,
 } from "@findit/domain";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
+import { measurePerf } from "@/lib/perf";
 import {
   generateJoinEmailCode,
   hashJoinEmailCode,
@@ -141,6 +142,7 @@ const getSupabaseUser = cache(async () => {
 });
 
 export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
+  return measurePerf("auth-profile", async () => {
   if (isDemoMode()) {
     const sessionId = await getDemoSessionId();
     const profile = demoCurrentUser(sessionId);
@@ -156,6 +158,7 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const resolved = coerceSoloAdminProfile(profile, user.email) as Profile;
   if (resolved.is_suspended && !isSoloAdmin(resolved)) return null;
   return resolved;
+  });
 });
 
 type StoreActor =
@@ -922,8 +925,26 @@ export async function createCustomerRequestAction(raw: unknown) {
     };
   }
 
+  return measurePerf("create-request", async () => {
   const { supabase, user } = await getSupabaseUser();
   if (!user) return { error: "Please sign in", needsAuth: true };
+
+  const clientKey = parsed.data.clientRequestKey || null;
+  if (clientKey) {
+    const { data: existingByKey } = await supabase
+      .from("customer_requests")
+      .select("id, product_name, city, state, postal_code, image_url, created_at, expires_at, stores_targeted, status")
+      .eq("customer_id", user.id)
+      .eq("client_request_key", clientKey)
+      .maybeSingle();
+    if (existingByKey) {
+      return {
+        request: existingByKey as CustomerRequest,
+        storesTargeted: existingByKey.stores_targeted || 0,
+        noStores: (existingByKey.stores_targeted || 0) === 0,
+      };
+    }
+  }
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const monthStart = monthlyFindWindowStart().toISOString();
@@ -1035,8 +1056,11 @@ export async function createCustomerRequestAction(raw: unknown) {
       category_confirmed: Boolean(
         parsed.data.categoryConfirmed || parsed.data.category || classified.status === "confident"
       ),
+      client_request_key: clientKey,
     })
-    .select("*")
+    .select(
+      "id, product_name, city, state, postal_code, image_url, created_at, expires_at, stores_targeted, status, customer_id"
+    )
     .single();
 
   if (error || !request) {
@@ -1062,6 +1086,7 @@ export async function createCustomerRequestAction(raw: unknown) {
     storesTargeted,
     noStores: storesTargeted === 0,
   };
+  });
 }
 
 async function notifyStoresOfNewRequest(input: {
@@ -1126,11 +1151,21 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
     .single();
   if (!request) return 0;
 
-  const { data: stores } = await admin
+  let storeQuery = admin
     .from("stores")
     .select("id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan, business_type, accepting_requests, latitude, longitude")
     .eq("is_active", true)
-    .eq("is_suspended", false);
+    .eq("is_suspended", false)
+    .eq("accepting_requests", true);
+  const reqLat = Number(request.latitude);
+  const reqLng = Number(request.longitude);
+  if (Number.isFinite(reqLat) && Number.isFinite(reqLng)) {
+    const pad = (Number(request.radius_miles) + 12) / 69;
+    storeQuery = storeQuery.or(
+      `and(latitude.gte.${reqLat - pad},latitude.lte.${reqLat + pad},longitude.gte.${reqLng - pad},longitude.lte.${reqLng + pad}),latitude.is.null`
+    );
+  }
+  const { data: stores } = await storeQuery;
 
   if (!stores?.length) return 0;
 
@@ -1263,7 +1298,7 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
       .map((r) => r.store_id);
 
     if (notifyStoreIds.length) {
-      await notifyStoresOfNewRequest({
+      void notifyStoresOfNewRequest({
         admin,
         requestId,
         productName: request.product_name,
@@ -1380,7 +1415,7 @@ export async function getCustomerRequestsAction(tab: "active" | "past" | "saved"
   } else {
     query = query.in("status", ["expired", "cancelled", "fulfilled"]);
   }
-  const { data } = await query.order("created_at", { ascending: false });
+  const { data } = await query.order("created_at", { ascending: false }).limit(40);
   return (data || []) as CustomerRequest[];
 }
 
@@ -1605,6 +1640,7 @@ export async function getStoreIncomingRequestsAction(
   filter: string = "all",
   range: string = "today"
 ) {
+  return measurePerf("load-store-inbox", async () => {
   const id = boundUuid(storeId);
   if (!id) return [];
   const actor = await getStoreActor(id);
@@ -1734,6 +1770,7 @@ export async function getStoreIncomingRequestsAction(
     target: { id: string };
     response: StoreResponse | null;
   })[];
+  });
 }
 
 export const getUserStoresAction = cache(async (): Promise<(Store & { role: string })[]> => {
@@ -1899,10 +1936,10 @@ export async function getNotificationsAction(): Promise<Notification[]> {
   if (!user) return [];
   const { data } = await supabase
     .from("notifications")
-    .select("*")
+    .select("id, user_id, type, title, body, related_request_id, related_store_id, read_at, created_at")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(40);
   return (data || []) as Notification[];
 }
 

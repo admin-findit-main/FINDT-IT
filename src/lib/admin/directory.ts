@@ -28,7 +28,7 @@ export async function getAdminPeopleAction(kind: "shopper" | "owner") {
       .select("id, first_name, last_name, display_name, email, account_type, subscription_plan, is_suspended, created_at")
       .eq("account_type", "customer")
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(80);
     return (data || []).map((row) => ({
       id: row.id as string,
       name:

@@ -15,6 +15,7 @@ import {
   touchHubDeviceAction,
 } from "@/lib/services/hub-devices";
 import { LIVE_POLL_MS, useStoreInboxRealtime } from "@/lib/supabase/realtime";
+import { readCached, writeCached } from "@/lib/data/client-cache";
 import { BrandLogo } from "@/components/brand/logo";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
 
@@ -154,6 +155,7 @@ export default function FinditHubPage() {
       primed.current = true;
 
       setQueue(pending);
+      writeCached(`hub-queue:${id}`, pending);
       setIndex((current) => Math.min(current, Math.max(pending.length - 1, 0)));
       setError(null);
       setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -174,8 +176,13 @@ export default function FinditHubPage() {
   }, [store?.id, loadRuntime, loadQueue]);
 
   useEffect(() => {
+    const cached = storeId ? readCached<HubRequest[]>(`hub-queue:${storeId}`, 180_000) : null;
+    if (cached?.length) {
+      setQueue(cached);
+      setLoading(false);
+    }
     void load();
-  }, [load]);
+  }, [load, storeId]);
 
   useEffect(() => {
     const id = window.setInterval(() => setClock((n) => n + 1), 1000);
@@ -197,18 +204,23 @@ export default function FinditHubPage() {
     };
   }, [load]);
 
+  const onRealtime = useCallback(() => {
+    if (storeId) void loadQueue(storeId);
+  }, [storeId, loadQueue]);
+  const inboxSync = useStoreInboxRealtime(storeId, { onChange: onRealtime });
+
   useEffect(() => {
     const id = window.setInterval(() => {
       if (document.visibilityState !== "visible" || !storeId) return;
-      void loadQueue(storeId);
+      if (inboxSync.state !== "live") void loadQueue(storeId);
       if (source === "device") {
         void touchHubDeviceAction().catch((err) => {
           console.error("[FINDIT Hub] device heartbeat failed", err);
         });
       }
-    }, LIVE_POLL_MS);
+    }, inboxSync.state === "live" ? 30_000 : LIVE_POLL_MS);
     return () => window.clearInterval(id);
-  }, [storeId, loadQueue, source]);
+  }, [storeId, loadQueue, source, inboxSync.state]);
 
   useEffect(() => {
     let wake: WakeLockSentinel | null = null;
@@ -231,11 +243,6 @@ export default function FinditHubPage() {
       void wake?.release();
     };
   }, []);
-
-  const onRealtime = useCallback(() => {
-    if (storeId) void loadQueue(storeId);
-  }, [storeId, loadQueue]);
-  useStoreInboxRealtime(storeId, { onChange: onRealtime });
 
   const active = queue[index] ?? null;
 

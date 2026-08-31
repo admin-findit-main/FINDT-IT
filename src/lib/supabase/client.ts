@@ -4,6 +4,12 @@ import { getSupabasePublishableKey, isSupabaseConfigured } from "@/lib/config/en
 import { supabaseCookieOptions } from "@/lib/config/product-hosts";
 import { looksLikeServiceRoleKey } from "@findit/domain";
 
+type BrowserClient = ReturnType<typeof createBrowserClient<Database>>;
+
+let browserClient: BrowserClient | null = null;
+let browserHost = "";
+
+/** One browser client per tab so Realtime does not open extra sockets. */
 export function createClient() {
   if (!isSupabaseConfigured()) {
     throw new Error(
@@ -15,11 +21,14 @@ export function createClient() {
     throw new Error("Browser client must use the public anon key only.");
   }
   const host = typeof window !== "undefined" ? window.location.host : "";
-  return createBrowserClient<Database>(
+  if (browserClient && browserHost === host) return browserClient;
+  browserHost = host;
+  browserClient = createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     key,
     {
       cookieOptions: supabaseCookieOptions(host),
     }
   );
+  return browserClient;
 }

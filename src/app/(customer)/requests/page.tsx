@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { GlassBadge } from "@/components/ui/glass";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { getCustomerRequestsAction } from "@/lib/services/actions";
+import { readCached, writeCached } from "@/lib/data/client-cache";
 import { formatRelativeTime } from "@/lib/utils";
 import { formatShortPlace } from "@findit/domain";
 import type { CustomerRequest } from "@/types/database";
@@ -15,9 +16,16 @@ export default function RequestsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
+    const cached = readCached<CustomerRequest[]>(`requests:${tab}`, 60_000);
+    if (cached) {
+      setItems(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     getCustomerRequestsAction(tab).then((data) => {
       setItems(data);
+      writeCached(`requests:${tab}`, data);
       setLoading(false);
     });
   }, [tab]);

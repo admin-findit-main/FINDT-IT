@@ -45,7 +45,20 @@ export function NotificationPrompt({
     }
   }, []);
 
-  if (permission === null || permission !== "default") return null;
+  if (permission === null) return null;
+  if (permission === "granted") return null;
+  if (permission === "denied") {
+    const onSettings =
+      audience === "store"
+        ? pathname === "/store/notifications"
+        : pathname === "/notifications";
+    if (!onSettings) return null;
+    return (
+      <p className={cn("text-sm text-ink-muted", compact ? "" : "px-5 pt-4 sm:px-8", className)}>
+        Alerts are blocked in this browser. Turn them on in browser or device settings.
+      </p>
+    );
+  }
   const onCustomerAlerts =
     pathname === "/notifications" || pathname.startsWith("/requests/");
   const onStoreAlerts =

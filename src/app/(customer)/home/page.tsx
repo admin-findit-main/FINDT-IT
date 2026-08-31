@@ -96,6 +96,7 @@ export default function CustomerHomePage() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const autoLocated = useRef(false);
   const pendingSubmit = useRef<{ forceDuplicate: boolean } | null>(null);
+  const submitKeyRef = useRef<string | null>(null);
   const ageGateAfterClose = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -281,7 +282,11 @@ export default function CustomerHomePage() {
       toast.error("Confirm the category so we send this to the right stores.");
       return;
     }
+    if (loading) return;
     setLoading(true);
+    if (!submitKeyRef.current && typeof crypto.randomUUID === "function") {
+      submitKeyRef.current = crypto.randomUUID();
+    }
     let nextPlace = place;
     if (!nextPlace.city.trim() && nextPlace.postalCode.trim()) {
       const found = await lookupUsZip(nextPlace.postalCode);
@@ -315,6 +320,7 @@ export default function CustomerHomePage() {
       latitude: coords?.lat ?? null,
       longitude: coords?.lng ?? null,
       ageRestrictedConfirmed: !restricted || ageOk,
+      clientRequestKey: submitKeyRef.current || undefined,
       });
     } catch {
       setLoading(false);
@@ -348,7 +354,10 @@ export default function CustomerHomePage() {
       toast.error(result.error);
       return;
     }
+    submitKeyRef.current = null;
     const created = result.request!;
+    const storesTargeted =
+      "storesTargeted" in result ? (result.storesTargeted ?? created.stores_targeted ?? 0) : 0;
     writePendingFind({
       id: created.id,
       productName: created.product_name,
@@ -358,7 +367,7 @@ export default function CustomerHomePage() {
       imageUrl: created.image_url,
       createdAt: created.created_at,
       expiresAt: created.expires_at,
-      storesTargeted: result.storesTargeted ?? created.stores_targeted ?? 0,
+      storesTargeted,
       startedAt: Date.now(),
     });
     router.push(`/requests/${created.id}`);

@@ -180,6 +180,7 @@ export interface CustomerRequest {
   found_with_findit?: boolean | null;
   still_looking_count?: number;
   last_rebroadcast_at?: string | null;
+  client_request_key?: string | null;
   created_at: string;
   updated_at: string;
 }

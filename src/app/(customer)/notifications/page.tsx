@@ -73,6 +73,11 @@ export default function NotificationsPage() {
       {browserPermission === "granted" ? (
         <p className="mt-3 text-sm text-ink-subtle">Browser alerts are on for this device.</p>
       ) : null}
+      {browserPermission === "denied" ? (
+        <p className="mt-3 text-sm text-ink-muted">
+          Alerts are blocked in this browser. Turn them on in browser or device settings.
+        </p>
+      ) : null}
       <div className="mt-6">
         {loading ? (
           <Skeleton className="h-24 w-full" />
