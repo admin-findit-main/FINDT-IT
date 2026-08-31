@@ -174,7 +174,7 @@ export function AuthPageLinks({
           href={shopperSignup}
           className="font-semibold text-ink underline-offset-2 hover:underline"
         >
-          Create an account
+          Create an account with your phone
         </Link>
       </p>
       <p className="text-center text-sm text-ink-muted">

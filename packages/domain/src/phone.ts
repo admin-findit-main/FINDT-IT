@@ -120,7 +120,7 @@ export function mapPhoneOtpError(
     text.includes("unsupported phone provider") ||
     (text.includes("sms") && text.includes("provider"))
   ) {
-    return "Text codes aren't set up yet. Use email instead.";
+    return "Text codes aren't set up yet. Finish Twilio in Supabase Auth → Phone.";
   }
   if (text.includes("sms") && text.includes("send")) {
     return "We couldn't send a text right now. Try again in a moment.";

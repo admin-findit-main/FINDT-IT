@@ -21,16 +21,13 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 
 export default function LoginScreen() {
   const theme = useAppTheme();
-  const { sendPhoneOtp, verifyPhoneOtp, signIn } = useAuth();
+  const { sendPhoneOtp, verifyPhoneOtp } = useAuth();
   const { reason } = useLocalSearchParams<{ reason?: string }>();
-  const [mode, setMode] = useState<"phone" | "email">("email");
   const [phoneDisplay, setPhoneDisplay] = useState("");
   const [phoneE164, setPhoneE164] = useState("");
   const [masked, setMasked] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -43,7 +40,6 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (reason !== "customer-only") return;
-    setMode("email");
     setError(
       "This app is for shoppers. The FINDIT operator signs in on the website, then opens /admin."
     );
@@ -76,17 +72,9 @@ export default function LoginScreen() {
     setBusy(false);
   };
 
-  const onEmail = async () => {
-    setBusy(true);
-    setError(null);
-    const res = await signIn(email.trim(), password);
-    if (res.error) setError(res.error);
-    setBusy(false);
-  };
-
   return (
     <Screen variant="auth">
-      <AuthHeader title="Sign in" subtitle="Ask nearby stores who has it." />
+      <AuthHeader title="Sign in" subtitle="We’ll text a 6-digit code." />
 
       <GlassCard>
         {!isSupabaseConfigured() && (
@@ -94,7 +82,7 @@ export default function LoginScreen() {
             Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env
           </GlassNotice>
         )}
-        {mode === "phone" && step === "phone" ? (
+        {step === "phone" ? (
           <>
             <GlassInput
               inset
@@ -122,8 +110,7 @@ export default function LoginScreen() {
               style={styles.cta}
             />
           </>
-        ) : null}
-        {mode === "phone" && step === "otp" ? (
+        ) : (
           <>
             <Text style={[styles.hint, { color: theme.inkMuted }]}>Code sent to {masked}</Text>
             <GlassInput
@@ -166,53 +153,10 @@ export default function LoginScreen() {
               </Text>
             </Pressable>
           </>
-        ) : null}
-        {mode === "email" ? (
-          <>
-            <GlassInput
-              inset
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              autoComplete="email"
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-            />
-            <GlassInput
-              inset
-              last
-              secureTextEntry
-              textContentType="password"
-              autoComplete="password"
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-            />
-            {error ? <GlassNotice>{error}</GlassNotice> : null}
-            <GlassButton
-              title="Sign in"
-              size="lg"
-              loading={busy}
-              disabled={busy}
-              onPress={onEmail}
-              style={styles.cta}
-            />
-          </>
-        ) : null}
+        )}
       </GlassCard>
 
-      <AuthFooter
-        secondaryLabel={mode === "phone" ? "Use email" : "Use phone"}
-        onSecondary={() => {
-          setMode(mode === "phone" ? "email" : "phone");
-          setError(null);
-          setStep("phone");
-        }}
-        linkHref="/(auth)/signup"
-        linkLabel="Create account"
-      />
+      <AuthFooter linkHref="/(auth)/signup" linkLabel="Create account" />
     </Screen>
   );
 }

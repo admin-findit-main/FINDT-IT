@@ -27,18 +27,22 @@ export function AuthFooter({
   linkHref,
   linkLabel,
 }: {
-  secondaryLabel: string;
-  onSecondary: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
   linkHref: Href;
   linkLabel: string;
 }) {
   const theme = useAppTheme();
   return (
     <View style={styles.footer}>
-      <Pressable onPress={onSecondary} hitSlop={8} style={styles.footerPress}>
-        <Text style={[styles.footerText, { color: theme.inkMuted }]}>{secondaryLabel}</Text>
-      </Pressable>
-      <Text style={[styles.dot, { color: theme.inkSubtle }]}>·</Text>
+      {secondaryLabel && onSecondary ? (
+        <>
+          <Pressable onPress={onSecondary} hitSlop={8} style={styles.footerPress}>
+            <Text style={[styles.footerText, { color: theme.inkMuted }]}>{secondaryLabel}</Text>
+          </Pressable>
+          <Text style={[styles.dot, { color: theme.inkSubtle }]}>·</Text>
+        </>
+      ) : null}
       <Link href={linkHref} style={styles.footerPress}>
         <Text style={[styles.footerText, { color: theme.inkMuted }]}>{linkLabel}</Text>
       </Link>

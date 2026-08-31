@@ -19,18 +19,13 @@ import { useAuth } from "@/lib/auth";
 
 export default function SignupScreen() {
   const theme = useAppTheme();
-  const { sendPhoneOtp, verifyPhoneOtp, signUp } = useAuth();
-  const [mode, setMode] = useState<"phone" | "email">("email");
+  const { sendPhoneOtp, verifyPhoneOtp } = useAuth();
   const [phoneDisplay, setPhoneDisplay] = useState("");
   const [phoneE164, setPhoneE164] = useState("");
   const [masked, setMasked] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"phone" | "otp">("phone");
-  const [firstName, setFirstName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [seconds, setSeconds] = useState(0);
 
@@ -67,33 +62,15 @@ export default function SignupScreen() {
     setBusy(false);
   };
 
-  const onEmail = async () => {
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    const res = await signUp({
-      email: email.trim(),
-      password,
-      firstName: firstName.trim() || "Friend",
-    });
-    if (res.error) setError(res.error);
-    else if (res.needsEmailConfirm) {
-      setNotice(
-        "Check your inbox, tap the link once, then sign in with this password."
-      );
-    }
-    setBusy(false);
-  };
-
   return (
     <Screen variant="auth">
       <AuthHeader
         title="Create account"
-        subtitle="Customer accounts only in this app."
+        subtitle="We’ll text a 6-digit code. No email or password."
       />
 
       <GlassCard>
-        {mode === "phone" && step === "phone" ? (
+        {step === "phone" ? (
           <>
             <GlassInput
               inset
@@ -121,8 +98,7 @@ export default function SignupScreen() {
               style={styles.cta}
             />
           </>
-        ) : null}
-        {mode === "phone" && step === "otp" ? (
+        ) : (
           <>
             <Text style={[styles.hint, { color: theme.inkMuted }]}>Code sent to {masked}</Text>
             <GlassInput
@@ -165,63 +141,10 @@ export default function SignupScreen() {
               </Text>
             </Pressable>
           </>
-        ) : null}
-        {mode === "email" ? (
-          <>
-            <GlassInput
-              inset
-              placeholder="First name"
-              autoComplete="given-name"
-              textContentType="givenName"
-              value={firstName}
-              onChangeText={setFirstName}
-            />
-            <GlassInput
-              inset
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              autoComplete="email"
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-            />
-            <GlassInput
-              inset
-              last
-              secureTextEntry
-              textContentType="newPassword"
-              autoComplete="password-new"
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-            />
-            {error ? <GlassNotice>{error}</GlassNotice> : null}
-            {notice ? <GlassNotice tone="muted">{notice}</GlassNotice> : null}
-            <GlassButton
-              title="Create account"
-              size="lg"
-              loading={busy}
-              disabled={busy}
-              onPress={onEmail}
-              style={styles.cta}
-            />
-          </>
-        ) : null}
+        )}
       </GlassCard>
 
-      <AuthFooter
-        secondaryLabel={mode === "phone" ? "Use email" : "Use phone"}
-        onSecondary={() => {
-          setMode(mode === "phone" ? "email" : "phone");
-          setError(null);
-          setNotice(null);
-          setStep("phone");
-        }}
-        linkHref="/(auth)/login"
-        linkLabel="Already have an account?"
-      />
+      <AuthFooter linkHref="/(auth)/login" linkLabel="Already have an account?" />
     </Screen>
   );
 }

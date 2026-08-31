@@ -6,22 +6,15 @@ import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
-import { GlassNotice } from "@/components/ui/glass";
 import { destinationAfterAuth, isSafeNextPath } from "@/lib/auth/home-path";
-import { CustomerEmailSignupForm } from "@/components/auth/customer-email-form";
 import {
   AuthAudienceSwitch,
   AuthSignupLinks,
 } from "@/components/auth/auth-audience";
-import {
-  AuthMethodSwitch,
-  EmailSignIn,
-  OneTimeLoginPanel,
-  type AuthMethod,
-} from "@/components/auth/email-sign-in";
+import { PhoneOtpForm } from "@/components/auth/phone-otp-form";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { signUpAction } from "@/lib/services/actions";
-import { useMarketingHomeHref, useSurfaceHref } from "@/components/host/host-surface";
+import { useSurfaceHref } from "@/components/host/host-surface";
 import { passwordStrength } from "@findit/domain";
 
 function SignupForm() {
@@ -29,14 +22,9 @@ function SignupForm() {
   const params = useSearchParams();
   const joinHref = useSurfaceHref("www", "/join");
   const signupHref = useSurfaceHref("dashboard", "/signup");
-  const homeHref = useMarketingHomeHref();
   const [loading, setLoading] = useState(false);
-  const [existingAccount, setExistingAccount] = useState(false);
-  const [method, setMethod] = useState<AuthMethod>("password");
-  const [email, setEmail] = useState("");
   const [staffPassword, setStaffPassword] = useState("");
   const [staffEmail, setStaffEmail] = useState("");
-  const [noAccountHint, setNoAccountHint] = useState(false);
 
   useEffect(() => {
     if (params.get("type") === "business") {
@@ -66,10 +54,6 @@ function SignupForm() {
     });
     setLoading(false);
     if ("error" in result && result.error) {
-      if ("code" in result && result.code === "existing_account") {
-        setExistingAccount(true);
-        return;
-      }
       toast.error(result.error);
       return;
     }
@@ -85,33 +69,6 @@ function SignupForm() {
       })
     );
     router.refresh();
-  }
-
-  if (existingAccount) {
-    return (
-      <Card className="p-6 sm:p-8">
-        <h1 className="text-2xl font-bold tracking-tight text-ink">
-          That email already has an account
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          FINDIT does not create a second login for the same email. Sign in with
-          your password, or email a one-time login.
-        </p>
-        <EmailSignIn
-          next={next}
-          initialEmail={staffEmail || email}
-          audience="shopper"
-        />
-        <p className="mt-6 text-center text-sm text-ink-muted">
-          <Link
-            href={homeHref}
-            className="font-semibold text-ink underline-offset-2 hover:underline"
-          >
-            Go back to askfindit.com
-          </Link>
-        </p>
-      </Card>
-    );
   }
 
   if (isStaffInvite) {
@@ -191,51 +148,21 @@ function SignupForm() {
         storeHref={joinHref}
       />
       <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink">
-        {method === "onetime" ? "One-time login" : "Create a shopper account"}
+        Create a shopper account
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        {method === "onetime"
-          ? "Already have FINDIT? We’ll email a link that signs you in once. New here? Switch to Password."
-          : "Shopper accounts only. Stores apply from the Store tab. Use a password, or a one-time login if you already have FINDIT."}
+        We’ll text a 6-digit code. That’s the shopper login — no email or
+        password. Stores apply from the Store tab.
       </p>
-      <div className="mt-6 space-y-5">
-        <AuthMethodSwitch
-          value={method}
-          onChange={(nextMethod) => {
-            setMethod(nextMethod);
-            setNoAccountHint(false);
-          }}
-        />
-        {noAccountHint ? (
-          <GlassNotice tone="muted">
-            No FINDIT account for that email yet. Create one with a password.
-          </GlassNotice>
-        ) : null}
-        {method === "onetime" ? (
-          <OneTimeLoginPanel
-            emailId="signup-onetime-email"
-            email={email}
-            onEmailChange={setEmail}
-            autoFocus
-            audience="shopper"
-            onNoAccount={() => {
-              setMethod("password");
-              setNoAccountHint(true);
-            }}
-            onUsePassword={() => setMethod("password")}
-          />
-        ) : (
-          <CustomerEmailSignupForm
-            email={email}
-            onEmailChange={setEmail}
-            onFinished={({ homePath, needsName }) => {
-              router.push(destinationAfterAuth({ homePath, next, needsName }));
-              router.refresh();
-            }}
-            onExistingAccount={() => setExistingAccount(true)}
-          />
-        )}
-      </div>
+      <PhoneOtpForm
+        createIfMissing
+        audience="shopper"
+        continueLabel="Text me a code"
+        onFinished={({ homePath, needsName }) => {
+          router.push(destinationAfterAuth({ homePath, next, needsName }));
+          router.refresh();
+        }}
+      />
       <AuthSignupLinks next={next} />
     </Card>
   );

@@ -1,15 +1,16 @@
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { Card } from "@/components/ui/primitives";
-import { EmailSignIn } from "@/components/auth/email-sign-in";
 import { AuthAudienceSwitch, AuthPageLinks } from "@/components/auth/auth-audience";
+import { PhoneOtpForm } from "@/components/auth/phone-otp-form";
 import { GlassNotice } from "@/components/ui/glass";
 import { publicLoginError } from "@/lib/auth/login-error";
+import { destinationAfterAuth } from "@/lib/auth/home-path";
 
 function LoginForm() {
+  const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next");
   const error = publicLoginError(params.get("error"));
@@ -21,14 +22,22 @@ function LoginForm() {
         Shopper sign in
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Use your password, or email a one-time login. Stores use the Store tab.
+        We’ll text a 6-digit code. Stores use the Store tab.
       </p>
       {error ? (
         <div className="mt-4">
           <GlassNotice tone="muted">{error}</GlassNotice>
         </div>
       ) : null}
-      <EmailSignIn next={next} audience="shopper" />
+      <PhoneOtpForm
+        createIfMissing={false}
+        audience="shopper"
+        continueLabel="Text me a code"
+        onFinished={({ homePath, needsName }) => {
+          router.push(destinationAfterAuth({ homePath, next, needsName }));
+          router.refresh();
+        }}
+      />
       <AuthPageLinks audience="shopper" next={next} />
     </Card>
   );

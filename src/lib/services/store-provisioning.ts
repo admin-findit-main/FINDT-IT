@@ -5,7 +5,7 @@ import {
   storeCategoriesForRequestCategory,
 } from "@/lib/services/category-routing";
 import { slugify } from "@/lib/utils";
-import { defaultCategoryIdsForType } from "@findit/domain";
+import { defaultCategoryIdsForType, normalizePhoneToE164 } from "@findit/domain";
 import { coordsFromZip } from "@/lib/services/zip-centroids";
 import type { DemandItem, Store, StoreMetrics } from "@/types/database";
 
@@ -23,6 +23,11 @@ export async function provisionStoreFromApplication(applicationId: string, revie
     throw new Error("Application already reviewed");
   }
 
+  const ownerPhoneParsed = normalizePhoneToE164(
+    String(application.owner_phone || application.phone || "")
+  );
+  const ownerPhone = ownerPhoneParsed.ok ? ownerPhoneParsed.e164 : null;
+
   let ownerId = application.applicant_user_id as string | null;
 
   if (!ownerId) {
@@ -38,6 +43,7 @@ export async function provisionStoreFromApplication(applicationId: string, revie
     const { data: created, error: createUserError } = await admin.auth.admin.createUser({
       email: application.owner_email.toLowerCase(),
       email_confirm: true,
+      phone: ownerPhone || undefined,
       user_metadata: {
         first_name: String(application.owner_name).split(" ")[0] || application.owner_name,
         last_name: String(application.owner_name).split(" ").slice(1).join(" ") || "",
@@ -57,15 +63,31 @@ export async function provisionStoreFromApplication(applicationId: string, revie
     ownerId = created.user.id;
   }
 
-  await admin
-    .from("profiles")
-    .update({
-      account_type: "business",
-      default_city: application.city,
-      default_state: application.state,
-      default_postal_code: application.postal_code,
-    })
-    .eq("id", ownerId);
+  const profilePatch: {
+    account_type: "business";
+    default_city: string;
+    default_state: string;
+    default_postal_code: string;
+    phone_e164?: string;
+  } = {
+    account_type: "business",
+    default_city: application.city,
+    default_state: application.state,
+    default_postal_code: application.postal_code,
+  };
+  if (ownerPhone) {
+    const { data: phoneTaken } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("phone_e164", ownerPhone)
+      .neq("id", ownerId)
+      .maybeSingle();
+    if (!phoneTaken) {
+      profilePatch.phone_e164 = ownerPhone;
+      await admin.auth.admin.updateUserById(ownerId, { phone: ownerPhone });
+    }
+  }
+  await admin.from("profiles").update(profilePatch).eq("id", ownerId);
 
   let slug = slugify(application.business_name);
   const { data: slugHit } = await admin.from("stores").select("id").eq("slug", slug).maybeSingle();

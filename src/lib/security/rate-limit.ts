@@ -7,6 +7,7 @@ const FAIL_CLOSED_BUCKETS = new Set([
   "login",
   "signup",
   "magic-link",
+  "phone-otp",
   "hub-pairing",
   "hub-claim",
   "create-request",

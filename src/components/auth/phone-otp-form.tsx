@@ -13,17 +13,21 @@ import {
   sendPhoneOtpAction,
   verifyPhoneOtpAction,
 } from "@/lib/services/phone-auth-actions";
+import { WrongLoginSideNotice } from "@/components/auth/auth-audience";
 import type { AppHomePath } from "@/lib/auth/home-path";
+import type { LoginAudience } from "@findit/domain";
 
 type Step = "phone" | "otp";
 
 export function PhoneOtpForm({
   createIfMissing,
   continueLabel = "Continue",
+  audience = "shopper",
   onFinished,
 }: {
   createIfMissing: boolean;
   continueLabel?: string;
+  audience?: LoginAudience;
   onFinished: (result: { homePath: AppHomePath; needsName: boolean }) => void;
 }) {
   const [step, setStep] = useState<Step>("phone");
@@ -33,6 +37,7 @@ export function PhoneOtpForm({
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [wrongSide, setWrongSide] = useState<LoginAudience | null>(null);
 
   useEffect(() => {
     if (seconds <= 0) return;
@@ -45,12 +50,17 @@ export function PhoneOtpForm({
     const result = await sendPhoneOtpAction({
       phone: phoneValue,
       createIfMissing,
+      audience,
     });
     setLoading(false);
     if (result.error) {
       toast.error(result.error);
+      if (result.code === "wrong_side" && result.requiredAudience) {
+        setWrongSide(result.requiredAudience);
+      }
       return false;
     }
+    setWrongSide(null);
     setPhoneE164(result.phone || phoneValue);
     setMasked(result.masked || maskPhoneE164(result.phone || phoneValue));
     setSeconds(OTP_RESEND_SECONDS);
@@ -71,12 +81,17 @@ export function PhoneOtpForm({
       phone: phoneE164 || phoneDisplay,
       token: code,
       createIfMissing,
+      audience,
     });
     setLoading(false);
     if (result.error) {
       toast.error(result.error);
+      if (result.code === "wrong_side" && result.requiredAudience) {
+        setWrongSide(result.requiredAudience);
+      }
       return;
     }
+    setWrongSide(null);
     onFinished({
       homePath: result.homePath || "/home",
       needsName: Boolean(result.needsName),
@@ -86,6 +101,7 @@ export function PhoneOtpForm({
   if (step === "otp") {
     return (
       <form onSubmit={onOtp} className="mt-6 space-y-4">
+        {wrongSide ? <WrongLoginSideNotice requiredAudience={wrongSide} /> : null}
         <div>
           <Label htmlFor="otp">Enter the code we sent to {masked}</Label>
           <Input
@@ -135,6 +151,7 @@ export function PhoneOtpForm({
 
   return (
     <form onSubmit={onPhone} className="mt-6 space-y-4">
+      {wrongSide ? <WrongLoginSideNotice requiredAudience={wrongSide} /> : null}
       <div>
         <Label htmlFor="phone">Enter your phone number</Label>
         <Input

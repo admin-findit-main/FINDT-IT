@@ -19,7 +19,7 @@ export function loginAudienceForAccount(input: {
 
 export function wrongLoginSideMessage(belongsOn: LoginAudience): string {
   if (belongsOn === "store") {
-    return "This email is a store login. Use Store sign in so FINDIT opens the business side.";
+    return "This is a store login. Use Store sign in so FINDIT opens the business side.";
   }
-  return "This email is a shopper login. Use Shopper sign in so FINDIT opens the customer side.";
+  return "This is a shopper login. Use Shopper sign in so FINDIT opens the customer side.";
 }

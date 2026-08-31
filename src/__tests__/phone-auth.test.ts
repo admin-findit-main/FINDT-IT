@@ -41,4 +41,19 @@ describe("customer phone auth", () => {
       /incorrect/i
     );
   });
+
+  it("lets a store owner sign in with the number on their account", () => {
+    demoSendPhoneOtp("+17035550198");
+    const result = demoVerifyPhoneOtp("+17035550198", DEMO_PHONE_OTP, false, "store");
+    expect(result.profile.account_type).toBe("business");
+    expect(result.needsName).toBe(false);
+  });
+
+  it("keeps a shopper phone off the store login", () => {
+    demoSendPhoneOtp("+17035551234");
+    demoVerifyPhoneOtp("+17035551234", DEMO_PHONE_OTP, true);
+    expect(() =>
+      demoVerifyPhoneOtp("+17035551234", DEMO_PHONE_OTP, false, "store")
+    ).toThrow(/Shopper sign in/);
+  });
 });

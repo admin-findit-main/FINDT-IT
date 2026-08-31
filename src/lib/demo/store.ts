@@ -28,6 +28,8 @@ import {
   accountDeletionBlockReason,
   createdInMonthlyFindWindow,
   customerNeedsFirstName,
+  loginAudienceForAccount,
+  wrongLoginSideMessage,
   getConsumerEntitlements,
   isAgeRestrictedFind,
   isSoloAdmin,
@@ -157,7 +159,7 @@ function seedState(): DemoState {
       notify_new_request: true,
       notify_demand_alerts: true,
       is_suspended: false,
-      phone_e164: null,
+      phone_e164: "+17035550198",
       created_at: now(),
       updated_at: now(),
     },
@@ -569,14 +571,30 @@ export function demoSendPhoneOtp(phoneE164: string): { phone: string } {
 export function demoVerifyPhoneOtp(
   phoneE164: string,
   token: string,
-  createIfMissing: boolean
+  createIfMissing: boolean,
+  audience?: "shopper" | "store"
 ): { profile: Profile; sessionId: string; needsName: boolean } {
   if (token !== DEMO_PHONE_OTP) {
     throw new Error("That code is incorrect.");
   }
   const state = getDemoState();
   let profile = state.profiles.find((p) => p.phone_e164 === phoneE164) || null;
+  if (profile) {
+    const belongs = loginAudienceForAccount({
+      isAdmin: isSoloAdmin(profile),
+      accountType: profile.account_type,
+      hasActiveStoreMembership: state.storeMembers.some(
+        (member) => member.user_id === profile!.id && member.status === "active"
+      ),
+    });
+    if (audience && belongs !== audience) {
+      throw new Error(wrongLoginSideMessage(belongs));
+    }
+  }
   if (!profile) {
+    if (audience === "store") {
+      throw new Error("No store account for this number. Use email or apply.");
+    }
     if (!createIfMissing) {
       throw new Error("No FINDIT account for this number yet. Sign up to continue.");
     }

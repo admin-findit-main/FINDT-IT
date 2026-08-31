@@ -81,11 +81,7 @@ describe("mapPhoneOtpError", () => {
     );
     expect(mapPhoneOtpError("Failed to fetch", "send")).toMatch(/connection/i);
     expect(mapPhoneOtpError("Signups not allowed for otp", "send")).toMatch(/Sign up/i);
-    expect(mapPhoneOtpError("Unsupported phone provider", "send")).toMatch(
-      /email instead/i
-    );
-    expect(mapPhoneOtpError("400: phone_provider_disabled", "send")).toMatch(
-      /email instead/i
-    );
+    expect(mapPhoneOtpError("Unsupported phone provider", "send")).toMatch(/Twilio/i);
+    expect(mapPhoneOtpError("400: phone_provider_disabled", "send")).toMatch(/Twilio/i);
   });
 });
