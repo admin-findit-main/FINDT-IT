@@ -106,10 +106,12 @@ export function FindSendOverlay({
   label?: string;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[70] grid place-items-end p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:place-items-center sm:inset-0 sm:bg-black/10">
-      <div className="w-full max-w-sm rounded-2xl border border-hairline-strong bg-white px-5 py-5 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
-        <FindProgress percent={percent} label={label || sendStageLabel(percent)} size="inline" />
-      </div>
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-[var(--canvas)]/88 px-6 backdrop-blur-md">
+      <FindProgress
+        percent={percent}
+        label={label || sendStageLabel(percent)}
+        size="inline"
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { cache } from "react";
+import { after } from "next/server";
 import { isDemoMode, isSupabaseConfigured } from "@/lib/config/env";
 import { coerceSoloAdminProfile, isSoloAdmin, isSoloAdminEmail } from "@/lib/auth/admin";
 import { authEmailErrorMessage } from "@/lib/auth/email-error";
@@ -1080,11 +1081,17 @@ export async function createCustomerRequestAction(raw: unknown) {
     requestId: request.id,
   });
 
-  const storesTargeted = await routeRequestToStoresAction(request.id);
+  after(() =>
+    routeRequestToStoresAction(request.id).catch((err) => {
+      console.error("[FINDIT] Route after create failed", err);
+    })
+  );
+
   return {
     request: request as CustomerRequest,
-    storesTargeted,
-    noStores: storesTargeted === 0,
+    storesTargeted: 0,
+    noStores: false,
+    routing: true as const,
   };
   });
 }
@@ -1173,6 +1180,10 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
+  const haveRequestPoint = Number.isFinite(reqLat) && Number.isFinite(reqLng);
+  const missingZipStores = stores.filter(
+    (store) => store.latitude == null || store.longitude == null
+  );
   const [
     { data: cats },
     { data: areas },
@@ -1200,16 +1211,16 @@ export async function routeRequestToStoresAction(requestId: string): Promise<num
       .select("store_id")
       .in("store_id", storeIds)
       .gte("created_at", monthStart.toISOString()),
-    resolvePoint({
-      postalCode: request.postal_code,
-      latitude: request.latitude,
-      longitude: request.longitude,
-    }),
-    resolvePointsByZip(
-      stores
-        .filter((store) => store.latitude == null || store.longitude == null)
-        .map((store) => store.postal_code)
-    ),
+    haveRequestPoint
+      ? Promise.resolve({ latitude: reqLat, longitude: reqLng })
+      : resolvePoint({
+          postalCode: request.postal_code,
+          latitude: request.latitude,
+          longitude: request.longitude,
+        }),
+    missingZipStores.length
+      ? resolvePointsByZip(missingZipStores.map((store) => store.postal_code))
+      : Promise.resolve(new Map()),
   ]);
 
   const monthCounts = new Map<string, number>();

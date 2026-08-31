@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { GlassNotice, VerifiedStoreBadge } from "@/components/ui/glass";
 import { Card, EmptyState } from "@/components/ui/primitives";
 import {
+  FindProgress,
   SyncLine,
   sendStageLabel,
   useClimbingPercent,
@@ -103,7 +104,7 @@ function SearchingStoresCard({
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
         {storesContacted > 0
           ? `Sent to ${storesContacted} store${storesContacted === 1 ? "" : "s"}`
-          : "Finding stores"}
+          : "Sending to nearby stores"}
         {placeLabel ? ` near ${placeLabel}` : ""}. Answers will show up here,
         closest first.
       </p>
@@ -198,7 +199,7 @@ export default function RequestDetailPage() {
     data?.status !== "cancelled" &&
     data?.status !== "fulfilled";
   const recentlyCreated = Boolean(
-    data && Date.now() - new Date(data.created_at).getTime() < 12_000
+    data && Date.now() - new Date(data.created_at).getTime() < 20_000
   );
   const searching = Boolean(
     openRequest &&
@@ -242,7 +243,11 @@ export default function RequestDetailPage() {
   if (loading && !data) {
     return (
       <div className="mx-auto max-w-xl px-5 py-8 sm:px-8">
-        <SyncLine percent={syncPercent || climb || 18} label={syncLabel} />
+        <FindProgress
+          percent={syncPercent || climb || 18}
+          label={syncLabel}
+          size="page"
+        />
       </div>
     );
   }
