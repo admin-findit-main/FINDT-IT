@@ -69,7 +69,7 @@ export default function HubConnectPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-black px-6 py-10 text-white">
       <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center text-center">
-        <BrandLogo kind="business" tone="dark" className="h-6 w-auto" />
+        <BrandLogo kind="business" tone="dark" className="h-8" />
         <h1 className="mt-8 text-3xl font-bold tracking-tight md:text-4xl">
           Connect this device to FINDIT
         </h1>

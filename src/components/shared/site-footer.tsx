@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLockup } from "@/components/brand/logo";
 import { PUBLIC_SUPPORT_EMAIL, SUPPORT_PHONE, mailHref, telHref } from "@/lib/config/support";
 
 const YEAR = new Date().getFullYear();
@@ -22,7 +23,8 @@ export function SiteFooter({ tone = "light" }: { tone?: "light" | "dark" }) {
     <footer
       className={`mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-12 text-sm ${muted} sm:flex-row sm:items-center sm:justify-between`}
     >
-      <div className="space-y-1">
+      <div className="space-y-3">
+        <BrandLockup tone={tone} />
         <p>© {YEAR} FINDIT</p>
         <p className="flex flex-wrap gap-x-3 gap-y-1">
           <a className={`font-medium ${hover}`} href={mailHref(PUBLIC_SUPPORT_EMAIL)}>

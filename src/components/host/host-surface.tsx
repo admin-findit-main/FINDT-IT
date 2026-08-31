@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import {
   marketingHomeHrefForSurface,
   matchProductSurface,
@@ -12,13 +12,24 @@ import {
 
 const HostSurfaceContext = createContext<ProductSurface>("local");
 
+function surfaceFromHost(host: string): ProductSurface {
+  const matched = matchProductSurface(host);
+  return matched === "apex" ? "www" : matched;
+}
+
 export function HostSurfaceProvider({
-  surface,
+  surface: surfaceProp,
   children,
 }: {
-  surface: ProductSurface;
+  surface?: ProductSurface;
   children: React.ReactNode;
 }) {
+  const [surface, setSurface] = useState<ProductSurface>(surfaceProp || "local");
+
+  useEffect(() => {
+    setSurface(surfaceFromHost(window.location.host));
+  }, []);
+
   return (
     <HostSurfaceContext.Provider value={surface}>
       {children}

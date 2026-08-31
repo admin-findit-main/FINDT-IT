@@ -1,5 +1,6 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { displayName, roleLabel } from "@findit/domain";
+import { useState } from "react";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ACCOUNT_DELETION_CONFIRMATION, displayName, roleLabel } from "@findit/domain";
 import { spacing, theme, typography } from "@findit/theme";
 import {
   GlassBackdrop,
@@ -8,12 +9,16 @@ import {
   GlassChip,
   GlassLabel,
 } from "@findit/theme/native";
+import { deleteMyAccount } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useTabContentInset } from "@/components/useTabContentInset";
 
 export default function ProfileScreen() {
   const { profile, activeStore, stores, setActiveStoreId, signOut } = useAuth();
   const { paddingBottom } = useTabContentInset();
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   return (
     <GlassBackdrop>
@@ -61,6 +66,40 @@ export default function ProfileScreen() {
           style={styles.signOut}
           textStyle={styles.signOutText}
         />
+
+        <GlassCard level="base" style={styles.section}>
+          <GlassLabel>Delete account</GlassLabel>
+          <Text style={styles.hint}>
+            Type {ACCOUNT_DELETION_CONFIRMATION} to permanently delete this login.
+          </Text>
+          <TextInput
+            value={deleteText}
+            onChangeText={setDeleteText}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            placeholder={ACCOUNT_DELETION_CONFIRMATION}
+            placeholderTextColor={theme.inkSubtle}
+            style={styles.deleteInput}
+          />
+          {deleteError ? <Text style={styles.deleteError}>{deleteError}</Text> : null}
+          <GlassButton
+            title={deleting ? "Deleting…" : "Delete account"}
+            variant="ink"
+            loading={deleting}
+            disabled={deleting}
+            onPress={async () => {
+              setDeleting(true);
+              setDeleteError(null);
+              const result = await deleteMyAccount(deleteText);
+              setDeleting(false);
+              if (result.error) {
+                setDeleteError(result.error);
+                return;
+              }
+              await signOut();
+            }}
+          />
+        </GlassCard>
       </ScrollView>
     </GlassBackdrop>
   );
@@ -95,4 +134,20 @@ const styles = StyleSheet.create({
   },
   signOut: { marginTop: spacing.xl },
   signOutText: { color: theme.accentInk },
+  deleteInput: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.hairline,
+    paddingHorizontal: spacing.md,
+    color: theme.ink,
+    fontSize: typography.size.body,
+  },
+  deleteError: {
+    color: theme.accentInk,
+    fontSize: typography.size.footnote,
+    marginBottom: spacing.sm,
+  },
 });

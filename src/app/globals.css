@@ -83,11 +83,11 @@
   --oos-border: rgba(142, 142, 147, 0.24);
 
   /* ---- Chrome geometry ------------------------------------------------- */
-  --blur-subtle: 12px;
-  --blur-base: 24px;
-  --blur-strong: 40px;
-  --blur-chrome: 30px;
-  --glass-saturate: 180%;
+  --blur-subtle: 8px;
+  --blur-base: 12px;
+  --blur-strong: 16px;
+  --blur-chrome: 10px;
+  --glass-saturate: 120%;
 
   --shadow-glass: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
   --shadow-glass-lg: 0 2px 4px rgba(0, 0, 0, 0.04), 0 16px 40px rgba(0, 0, 0, 0.08);
@@ -141,7 +141,7 @@
 
   --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont,
     "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -296,6 +296,19 @@ h1 {
 
 .findit-search-dot {
   animation: findit-search-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes findit-route-bar {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.findit-route-bar {
+  animation: findit-route-bar 0.9s ease-in-out infinite;
 }
 
 .glass-press:active {

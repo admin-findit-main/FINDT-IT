@@ -64,9 +64,15 @@ npx eas-cli login
 npx eas build --platform ios --profile preview
 ```
 
-Bundle IDs: `com.findit.customer` · `com.findit.employee`
+Bundle IDs: `com.findit.customer` · `com.findit.employee` · Hub tablet `com.findit.hub`
 
 Owner/admin remain on the web URL (`npm run dev` / production web).
+
+## FINDIT Hub Android (counter tablet)
+
+Native kiosk in `apps/hub-android`. It opens `https://store.askfindit.com/hub` full screen (no browser chrome), landscape, with the FINDIT splash. Pairing uses the existing Devices code; the WebView keeps the device cookie so the tablet reconnects after a restart. Set FINDIT Hub as the **Home app** so it launches after reboot. Unplug to let the screen sleep; plug in to keep it awake.
+
+Open the folder in Android Studio (JDK 17). Details: `apps/hub-android/README.md`.
 
 ## Morning checklist
 

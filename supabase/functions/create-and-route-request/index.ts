@@ -295,7 +295,7 @@ Deno.serve(async (req) => {
   const { data: stores } = await admin
     .from("stores")
     .select(
-      "id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan, latitude, longitude"
+      "id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan, business_type, accepting_requests, latitude, longitude"
     )
     .eq("is_active", true)
     .eq("is_suspended", false);
@@ -308,6 +308,9 @@ Deno.serve(async (req) => {
       { data: areas },
       { data: hours },
       { data: existingTargets },
+      { data: catalogCats },
+      { data: catalogKeys },
+      { data: customKeys },
     ] = await Promise.all([
       admin
         .from("store_categories")
@@ -325,7 +328,32 @@ Deno.serve(async (req) => {
         .from("request_targets")
         .select("store_id")
         .eq("request_id", request.id),
+      admin
+        .from("store_catalog_categories")
+        .select("store_id, category_id")
+        .in("store_id", storeIds),
+      admin
+        .from("store_catalog_keywords")
+        .select("store_id, keyword_id")
+        .in("store_id", storeIds),
+      admin
+        .from("store_custom_keywords")
+        .select("store_id, normalized_keyword")
+        .in("store_id", storeIds),
     ]);
+
+    const keywordIds = [
+      ...new Set((catalogKeys || []).map((row) => row.keyword_id).filter(Boolean)),
+    ];
+    const { data: keywordRows } = keywordIds.length
+      ? await admin
+          .from("catalog_keywords")
+          .select("id, normalized_keyword")
+          .in("id", keywordIds)
+      : { data: [] as { id: string; normalized_keyword: string }[] };
+    const keywordTextById = new Map(
+      (keywordRows || []).map((row) => [row.id, row.normalized_keyword])
+    );
 
     const monthStart = new Date();
     monthStart.setDate(1);
@@ -350,11 +378,26 @@ Deno.serve(async (req) => {
       city: store.city,
       service_radius_miles: store.service_radius_miles ?? 10,
       subscription_plan: store.subscription_plan,
+      businessTypeId: store.business_type || null,
+      acceptingRequests: store.accepting_requests !== false,
       latitude: store.latitude,
       longitude: store.longitude,
       categories: (cats || [])
         .filter((c) => c.store_id === store.id)
         .map((c) => c.category),
+      catalogCategoryIds: (catalogCats || [])
+        .filter((c) => c.store_id === store.id)
+        .map((c) => c.category_id),
+      catalogKeywordIds: (catalogKeys || [])
+        .filter((c) => c.store_id === store.id)
+        .map((c) => c.keyword_id),
+      catalogKeywordTexts: (catalogKeys || [])
+        .filter((c) => c.store_id === store.id)
+        .map((c) => keywordTextById.get(c.keyword_id) || "")
+        .filter(Boolean),
+      customKeywords: (customKeys || [])
+        .filter((c) => c.store_id === store.id)
+        .map((c) => c.normalized_keyword),
       service_zips: (areas || [])
         .filter((a) => a.store_id === store.id)
         .map((a) => a.postal_code),
@@ -369,6 +412,9 @@ Deno.serve(async (req) => {
         city: request.city,
         category: request.category,
         radius_miles: request.radius_miles,
+        productName: request.product_name,
+        description: request.description,
+        categoryConfirmed: Boolean(request.category_confirmed || request.category),
         latitude: request.latitude,
         longitude: request.longitude,
       },
@@ -387,6 +433,8 @@ Deno.serve(async (req) => {
         delivery_status: "sent",
         route_sent_at: nowIso,
         was_closed_at_route: !openInfo.open,
+        routing_reason: d.routingReason || null,
+        match_kind: d.matchKind || null,
         notify_after:
           !openInfo.open && openInfo.reopenAt
             ? openInfo.reopenAt.toISOString()

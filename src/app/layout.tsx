@@ -1,21 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist } from "next/font/google";
 import { Toaster } from "sonner";
 import { AuthLinkCatcher } from "@/components/auth/auth-link-catcher";
 import { HostSurfaceProvider } from "@/components/host/host-surface";
-import { matchProductSurface } from "@/lib/config/product-hosts";
 import { RegisterSW } from "@/components/shared/register-sw";
 import { LoadProgressHost } from "@/components/shared/load-progress";
 import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
@@ -59,18 +52,14 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const host = (await headers()).get("host") || "";
-  const matched = matchProductSurface(host);
-  const surface = matched === "apex" ? "www" : matched;
-
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full overflow-x-clip antialiased`}
+      className={`${geistSans.variable} h-full overflow-x-clip antialiased`}
     >
       <body className="flex min-h-full flex-col overflow-x-clip bg-canvas text-ink">
-        <HostSurfaceProvider surface={surface}>{children}</HostSurfaceProvider>
+        <HostSurfaceProvider>{children}</HostSurfaceProvider>
         <AuthLinkCatcher />
         <RegisterSW />
         <LoadProgressHost />

@@ -8,16 +8,16 @@ import { useHostSurface } from "@/components/host/host-surface";
 
 const ASSETS = {
   mark: {
-    light: { src: "/brand/findit-mark-light.png", width: 527, height: 490 },
-    dark: { src: "/brand/findit-mark-dark.png", width: 525, height: 491 },
+    light: { src: "/brand/findit-mark-light.png", width: 535, height: 498 },
+    dark: { src: "/brand/findit-mark-dark.png", width: 533, height: 497 },
   },
   plus: {
-    light: { src: "/brand/findit-plus-light.png", width: 649, height: 152 },
-    dark: { src: "/brand/findit-plus-dark.png", width: 649, height: 152 },
+    light: { src: "/brand/findit-plus-light.png", width: 639, height: 143 },
+    dark: { src: "/brand/findit-plus-dark.png", width: 639, height: 143 },
   },
   business: {
-    light: { src: "/brand/findit-business-light.png", width: 920, height: 152 },
-    dark: { src: "/brand/findit-business-dark.png", width: 920, height: 152 },
+    light: { src: "/brand/findit-business-light.png", width: 919, height: 143 },
+    dark: { src: "/brand/findit-business-dark.png", width: 917, height: 142 },
   },
 } as const;
 
@@ -29,6 +29,12 @@ const ALT: Record<BrandKind, string> = {
   mark: "FINDIT",
   plus: "FINDIT+",
   business: "FINDIT Business",
+};
+
+const DEFAULT_HEIGHT: Record<BrandKind, string> = {
+  mark: "h-8",
+  plus: "h-7",
+  business: "h-7",
 };
 
 export function BrandLogo({
@@ -51,13 +57,18 @@ export function BrandLogo({
       alt={alt ?? ALT[kind]}
       width={asset.width}
       height={asset.height}
-      className={cn("h-7 w-auto", className)}
+      className={cn(
+        DEFAULT_HEIGHT[kind],
+        "w-auto max-w-full object-contain object-left",
+        className
+      )}
       decoding="async"
+      draggable={false}
     />
   );
 }
 
-/** F-mark + FINDIT word. Use on customer chrome. */
+/** F-mark + FINDIT word. Use on customer and marketing chrome. */
 export function BrandLockup({
   tone = "light",
   className,
@@ -69,12 +80,12 @@ export function BrandLockup({
 }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <BrandLogo kind="mark" tone={tone} className="h-7 w-auto object-contain" alt="" />
+      <BrandLogo kind="mark" tone={tone} className="h-8 w-auto" alt="" />
       {wordmark ? (
         <span
           className={cn(
-            "text-[1.35rem] font-bold leading-none tracking-tight",
-            tone === "dark" ? "text-ink-inverse" : "text-ink"
+            "text-[1.45rem] font-bold leading-none tracking-tight",
+            tone === "dark" ? "text-white" : "text-ink"
           )}
         >
           FINDIT
@@ -113,9 +124,9 @@ export function BrandHomeLink({
       {kind === "findit" ? (
         <BrandLockup tone={tone} />
       ) : kind === "plus" ? (
-        <BrandLogo kind="plus" tone={tone} className="h-6 w-auto" />
+        <BrandLogo kind="plus" tone={tone} />
       ) : (
-        <BrandLogo kind="business" tone={tone} className="h-6 w-auto sm:h-7" />
+        <BrandLogo kind="business" tone={tone} />
       )}
     </Link>
   );

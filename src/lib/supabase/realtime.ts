@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export const LIVE_POLL_MS = 4000;
+export const LIVE_POLL_MS = 8000;
+export const SEARCHING_POLL_MS = 4000;
 
 export type RealtimeSync = {
   state: "idle" | "connecting" | "live" | "polling";

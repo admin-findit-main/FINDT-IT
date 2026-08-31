@@ -1,37 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { BrandLogo } from "@/components/brand/logo";
-
-function resourcePercent(): number {
-  if (typeof performance === "undefined") return 12;
-  const nav = performance.getEntriesByType("navigation")[0] as
-    | PerformanceNavigationTiming
-    | undefined;
-  const resources = performance.getEntriesByType(
-    "resource"
-  ) as PerformanceResourceTiming[];
-
-  let loaded = 0;
-  let total = 0;
-  for (const entry of resources) {
-    const size = entry.transferSize || entry.encodedBodySize || 1;
-    total += size;
-    if (entry.responseEnd > 0) loaded += size;
-  }
-  const fromResources = total > 0 ? (loaded / total) * 100 : 0;
-
-  let fromNav = 18;
-  if (nav) {
-    if (nav.loadEventEnd > 0) fromNav = 100;
-    else if (nav.domComplete > 0) fromNav = 88;
-    else if (nav.domContentLoadedEventEnd > 0) fromNav = 64;
-    else if (nav.responseEnd > 0) fromNav = 42;
-    else if (nav.requestStart > 0) fromNav = 24;
-  }
-
-  return Math.max(8, Math.min(99, Math.round(Math.max(fromNav, fromResources))));
-}
 
 export function sendStageLabel(percent: number) {
   if (percent >= 100) return "Live";
@@ -53,11 +24,41 @@ export function useClimbingPercent(active: boolean, ceiling = 90) {
     const id = window.setInterval(() => {
       const elapsed = Date.now() - started;
       setPercent(Math.min(ceiling, 12 + Math.floor(elapsed / 90)));
-    }, 120);
+    }, 160);
     return () => window.clearInterval(id);
   }, [active, ceiling]);
 
   return percent;
+}
+
+export function SyncLine({
+  percent,
+  label,
+}: {
+  percent: number;
+  label?: string;
+}) {
+  const shown = Math.max(0, Math.min(100, Math.round(percent)));
+  return (
+    <div
+      className="flex items-center gap-3"
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={shown}
+      aria-label={label || "Syncing"}
+    >
+      <div className="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-ink-100">
+        <div
+          className="h-full rounded-full bg-accent transition-[width] duration-200"
+          style={{ width: `${shown}%` }}
+        />
+      </div>
+      <p className="shrink-0 text-xs font-semibold tabular-nums text-ink-muted">
+        {shown}%{label ? ` · ${label}` : ""}
+      </p>
+    </div>
+  );
 }
 
 export function FindProgress({
@@ -77,24 +78,24 @@ export function FindProgress({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={shown}
-      aria-label={label || "Loading FINDIT"}
+      aria-label={label || "Sending"}
     >
-      <BrandLogo kind="mark" className="h-9 w-auto" />
-      <div className="mt-5 h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
+      <BrandLogo kind="mark" className="h-8 w-auto" />
+      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-ink-100">
         <div
           className="h-full rounded-full bg-accent transition-[width] duration-200"
           style={{ width: `${shown}%` }}
         />
       </div>
-      <p className="mt-3 text-sm font-semibold tabular-nums text-ink">{shown}%</p>
-      <p className="mt-1 text-xs text-ink-muted">{label || "Loading FINDIT"}</p>
+      <p className="mt-2 text-sm font-semibold tabular-nums text-ink">{shown}%</p>
+      <p className="mt-1 text-xs text-ink-muted">{label || "Sending your Find"}</p>
     </div>
   );
   if (size === "inline") return body;
   if (size === "page") {
-    return <div className="grid place-items-center px-6 py-12">{body}</div>;
+    return <div className="grid place-items-center px-6 py-10">{body}</div>;
   }
-  return <div className="grid place-items-center px-6 py-8">{body}</div>;
+  return <div className="grid place-items-center px-6 py-6">{body}</div>;
 }
 
 export function FindSendOverlay({
@@ -105,8 +106,8 @@ export function FindSendOverlay({
   label?: string;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-canvas/75 p-6">
-      <div className="w-full max-w-sm rounded-2xl border border-hairline-strong bg-white px-6 py-7 shadow-[0_12px_40px_rgba(0,0,0,0.08)]">
+    <div className="fixed inset-x-0 bottom-0 z-[70] grid place-items-end p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:place-items-center sm:inset-0 sm:bg-black/10">
+      <div className="w-full max-w-sm rounded-2xl border border-hairline-strong bg-white px-5 py-5 shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
         <FindProgress percent={percent} label={label || sendStageLabel(percent)} size="inline" />
       </div>
     </div>
@@ -117,51 +118,52 @@ export function LoadMark({ percent, label }: { percent: number; label?: string }
   return <FindProgress percent={percent} label={label} size="card" />;
 }
 
-/** Accurate % from completed network work (resources + in-flight fetches). */
+export function RouteBusyBar() {
+  return (
+    <div
+      className="h-0.5 w-full overflow-hidden bg-ink-100"
+      role="status"
+      aria-label="Loading"
+    >
+      <div className="findit-route-bar h-full w-1/3 rounded-full bg-accent" />
+    </div>
+  );
+}
+
+/** Thin bar only while changing pages — does not wrap every fetch. */
 export function LoadProgressHost() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
-  const [percent, setPercent] = useState(0);
 
   useEffect(() => {
-    let inflight = 0;
-    let started = 0;
-    let done = 0;
-    let hideTimer: number | undefined;
-    const orig = window.fetch;
+    setVisible(false);
+  }, [pathname]);
 
-    const show = (next: number) => {
-      setVisible(true);
-      setPercent(Math.max(0, Math.min(100, next)));
-    };
-
-    window.fetch = async (...args) => {
-      inflight += 1;
-      started += 1;
-      show(Math.min(90, Math.round((done / Math.max(started, 1)) * 90) || 12));
-      try {
-        return await orig(...args);
-      } finally {
-        inflight -= 1;
-        done += 1;
-        const fromFetch = started ? Math.round((done / started) * 100) : 100;
-        const mixed = Math.max(fromFetch, resourcePercent());
-        show(inflight ? Math.min(95, mixed) : 100);
-        if (!inflight) {
-          window.clearTimeout(hideTimer);
-          hideTimer = window.setTimeout(() => {
-            setVisible(false);
-            setPercent(0);
-            started = 0;
-            done = 0;
-          }, 220);
-        }
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const link = target?.closest("a");
+      if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey) {
+        return;
       }
+      if (link.target && link.target !== "_self") return;
+      const href = link.getAttribute("href");
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+        return;
+      }
+      try {
+        const url = new URL(link.href, window.location.href);
+        if (url.origin !== window.location.origin) return;
+        if (url.pathname === window.location.pathname && url.search === window.location.search) {
+          return;
+        }
+      } catch {
+        return;
+      }
+      setVisible(true);
     };
-
-    return () => {
-      window.fetch = orig;
-      window.clearTimeout(hideTimer);
-    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
   }, []);
 
   if (!visible) return null;
@@ -170,35 +172,15 @@ export function LoadProgressHost() {
     <div
       className="pointer-events-none fixed inset-x-0 top-0 z-[80] pt-[env(safe-area-inset-top)]"
       role="progressbar"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={percent}
       aria-label="Loading"
     >
-      <div className="h-0.5 w-full bg-transparent">
-        <div
-          className="h-0.5 bg-accent transition-[width] duration-150"
-          style={{ width: `${percent}%` }}
-        />
+      <div className="h-0.5 w-full overflow-hidden bg-transparent">
+        <div className="findit-route-bar h-0.5 w-1/3 bg-accent" />
       </div>
     </div>
   );
 }
 
 export function RouteLoading() {
-  const [percent, setPercent] = useState(12);
-
-  useEffect(() => {
-    setPercent(resourcePercent());
-    const id = window.setInterval(() => {
-      setPercent((prev) => {
-        const next = resourcePercent();
-        if (next >= 100) return 100;
-        return Math.max(prev, Math.min(99, next === prev ? prev + 1 : next));
-      });
-    }, 120);
-    return () => window.clearInterval(id);
-  }, []);
-
-  return <LoadMark percent={percent} />;
+  return <RouteBusyBar />;
 }

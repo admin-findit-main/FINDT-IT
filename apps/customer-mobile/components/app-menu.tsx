@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.weight.semibold,
     letterSpacing: typography.tracking.body,
   },
-  headerMark: { height: 28, width: 30 },
+  headerMark: { height: 32, width: 34 },
   iconBtn: {
     width: 44,
     height: 44,

@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, MapPin } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { GlassNotice, VerifiedStoreBadge } from "@/components/ui/glass";
 import { Card, EmptyState } from "@/components/ui/primitives";
 import {
-  FindProgress,
+  SyncLine,
   sendStageLabel,
   useClimbingPercent,
 } from "@/components/shared/load-progress";
@@ -29,7 +29,11 @@ import {
   submitPilotFeedbackAction,
   trackDirectionsClickAction,
 } from "@/lib/services/actions";
-import { LIVE_POLL_MS, useRequestRealtime } from "@/lib/supabase/realtime";
+import {
+  LIVE_POLL_MS,
+  SEARCHING_POLL_MS,
+  useRequestRealtime,
+} from "@/lib/supabase/realtime";
 import { formatDurationSeconds } from "@/lib/services/request-lifecycle";
 import {
   formatExpiresIn,
@@ -91,9 +95,9 @@ function SearchingStoresCard({
   syncLabel: string;
 }) {
   return (
-    <Card className="mt-4 p-6 text-center">
-      <FindProgress percent={percent} label={syncLabel} size="inline" />
-      <h2 className="mt-5 text-xl font-bold tracking-tight text-ink">
+    <Card className="mt-4 p-5 text-center sm:p-6">
+      <SyncLine percent={percent} label={syncLabel} />
+      <h2 className="mt-4 text-lg font-bold tracking-tight text-ink">
         Asking nearby stores
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
@@ -117,6 +121,7 @@ export default function RequestDetailPage() {
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [feedbackDone, setFeedbackDone] = useState(false);
   const [visibleStoreCount, setVisibleStoreCount] = useState(STORES_PAGE_SIZE);
+  const searchingRef = useRef(false);
 
   const load = useCallback(async () => {
     const result = await getCustomerRequestAction(params.id);
@@ -135,10 +140,16 @@ export default function RequestDetailPage() {
       setLoading(false);
     }
     void load();
-    const t = setInterval(() => {
+    let timer = 0;
+    const tick = () => {
       if (document.visibilityState === "visible") void load();
-    }, LIVE_POLL_MS);
-    return () => clearInterval(t);
+      timer = window.setTimeout(
+        tick,
+        searchingRef.current ? SEARCHING_POLL_MS : LIVE_POLL_MS
+      );
+    };
+    timer = window.setTimeout(tick, SEARCHING_POLL_MS);
+    return () => window.clearTimeout(timer);
   }, [load, params.id]);
 
   useEffect(() => {
@@ -194,6 +205,7 @@ export default function RequestDetailPage() {
       responses.length === 0 &&
       (storesContacted > 0 || recentlyCreated)
   );
+  searchingRef.current = searching || loading;
   const waitingOnMore = Boolean(
     openRequest && responses.length > 0 && storesContacted > responses.length
   );
@@ -230,7 +242,7 @@ export default function RequestDetailPage() {
   if (loading && !data) {
     return (
       <div className="mx-auto max-w-xl px-5 py-8 sm:px-8">
-        <FindProgress percent={syncPercent || climb || 18} label={syncLabel} />
+        <SyncLine percent={syncPercent || climb || 18} label={syncLabel} />
       </div>
     );
   }

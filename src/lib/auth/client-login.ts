@@ -2,18 +2,13 @@
 
 import {
   isSoloAdminEmail,
-  loginAudienceForAccount,
   wrongLoginSideMessage,
   type LoginAudience,
 } from "@findit/domain";
 import { createClient } from "@/lib/supabase/client";
 import { destinationAfterAuth, type AppHomePath } from "@/lib/auth/home-path";
 import { postAuthLocation } from "@/lib/config/product-hosts";
-import {
-  getAppWorkspaceAction,
-  signInAction,
-  signOutAction,
-} from "@/lib/services/actions";
+import { signInAction, signOutAction } from "@/lib/services/actions";
 
 function go(href: string) {
   window.location.assign(postAuthLocation(href, window.location.host));
@@ -63,78 +58,20 @@ export async function loginEmailPassword(
   audience?: LoginAudience
 ): Promise<LoginEmailPasswordResult> {
   const normalized = email.trim().toLowerCase();
-
-  try {
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: normalized,
-      password,
-    });
-    if (error) {
-      const server = await signInAction(normalized, password, audience);
-      const failed = fromServerResult(server);
-      if (failed.error) return failed;
-      go(
-        destinationAfterAuth({
-          homePath:
-            "homePath" in server && server.homePath
-              ? (server.homePath as AppHomePath)
-              : undefined,
-          next,
-          email: normalized,
-        })
-      );
-      return {};
-    }
-  } catch (err) {
-    const server = await signInAction(normalized, password, audience);
-    const failed = fromServerResult(server);
-    if (failed.error) {
-      return {
-        error:
-          failed.error ||
-          (err instanceof Error ? err.message : "Could not sign in"),
-        code: failed.code,
-        requiredAudience: failed.requiredAudience,
-      };
-    }
-    go(
-      destinationAfterAuth({
-        homePath:
-          "homePath" in server && server.homePath
-            ? (server.homePath as AppHomePath)
-            : undefined,
-        next,
-        email: normalized,
-      })
-    );
-    return {};
-  }
+  const server = await signInAction(normalized, password, audience);
+  const failed = fromServerResult(server);
+  if (failed.error) return failed;
 
   if (isSoloAdminEmail(normalized) && audience && audience !== "store") {
     return closeWrongSideSession("store");
   }
 
-  const workspace = await getAppWorkspaceAction();
-  if (audience && workspace) {
-    const belongs = loginAudienceForAccount({
-      isAdmin: workspace.isAdmin || isSoloAdminEmail(normalized),
-      accountType: workspace.accountType,
-      hasActiveStoreMembership: workspace.hasStore,
-    });
-    if (belongs !== audience) {
-      return closeWrongSideSession(belongs);
-    }
-  }
-
-  if (isSoloAdminEmail(normalized)) {
-    go("/admin");
-    return {};
-  }
-
   go(
     destinationAfterAuth({
-      homePath: (workspace?.homePath || "/home") as AppHomePath,
+      homePath:
+        "homePath" in server && server.homePath
+          ? (server.homePath as AppHomePath)
+          : undefined,
       next,
       email: normalized,
     })

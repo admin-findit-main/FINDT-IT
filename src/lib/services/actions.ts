@@ -153,7 +153,9 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   const profile = data as Profile | null;
   if (!profile) return null;
-  return coerceSoloAdminProfile(profile, user.email) as Profile;
+  const resolved = coerceSoloAdminProfile(profile, user.email) as Profile;
+  if (resolved.is_suspended && !isSoloAdmin(resolved)) return null;
+  return resolved;
 });
 
 type StoreActor =
@@ -290,6 +292,10 @@ export async function signInAction(
     return { profile, homePath: "/admin" as AppHomePath };
   }
   if (!profile) return { error: "Profile not found" };
+  if (profile.is_suspended) {
+    await supabase.auth.signOut();
+    return { error: "This account is suspended." };
+  }
   const { data: membership } = user
     ? await supabase
         .from("store_members")
@@ -820,7 +826,7 @@ export async function signOutAction() {
   }
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "global" });
 }
 
 export async function switchDemoUserAction(_email: string) {
@@ -863,6 +869,13 @@ export async function createCustomerRequestAction(raw: unknown) {
     classified.productCategory || parsed.data.category || null;
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Please sign in to submit a request", needsAuth: true };
+  const findLimit = await consumeRateLimit({
+    bucket: "create-request",
+    limit: 20,
+    windowMs: 60 * 60_000,
+    key: profile.id,
+  });
+  if (!findLimit.ok) return { error: findLimit.error };
   if (isSoloAdmin(profile)) {
     return { error: "Operator accounts use Admin, not customer Finds." };
   }
@@ -1476,16 +1489,24 @@ export async function respondToRequestAction(input: {
     updated_at: respondedAt,
   };
 
-  const { data, error } = existing
-    ? await admin
-        .from("store_responses")
-        .update(payload)
-        .eq("id", existing.id)
-        .select("*")
-        .single()
-    : await admin.from("store_responses").insert(payload).select("*").single();
+  const { data, error } = await admin
+    .from("store_responses")
+    .upsert(payload, { onConflict: "request_id,store_id" })
+    .select("*")
+    .single();
 
-  if (error) return { error: "Couldn't save your response. Please try again." };
+  if (error) {
+    if (error.code === "23505") {
+      const { data: row } = await admin
+        .from("store_responses")
+        .select("*")
+        .eq("request_id", input.requestId)
+        .eq("store_id", input.storeId)
+        .maybeSingle();
+      if (row) return { response: row as StoreResponse };
+    }
+    return { error: "Couldn't save your response. Please try again." };
+  }
 
   const secs = responseTimeSeconds(target.route_sent_at || target.created_at, respondedAt);
   const notifyCustomer =
@@ -1535,33 +1556,37 @@ export async function respondToRequestAction(input: {
     });
     const wantsAlert = shouldNotifyCustomerOfReply(input.responseType, customer || {});
     if (copy && wantsAlert) {
-      await admin.from("notifications").insert({
-        user_id: requestRow.customer_id,
-        type: input.responseType,
-        title: copy.title,
-        body: copy.body,
-        related_request_id: input.requestId,
-        related_store_id: input.storeId,
-      });
       const push = customerReplyPushCopy({
         responseType: input.responseType,
         productName: requestRow.product_name,
         storeName: store?.name,
       });
-      if (push) {
-        await notifyCustomerDevices({
-          admin,
-          customerId: requestRow.customer_id,
-          title: push.title,
-          body: push.body,
-          data: {
-            type: input.responseType,
-            requestId: input.requestId,
-            storeId: input.storeId,
-            url: `/requests/${input.requestId}`,
-          },
+      void (async () => {
+        await admin.from("notifications").insert({
+          user_id: requestRow.customer_id,
+          type: input.responseType,
+          title: copy.title,
+          body: copy.body,
+          related_request_id: input.requestId,
+          related_store_id: input.storeId,
         });
-      }
+        if (push) {
+          await notifyCustomerDevices({
+            admin,
+            customerId: requestRow.customer_id,
+            title: push.title,
+            body: push.body,
+            data: {
+              type: input.responseType,
+              requestId: input.requestId,
+              storeId: input.storeId,
+              url: `/requests/${input.requestId}`,
+            },
+          });
+        }
+      })().catch((err) => {
+        console.error("[FINDIT] customer reply notify failed", err);
+      });
     }
   }
 
@@ -2169,59 +2194,14 @@ export async function deleteAccountAction(confirmation: string) {
   if (!user) return { error: "Unauthorized" };
 
   try {
-    const { createServiceClient } = await import("@/lib/supabase/admin");
-    const admin = createServiceClient();
-    const { data: ownedStores } = await admin
-      .from("stores")
-      .select("name")
-      .eq("owner_id", user.id);
-    const blocked = accountDeletionBlockReason({
-      isOperator: isSoloAdmin(profile),
-      ownedStoreNames: (ownedStores || []).map((store) => store.name),
-    });
-    if (blocked) return { error: blocked };
-
-    const { data: responses } = await admin
-      .from("store_responses")
-      .select("id, store_id")
-      .eq("responded_by", user.id);
-    if (responses?.length) {
-      const storeIds = [...new Set(responses.map((row) => row.store_id))];
-      const { data: stores } = await admin
-        .from("stores")
-        .select("id, owner_id")
-        .in("id", storeIds);
-      const ownerByStore = new Map(
-        (stores || []).map((store) => [store.id, store.owner_id])
-      );
-      for (const row of responses) {
-        const ownerId = ownerByStore.get(row.store_id);
-        if (ownerId && ownerId !== user.id) {
-          await admin
-            .from("store_responses")
-            .update({ responded_by: ownerId })
-            .eq("id", row.id);
-        }
-      }
-    }
-
-    const { REQUEST_IMAGES_BUCKET } = await import("@/lib/services/storage");
-    const { data: files } = await admin.storage
-      .from(REQUEST_IMAGES_BUCKET)
-      .list(user.id, { limit: 1000 });
-    if (files?.length) {
-      await admin.storage
-        .from(REQUEST_IMAGES_BUCKET)
-        .remove(files.map((file) => `${user.id}/${file.name}`));
-    }
-
     const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-    if (accessToken) {
-      await admin.auth.admin.signOut(accessToken, "global");
-    }
-    const { error } = await admin.auth.admin.deleteUser(user.id);
-    if (error) return { error: error.message };
+    const { purgeFinditAccount } = await import("@/lib/account/purge");
+    const purged = await purgeFinditAccount({
+      userId: user.id,
+      isOperator: isSoloAdmin(profile),
+      accessToken: sessionData.session?.access_token,
+    });
+    if (purged.error) return { error: purged.error };
     await supabase.auth.signOut();
     return { ok: true as const };
   } catch (error) {
@@ -2231,7 +2211,7 @@ export async function deleteAccountAction(confirmation: string) {
         error: "Account deletion is not configured. Email FINDIT support instead.",
       };
     }
-    return { error: message || "Could not delete this account. Try again or email support." };
+    return { error: toPublicError(error, "Could not delete this account. Try again or email support.") };
   }
 }
 
@@ -2811,7 +2791,11 @@ export async function fulfillRequestAction(input: {
         related_request_id: input.requestId,
         related_store_id: input.storeId,
       }));
-    if (rows.length) await supabase.from("notifications").insert(rows);
+    if (rows.length) {
+      const { createServiceClient } = await import("@/lib/supabase/admin");
+      const admin = createServiceClient();
+      await admin.from("notifications").insert(rows);
+    }
   }
 
   await trackEvent("request_fulfilled", {

@@ -181,12 +181,13 @@ export async function updateSession(request: NextRequest) {
     first_name?: string | null;
   } | null = null;
   let memberRole: string | null = null;
+  let profileSuspended = false;
 
   if (user) {
     const [{ data: profile }, { data: membership }] = await Promise.all([
       supabase
         .from("profiles")
-        .select("account_type, email, first_name")
+        .select("account_type, email, first_name, is_suspended")
         .eq("id", user.id)
         .maybeSingle(),
       supabase
@@ -205,6 +206,7 @@ export async function updateSession(request: NextRequest) {
       },
       user.email
     );
+    profileSuspended = Boolean(profile?.is_suspended);
     memberRole = membership?.role ?? null;
     actor = classifyStoreActor({
       isAdmin: isSoloAdmin(resolvedProfile),
@@ -220,6 +222,17 @@ export async function updateSession(request: NextRequest) {
 
   const internalPath =
     decision.kind === "continue" ? decision.internalPath : path;
+  const isSuspendedPage = internalPath.startsWith("/account-suspended");
+  if (user && profileSuspended) {
+    const admin = isSoloAdmin(resolvedProfile);
+    if (!admin && !isSuspendedPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/account-suspended";
+      url.search = "";
+      return copyCookies(supabaseResponse, NextResponse.redirect(url));
+    }
+  }
+
   const isAuthRoute =
     internalPath.startsWith("/login") ||
     internalPath.startsWith("/signup") ||

@@ -11,7 +11,7 @@ import {
   formatShortPlace,
   getConsumerEntitlements,
 } from "@findit/domain";
-import { BrandLogo } from "@/components/brand/logo";
+import { BrandLockup, BrandLogo } from "@/components/brand/logo";
 import { usePublicHref } from "@/components/host/host-surface";
 import { useCustomerProfile } from "@/components/customer/session";
 import { cn } from "@/lib/utils";
@@ -151,6 +151,9 @@ export function CustomerMenuButton({ className }: { className?: string }) {
 
 export function CustomerTopBar() {
   const homeHref = usePublicHref("/home");
+  const profile = useCustomerProfile();
+  const plus =
+    getConsumerEntitlements(profile?.subscription_plan).planId === "plus";
   return (
     <>
       <header className="glass-chrome fixed inset-x-0 top-0 z-50 border-b border-hairline-strong pt-[env(safe-area-inset-top)]">
@@ -159,9 +162,9 @@ export function CustomerTopBar() {
           <Link
             href={homeHref}
             className="mx-auto inline-flex items-center"
-            aria-label="FINDIT home"
+            aria-label={plus ? "FINDIT+ home" : "FINDIT home"}
           >
-            <BrandLogo kind="mark" className="h-7 w-auto" />
+            {plus ? <BrandLogo kind="plus" className="h-6" /> : <BrandLockup />}
           </Link>
           <div className="w-11 shrink-0" aria-hidden />
         </div>

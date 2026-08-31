@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
   },
   fill: { flex: 1, minWidth: 0 },
   selectCol: { alignItems: "flex-end", gap: spacing.sm },
-  plusMark: { height: 22, width: 94 },
+  plusMark: { height: 24, width: 107 },
   planName: {
     fontSize: typography.size.title3,
     fontWeight: typography.weight.bold,

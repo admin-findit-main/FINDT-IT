@@ -175,7 +175,7 @@ export function DashboardShell({
                 <span className="text-[15px] font-semibold tracking-tight">Admin</span>
               </span>
             ) : (
-              <BrandLogo kind="business" className="h-6 w-auto" />
+              <BrandLogo kind="business" className="h-7" />
             )}
           </Link>
           <button

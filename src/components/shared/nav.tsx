@@ -139,7 +139,7 @@ export function StoreNav({ storeName, role, canManageStore }: StoreChromeProps) 
           className="mb-3 flex items-center px-3"
           aria-label="FINDIT Business"
         >
-          <BrandLogo kind="business" className="h-6 w-auto" />
+          <BrandLogo kind="business" className="h-7" />
         </Link>
         <p className="mb-6 px-3 text-xs leading-snug text-ink-muted">
           Working as{" "}

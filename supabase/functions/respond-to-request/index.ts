@@ -133,14 +133,13 @@ Deno.serve(async (req) => {
     updated_at: respondedAt,
   };
 
-  const { data, error } = existing
-    ? await admin
-        .from("store_responses")
-        .update(payload)
-        .eq("id", existing.id)
-        .select("*")
-        .single()
-    : await admin.from("store_responses").insert(payload).select("*").single();
+  const { data, error } = await admin
+    .from("store_responses")
+    .upsert(existing?.id ? { ...payload, id: existing.id } : payload, {
+      onConflict: "request_id,store_id",
+    })
+    .select("*")
+    .single();
 
   if (error || !data) {
     return jsonResponse(
@@ -204,40 +203,57 @@ Deno.serve(async (req) => {
               : `${storeName} can order it`,
           body: `${requestRow.product_name}`,
         };
-      await admin.from("notifications").insert({
-        user_id: requestRow.customer_id,
-        type: responseType,
-        title:
-          responseType === "in_stock"
-            ? `${storeName} has it in stock`
-            : `${storeName} can order it`,
-        body: `${requestRow.product_name}`,
-        related_request_id: requestId,
-        related_store_id: storeId,
-      });
-
-      await notifyCustomerPush({
-        admin,
-        customerId: requestRow.customer_id,
-        title: copy.title,
-        body: copy.body,
-        data: {
+      const notifyTask = Promise.all([
+        admin.from("notifications").insert({
+          user_id: requestRow.customer_id,
           type: responseType,
-          requestId,
-          storeId,
-          url: `/requests/${requestId}`,
-        },
+          title:
+            responseType === "in_stock"
+              ? `${storeName} has it in stock`
+              : `${storeName} can order it`,
+          body: `${requestRow.product_name}`,
+          related_request_id: requestId,
+          related_store_id: storeId,
+        }),
+        notifyCustomerPush({
+          admin,
+          customerId: requestRow.customer_id,
+          title: copy.title,
+          body: copy.body,
+          data: {
+            type: responseType,
+            requestId,
+            storeId,
+            url: `/requests/${requestId}`,
+          },
+        }),
+      ]).catch((err) => {
+        console.error("[FINDIT] Customer notify failed", err);
       });
+      const runtime = (
+        globalThis as {
+          EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void };
+        }
+      ).EdgeRuntime;
+      if (runtime?.waitUntil) runtime.waitUntil(notifyTask);
+      else await notifyTask;
     }
   }
 
-  await admin.from("analytics_events").insert({
+  const analyticsTask = admin.from("analytics_events").insert({
     event_name: "store_response_created",
     user_id: user.id,
     store_id: storeId,
     request_id: requestId,
     metadata: { responseType, responseTimeSeconds: secs },
   });
+  const runtime = (
+    globalThis as {
+      EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void };
+    }
+  ).EdgeRuntime;
+  if (runtime?.waitUntil) runtime.waitUntil(analyticsTask);
+  else await analyticsTask;
 
   return jsonResponse({ response: data }, 200, origin);
 });

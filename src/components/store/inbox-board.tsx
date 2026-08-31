@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/ui/dialog";
-import { Card, EmptyState, Input, Label, Textarea } from "@/components/ui/primitives";
+import { Card, EmptyState, Input, Label, Skeleton, Textarea } from "@/components/ui/primitives";
 import {
   GlassCard,
   GlassChip,
@@ -16,7 +16,6 @@ import {
   toneForResponse,
 } from "@/components/ui/glass";
 import { StatusBadge } from "@/components/shared/status";
-import { FindProgress } from "@/components/shared/load-progress";
 import { AVAILABILITY_OPTIONS, HOLD_OPTIONS, STOCK_AMOUNT_OPTIONS } from "@/lib/config/constants";
 import {
   getCurrentProfile,
@@ -62,6 +61,7 @@ export function StoreInboxBoard() {
   const [availability, setAvailability] = useState("Tomorrow");
   const [stockAmount, setStockAmount] = useState<"plenty" | "few_left" | "last_one" | "">("");
   const [submitting, setSubmitting] = useState(false);
+  const inFlight = useRef(false);
 
   const loadInbox = useCallback(async (sid = storeId) => {
     if (!sid) return;
@@ -127,7 +127,8 @@ export function StoreInboxBoard() {
       trackDemand?: boolean;
     }
   ) {
-    if (!request || !storeId) return;
+    if (!request || !storeId || inFlight.current) return;
+    inFlight.current = true;
     setActiveRequest(request);
     setSubmitting(true);
     const result = await respondToRequestAction({
@@ -137,6 +138,7 @@ export function StoreInboxBoard() {
       ...extra,
     });
     setSubmitting(false);
+    inFlight.current = false;
     if (result.error) {
       toast.error(result.error);
       return;
@@ -155,7 +157,8 @@ export function StoreInboxBoard() {
       setActiveRequest(null);
       resetForm();
     }
-    load();
+    setItems((rows) => rows.filter((row) => row.id !== request.id));
+    void loadInbox();
   }
 
   function resetForm() {
@@ -320,7 +323,10 @@ export function StoreInboxBoard() {
 
       <div className="mt-4 space-y-3">
         {loading ? (
-          <FindProgress percent={36} label="Checking for Finds" />
+          <div className="space-y-3">
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-24 w-full" />
+          </div>
         ) : items.length === 0 ? (
           <EmptyState
             title="No asks in this view"

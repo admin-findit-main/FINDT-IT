@@ -7,11 +7,12 @@ import { Card } from "@/components/ui/primitives";
 import { EmailSignIn } from "@/components/auth/email-sign-in";
 import { AuthAudienceSwitch, AuthPageLinks } from "@/components/auth/auth-audience";
 import { GlassNotice } from "@/components/ui/glass";
+import { publicLoginError } from "@/lib/auth/login-error";
 
 function LoginForm() {
   const params = useSearchParams();
   const next = params.get("next");
-  const error = params.get("error");
+  const error = publicLoginError(params.get("error"));
 
   return (
     <Card className="p-6 sm:p-8">
@@ -24,11 +25,7 @@ function LoginForm() {
       </p>
       {error ? (
         <div className="mt-4">
-          <GlassNotice tone="muted">
-            {error === "auth_callback"
-              ? "That email link is invalid or already used. Request a new one, or sign in with your password."
-              : error}
-          </GlassNotice>
+          <GlassNotice tone="muted">{error}</GlassNotice>
         </div>
       ) : null}
       <EmailSignIn next={next} audience="shopper" />

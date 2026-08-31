@@ -22,10 +22,10 @@ export default function UpdatePasswordPage() {
         const { createClient } = await import("@/lib/supabase/client");
         const supabase = createClient();
         const {
-          data: { session },
-        } = await supabase.auth.getSession();
+          data: { user },
+        } = await supabase.auth.getUser();
         if (cancelled) return;
-        if (!session) {
+        if (!user) {
           window.location.replace("/login?error=auth_callback");
           return;
         }
@@ -56,7 +56,7 @@ export default function UpdatePasswordPage() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) {
         setLoading(false);
-        toast.error(error.message);
+        toast.error("Could not update that password. Request a new reset link.");
         return;
       }
       toast.success("Password updated");
@@ -76,7 +76,7 @@ export default function UpdatePasswordPage() {
       );
     } catch (err) {
       setLoading(false);
-      toast.error(err instanceof Error ? err.message : "Could not update password");
+      toast.error("Could not update that password. Try again.");
     }
   }
 

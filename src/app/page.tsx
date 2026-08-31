@@ -1,5 +1,5 @@
 import { BUSINESS_PRICE_MONTHLY } from "@/lib/config/constants";
-import { BrandLogo } from "@/components/brand/logo";
+import { BrandLockup, BrandLogo } from "@/components/brand/logo";
 import { MarketingHeader } from "@/components/marketing/site-header";
 import { WaitlistForm } from "@/components/marketing/waitlist-form";
 import { SiteFooter } from "@/components/shared/site-footer";
@@ -17,7 +17,7 @@ export default function LandingPage() {
       <main>
         <section className="mx-auto grid max-w-6xl gap-12 px-5 pb-16 pt-12 sm:px-6 md:grid-cols-2 md:items-start md:gap-16 md:pb-24 md:pt-20">
           <div>
-            <BrandLogo kind="mark" className="h-10 w-auto" />
+            <BrandLockup />
             <h1 className="mt-6 max-w-lg text-4xl font-bold tracking-tight text-ink sm:text-5xl">
               Ask nearby stores if they have it.
             </h1>
@@ -111,7 +111,8 @@ export default function LandingPage() {
 
         <section id="stores" className="py-16 md:py-20">
           <div className="mx-auto max-w-6xl px-5 sm:px-6">
-            <h2 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">
+            <BrandLogo kind="business" className="h-8" />
+            <h2 className="mt-5 text-2xl font-bold tracking-tight text-ink md:text-3xl">
               For stores
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-ink-muted">

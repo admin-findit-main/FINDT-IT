@@ -3,9 +3,26 @@ import { requestOrigin } from "@/lib/security/request-log";
 
 type ConsumeResult = { ok: true } | { ok: false; error: string };
 
+const FAIL_CLOSED_BUCKETS = new Set([
+  "login",
+  "signup",
+  "magic-link",
+  "hub-pairing",
+  "hub-claim",
+  "create-request",
+  "account-delete",
+]);
+
+function failOpenOnError(bucket: string): boolean {
+  if (process.env.NODE_ENV === "production" && FAIL_CLOSED_BUCKETS.has(bucket)) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Sliding-window counter in `rate_limit_buckets` (service role only).
- * Fail closed only when the table is reachable and the caller is over the cap.
+ * Auth buckets fail closed in production if the table is unreachable.
  */
 export async function consumeRateLimit(input: {
   bucket: string;
@@ -29,7 +46,9 @@ export async function consumeRateLimit(input: {
       .maybeSingle();
     if (readError) {
       console.error("[FINDIT] rate limit read failed", { bucket: input.bucket, ip: origin.ip });
-      return { ok: true };
+      return failOpenOnError(input.bucket)
+        ? { ok: true }
+        : { ok: false, error: "Too many attempts. Wait a few minutes and try again." };
     }
 
     const now = Date.now();
@@ -58,10 +77,15 @@ export async function consumeRateLimit(input: {
     });
     if (writeError) {
       console.error("[FINDIT] rate limit write failed", { bucket: input.bucket, ip: origin.ip });
+      if (!failOpenOnError(input.bucket)) {
+        return { ok: false, error: "Too many attempts. Wait a few minutes and try again." };
+      }
     }
     return { ok: true };
   } catch (err) {
     console.error("[FINDIT] rate limit unavailable", err);
-    return { ok: true };
+    return failOpenOnError(input.bucket)
+      ? { ok: true }
+      : { ok: false, error: "Too many attempts. Wait a few minutes and try again." };
   }
 }

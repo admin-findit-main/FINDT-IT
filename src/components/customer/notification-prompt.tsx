@@ -15,7 +15,7 @@ import {
   subscribeWebPush,
 } from "@/lib/web-push-client";
 
-const DISMISS_KEY = "findit-web-notify-prompt-dismissed";
+const DISMISS_KEY = "findit-web-notify-prompt-dismissed-v1";
 
 export function NotificationPrompt({
   compact = false,
@@ -39,7 +39,7 @@ export function NotificationPrompt({
     setPermission(browserNotifyPermission());
     setIosHomeScreen(isIosDevice() && !isStandaloneDisplay());
     try {
-      setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1");
+      setDismissed(localStorage.getItem(DISMISS_KEY) === "1");
     } catch {
       setDismissed(false);
     }
@@ -83,7 +83,7 @@ export function NotificationPrompt({
 
   function dismiss() {
     try {
-      sessionStorage.setItem(DISMISS_KEY, "1");
+      localStorage.setItem(DISMISS_KEY, "1");
     } catch {
       // Ignore private-mode storage failures.
     }

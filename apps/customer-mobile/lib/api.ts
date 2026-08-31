@@ -219,6 +219,28 @@ export async function updateMyPlace(input: {
   });
 }
 
+export async function deleteMyAccount(confirmation: string) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) return { error: "Please sign in" };
+  const origin = (process.env.EXPO_PUBLIC_APP_URL || "https://dashboard.askfindit.com").replace(
+    /\/$/,
+    ""
+  );
+  const response = await fetch(`${origin}/api/account/delete`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ confirmation }),
+  });
+  const body = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) return { error: body.error || "Could not delete this account." };
+  return { ok: true as const };
+}
+
 export async function markNotificationRead(id: string) {
   await supabase
     .from("notifications")

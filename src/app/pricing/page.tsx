@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { BrandLogo } from "@/components/brand/logo";
 import { LegalShell } from "@/components/shared/legal-shell";
 import { BUSINESS_PRICE_MONTHLY } from "@/lib/config/constants";
 
@@ -19,12 +20,14 @@ export default function PricingPage() {
         open. Join from{" "}
         <a href="/#waitlist">askfindit.com</a>.
       </p>
+      <BrandLogo kind="plus" className="mt-2 h-6" />
       <h2>Shoppers</h2>
       <p>
         The FINDIT app is how you ask nearby stores if they have a product.
         Pricing for shoppers will be shown in the app when sign-up opens. Nothing
         is billed while we waitlist.
       </p>
+      <BrandLogo kind="business" className="mt-6 h-6" />
       <h2>Stores</h2>
       <p>
         The store app is {STORE_PRICE}/month per location. That includes every

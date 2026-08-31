@@ -18,7 +18,7 @@ export function BrandMark({
           ? require("../assets/brand/findit-mark-dark.png")
           : require("../assets/brand/findit-mark-light.png")
       }
-      style={[{ height: 40, width: 43 }, style]}
+      style={[{ height: 36, width: 39 }, style]}
     />
   );
 }
@@ -39,7 +39,7 @@ export function BrandPlus({
           ? require("../assets/brand/findit-plus-dark.png")
           : require("../assets/brand/findit-plus-light.png")
       }
-      style={[{ height: 28, width: 120 }, style]}
+      style={[{ height: 26, width: 116 }, style]}
     />
   );
 }

@@ -90,8 +90,8 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   brandImg: {
-    height: 32,
-    width: 194,
+    height: 28,
+    width: 180,
     marginBottom: spacing.sm,
   },
   sub: {

@@ -269,17 +269,21 @@ export default function FinditHubPage() {
     setCustomAvailability("");
   }
 
+  const inFlight = useRef(false);
+
   async function send(
     responseType: "in_stock" | "out_of_stock" | "can_order",
     extras?: { price?: number | null; note?: string; estimatedAvailabilityLabel?: string }
   ) {
-    if (!storeId || !active || busy) return;
+    if (!storeId || !active || busy || inFlight.current) return;
     if (!isValidId(storeId) || !isValidId(active.id)) {
       setError("That request looks invalid. Refresh Hub and try again.");
       return;
     }
+    inFlight.current = true;
     setBusy(true);
     setError(null);
+    const answeredId = active.id;
     const result = await respondToRequestAction({
       requestId: active.id,
       storeId,
@@ -289,17 +293,17 @@ export default function FinditHubPage() {
       estimatedAvailabilityLabel: extras?.estimatedAvailabilityLabel,
     });
     setBusy(false);
+    inFlight.current = false;
     if ("error" in result && result.error) {
       console.error("[FINDIT Hub] respond failed", result.error);
       setError(result.error);
       return;
     }
+    setQueue((q) => q.filter((row) => row.id !== answeredId));
     setSentFlash(true);
     resetComposer();
-    window.setTimeout(() => {
-      setSentFlash(false);
-      void load({ silent: true });
-    }, 1400);
+    window.setTimeout(() => setSentFlash(false), 1400);
+    void load({ silent: true });
   }
 
   const parsedPrice = price.trim() ? Number(price) : null;
@@ -316,7 +320,7 @@ export default function FinditHubPage() {
 
       <header className="flex shrink-0 items-center justify-between px-5 py-3 md:px-8">
         <div className="flex items-center gap-3">
-          <BrandLogo kind="business" tone="dark" className="h-5 w-auto" />
+          <BrandLogo kind="business" tone="dark" className="h-6" />
           <span className="hidden text-white/25 sm:inline">·</span>
           <p className="max-w-[40vw] truncate text-sm text-white/70">{store?.name || "Store"}</p>
           {queue.length > 0 ? (
@@ -608,7 +612,7 @@ export default function FinditHubPage() {
       {settingsOpen ? (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/70 p-6 md:items-center">
           <div className="w-full max-w-md rounded-3xl bg-[#141416] p-6">
-            <BrandLogo kind="business" tone="dark" className="h-5 w-auto" />
+            <BrandLogo kind="business" tone="dark" className="h-6" />
             <p className="mt-2 text-2xl font-bold">{store?.name}</p>
             {deviceName ? (
               <p className="mt-1 text-sm text-white/60">{deviceName}</p>

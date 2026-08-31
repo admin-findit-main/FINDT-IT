@@ -26,6 +26,10 @@ export default function AdminSystemPage() {
           <dd>FastSpring sandbox — live charges stay off until launch</dd>
         </div>
         <div>
+          <dt className="text-ink-muted">Health</dt>
+          <dd>/api/health — app and database probe</dd>
+        </div>
+        <div>
           <dt className="text-ink-muted">Secrets</dt>
           <dd>Never displayed on this page</dd>
         </div>

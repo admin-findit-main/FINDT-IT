@@ -4,6 +4,8 @@ import { cache } from "react";
 import type { Store, StoreDevice, StoreMemberRole } from "@/types/database";
 import { isDemoMode, appUrl } from "@/lib/config/env";
 import { isSoloAdmin } from "@/lib/auth/admin";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
+import { logSecurityEvent } from "@/lib/security/audit";
 import { HUB_DEVICE_ONLINE_MS, HUB_PAIRING_TTL_MS } from "@/lib/hub/constants";
 import {
   deviceIsOnline,
@@ -83,6 +85,13 @@ export const getHubRuntimeAction = cache(async (): Promise<HubRuntime | null> =>
 export async function createHubPairingAction(): Promise<
   { code: string; expiresAt: string; pairUrl: string } | { error: string }
 > {
+  const limited = await consumeRateLimit({
+    bucket: "hub-pairing",
+    limit: 10,
+    windowMs: 15 * 60_000,
+  });
+  if (!limited.ok) return { error: limited.error };
+
   if (isDemoMode()) {
     const { demoCreateHubPairing } = await import("@/lib/demo/store");
     const created = demoCreateHubPairing();
@@ -197,6 +206,13 @@ export async function previewHubPairingAction(rawCode: string) {
   if (!code) return { error: "Enter the 6-digit code from the device." };
   const manager = await requireStoreManager();
   if (manager.error || !manager.storeId) return { error: manager.error || "Unauthorized" };
+  const limited = await consumeRateLimit({
+    bucket: "hub-claim",
+    limit: 20,
+    windowMs: 15 * 60_000,
+    key: manager.profile?.id || manager.storeId,
+  });
+  if (!limited.ok) return { error: limited.error };
 
   if (isDemoMode()) {
     const { demoLookupHubPairing, getDemoState } = await import("@/lib/demo/store");
@@ -236,6 +252,13 @@ export async function claimHubPairingAction(input: {
   if (manager.error || !manager.storeId || !manager.profile) {
     return { error: manager.error || "Unauthorized" };
   }
+  const limited = await consumeRateLimit({
+    bucket: "hub-claim",
+    limit: 10,
+    windowMs: 15 * 60_000,
+    key: manager.profile.id,
+  });
+  if (!limited.ok) return { error: limited.error };
 
   if (isDemoMode()) {
     const { demoClaimHubPairing } = await import("@/lib/demo/store");
@@ -291,6 +314,12 @@ export async function claimHubPairingAction(input: {
     await admin.from("store_devices").delete().eq("id", device.id);
     return { error: "That code was already used." };
   }
+  void logSecurityEvent({
+    actorId: manager.profile.id,
+    action: "hub_device_paired",
+    resource: device.id,
+    metadata: { storeId: manager.storeId },
+  });
   return { ok: true as const, device: toView(device as StoreDevice) };
 }
 

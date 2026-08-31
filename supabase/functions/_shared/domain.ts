@@ -207,11 +207,70 @@ type RoutingStoreCandidate = {
   subscription_plan?: string;
   categories: string[];
   service_zips: string[];
+  businessTypeId?: string | null;
+  acceptingRequests?: boolean;
+  catalogCategoryIds?: string[];
+  catalogKeywordIds?: string[];
+  catalogKeywordTexts?: string[];
+  customKeywords?: string[];
   month_targets_received?: number;
   free_plan_monthly_cap?: number | null;
   latitude?: number | string | null;
   longitude?: number | string | null;
 };
+
+function normalizeLite(value: string): string {
+  return value.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function requestHaystack(request: {
+  productName?: string | null;
+  description?: string | null;
+}): string {
+  return normalizeLite(`${request.productName || ""} ${request.description || ""}`);
+}
+
+const PRODUCT_CATEGORY_TO_TYPE: Record<string, string> = {
+  "tobacco & vape": "smoke_shop",
+  grocery: "grocery",
+  beauty: "beauty",
+  electronics: "electronics",
+  convenience: "convenience",
+  auto: "auto_parts",
+  clothing: "clothing",
+  collectibles: "collectibles",
+  hardware: "hardware",
+  coffee: "coffee_shop",
+  nails: "nail_salon",
+  specialty: "specialty",
+  other: "specialty",
+};
+
+function catalogMatchKind(
+  store: RoutingStoreCandidate,
+  haystack: string,
+  allowedCategories: string[] | null,
+  requestCategory?: string | null
+): "keyword" | "category" | "business_type" | null {
+  const custom = (store.customKeywords || []).map(normalizeLite).filter(Boolean);
+  const keyTexts = (store.catalogKeywordTexts || []).map(normalizeLite).filter(Boolean);
+  if (
+    custom.some((word) => haystack.includes(word)) ||
+    keyTexts.some((word) => haystack.includes(word))
+  ) {
+    return "keyword";
+  }
+  if (allowedCategories && store.categories.length > 0) {
+    if (categoriesOverlap(store.categories, allowedCategories)) return "category";
+  }
+  const expectedType = requestCategory
+    ? PRODUCT_CATEGORY_TO_TYPE[requestCategory.trim().toLowerCase()]
+    : null;
+  if (expectedType && store.businessTypeId === expectedType) {
+    return "business_type";
+  }
+  return null;
+}
 
 function storeCoversCustomerZip(
   store: Pick<RoutingStoreCandidate, "postal_code" | "service_zips">,
@@ -241,24 +300,52 @@ export function selectEligibleStores(input: {
     city?: string | null;
     category: string | null;
     radius_miles: number;
+    productName?: string | null;
+    description?: string | null;
+    categoryConfirmed?: boolean;
     latitude?: number | string | null;
     longitude?: number | string | null;
   };
   stores: RoutingStoreCandidate[];
   alreadyTargetedStoreIds?: string[];
   bypassPlanCaps?: boolean;
-}): { eligible: { storeId: string; estimatedMiles: number }[] } {
+}): {
+  eligible: {
+    storeId: string;
+    estimatedMiles: number;
+    matchKind?: string;
+    routingReason?: string;
+  }[];
+} {
   const already = new Set(input.alreadyTargetedStoreIds || []);
   const allowedCategories = storeCategoriesForRequestCategory(
     input.request.category
   );
-  const eligible: { storeId: string; estimatedMiles: number }[] = [];
+  const haystack = requestHaystack(input.request);
+  const eligible: {
+    storeId: string;
+    estimatedMiles: number;
+    matchKind?: string;
+    routingReason?: string;
+  }[] = [];
 
   for (const store of input.stores) {
     if (already.has(store.id)) continue;
     if (!store.is_active || store.is_suspended) continue;
+    if (store.acceptingRequests === false) continue;
 
-    if (allowedCategories && store.categories.length > 0) {
+    const hasCatalog =
+      Boolean(store.businessTypeId) ||
+      (store.catalogCategoryIds && store.catalogCategoryIds.length > 0);
+    const matchKind = catalogMatchKind(
+      store,
+      haystack,
+      allowedCategories,
+      input.request.category
+    );
+    if (hasCatalog && (input.request.productName || input.request.category)) {
+      if (!matchKind) continue;
+    } else if (allowedCategories && store.categories.length > 0) {
       if (!categoriesOverlap(store.categories, allowedCategories)) continue;
     }
 
@@ -303,7 +390,12 @@ export function selectEligibleStores(input: {
       continue;
     }
 
-    eligible.push({ storeId: store.id, estimatedMiles: est });
+    eligible.push({
+      storeId: store.id,
+      estimatedMiles: est,
+      matchKind: matchKind || "category",
+      routingReason: input.request.category || undefined,
+    });
   }
 
   return { eligible };
@@ -392,12 +484,31 @@ export function responseTimeSeconds(
   return Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000));
 }
 
+const FINDIT_CORS_ORIGINS = new Set([
+  "https://www.askfindit.com",
+  "https://askfindit.com",
+  "https://dashboard.askfindit.com",
+  "https://store.askfindit.com",
+  "https://app.askfindit.com",
+  "http://localhost:3000",
+  "http://localhost:3002",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3002",
+]);
+
 export function corsHeaders(origin?: string | null) {
+  const allowOrigin =
+    !origin || origin === "null"
+      ? "*"
+      : FINDIT_CORS_ORIGINS.has(origin)
+        ? origin
+        : "https://dashboard.askfindit.com";
   return {
-    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
   };
 }
 

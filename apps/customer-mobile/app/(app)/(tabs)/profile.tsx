@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
+  ACCOUNT_DELETION_CONFIRMATION,
   accountContactLabel,
   displayName,
   shortPlaceFromProfile,
@@ -19,7 +20,7 @@ import { AppChrome } from "@/components/app-menu";
 import { PlaceFields } from "@/components/place-fields";
 import { SettingsChoice, SettingsSection, SettingsToggle } from "@/components/settings-row";
 import { useAppearance } from "@/lib/appearance";
-import { updateMyProfile } from "@/lib/api";
+import { deleteMyAccount, updateMyProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export default function ProfileScreen() {
@@ -34,6 +35,8 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setFirstName(profile?.first_name || "");
@@ -185,6 +188,35 @@ export default function ProfileScreen() {
           >
             <Text style={[styles.signOutText, { color: theme.accentInk }]}>Sign out</Text>
           </Pressable>
+        </GlassCard>
+        <GlassCard style={{ marginTop: spacing.md }}>
+          <Text style={[styles.contactLabel, { color: theme.inkMuted }]}>
+            Type {ACCOUNT_DELETION_CONFIRMATION} to delete this account
+          </Text>
+          <GlassInput
+            value={deleteText}
+            onChangeText={setDeleteText}
+            autoCapitalize="characters"
+            placeholder={ACCOUNT_DELETION_CONFIRMATION}
+            containerStyle={{ marginBottom: spacing.sm, marginTop: spacing.sm }}
+          />
+          <GlassButton
+            title={deleting ? "Deleting…" : "Delete account"}
+            variant="ink"
+            loading={deleting}
+            disabled={deleting}
+            onPress={async () => {
+              setDeleting(true);
+              setError(null);
+              const result = await deleteMyAccount(deleteText);
+              setDeleting(false);
+              if (result.error) {
+                setError(result.error);
+                return;
+              }
+              await signOut();
+            }}
+          />
         </GlassCard>
       </ScrollView>
     </AppChrome>
