@@ -1,7 +1,6 @@
 "use server";
 
 import {
-  BILLING_LAUNCH_CHECKS,
   BILLING_PLANS,
   STORE_BILLING_STATUS_LABELS,
   formatMoney,
@@ -583,8 +582,4 @@ export async function adminStoreBillingAction(input: {
       .eq("id", sub.id);
   }
   return { ok: true as const };
-}
-
-export function billingLaunchChecks() {
-  return BILLING_LAUNCH_CHECKS;
 }
