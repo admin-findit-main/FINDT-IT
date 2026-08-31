@@ -13,7 +13,7 @@ export function MarketingStartCard() {
   return (
     <div
       id="start"
-      className="rounded-2xl border border-hairline-strong bg-white p-6 sm:p-8"
+      className="rounded-2xl border border-hairline-strong bg-white p-6 shadow-[0_8px_24px_rgba(0,0,0,0.04)] sm:p-8"
     >
       <p className="text-lg font-semibold text-ink">Get started</p>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
