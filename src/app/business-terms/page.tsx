@@ -18,16 +18,14 @@ export default function BusinessTermsPage() {
         <Link href="/acceptable-use">Acceptable Use Policy</Link>.
       </p>
       <p>
-        Applications open from the waitlist on <Link href="/join">askfindit.com/join</Link> when
-        we start taking stores. Support:{" "}
+        Apply your store at <Link href="/join">askfindit.com/join</Link>. Support:{" "}
         <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
       </p>
 
       <h2>Joining FINDIT</h2>
       <p>
         Listing a store is not automatic. FINDIT reviews applications and may
-        approve, request more information, or decline. During the closed
-        pilot, FINDIT decides which stores are live. Approval does not
+        approve, request more information, or decline. Approval does not
         guarantee a volume of Finds or any sale.
       </p>
 

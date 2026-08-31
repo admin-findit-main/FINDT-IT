@@ -1,7 +1,7 @@
 import { BUSINESS_PRICE_MONTHLY } from "@/lib/config/constants";
 import { BrandLockup, BrandLogo } from "@/components/brand/logo";
 import { MarketingHeader } from "@/components/marketing/site-header";
-import { WaitlistForm } from "@/components/marketing/waitlist-form";
+import { MarketingStartCard } from "@/components/marketing/start-card";
 import { SiteFooter } from "@/components/shared/site-footer";
 import { StatusPill, StatusRail } from "@/components/ui/glass";
 
@@ -30,10 +30,10 @@ export default function LandingPage() {
             <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted">
               FINDIT is not delivery and not shipping. The shopper app is how
               you ask. The store app is how a shop answers, including a
-              countertop Hub. Sign-in is off while we waitlist.
+              countertop Hub.
             </p>
           </div>
-          <WaitlistForm />
+          <MarketingStartCard />
         </section>
 
         <section
@@ -126,15 +126,11 @@ export default function LandingPage() {
               <li>See demand for products you don’t stock yet.</li>
               <li>Owners and staff get their own logins. The Hub pairs with a code, not the owner password.</li>
             </ul>
-            <p className="mt-8 text-sm text-ink-muted">
-              We’re waitlisting stores too. Join as a store in the form above
-              — we’ll email you when applications open.
-            </p>
             <a
-              href="#waitlist"
-              className="mt-6 inline-flex min-h-11 items-center font-semibold text-accent-ink underline-offset-2 hover:underline"
+              href="/join"
+              className="mt-8 inline-flex min-h-11 items-center font-semibold text-accent-ink underline-offset-2 hover:underline"
             >
-              Join the store waitlist
+              Apply your store
             </a>
           </div>
         </section>

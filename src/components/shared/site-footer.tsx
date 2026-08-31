@@ -5,7 +5,8 @@ import { PUBLIC_SUPPORT_EMAIL, SUPPORT_PHONE, mailHref, telHref } from "@/lib/co
 const YEAR = new Date().getFullYear();
 
 const LINKS = [
-  { href: "/#waitlist", label: "Waitlist" },
+  { href: "/#start", label: "Get started" },
+  { href: "/join", label: "Stores" },
   { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Support" },
   { href: "/privacy", label: "Privacy" },

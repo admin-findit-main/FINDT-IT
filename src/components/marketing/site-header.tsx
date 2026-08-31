@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { BrandHomeLink } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
+import { useSurfaceHref } from "@/components/host/host-surface";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
@@ -14,6 +15,8 @@ const LINKS = [
 
 export function MarketingHeader() {
   const [open, setOpen] = useState(false);
+  const shopperSignup = useSurfaceHref("dashboard", "/signup");
+  const shopperLogin = useSurfaceHref("dashboard", "/login");
 
   return (
     <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong">
@@ -34,8 +37,11 @@ export function MarketingHeader() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm">
+            <Link href={shopperLogin}>Sign in</Link>
+          </Button>
           <Button asChild size="sm">
-            <Link href="/#waitlist">Join waitlist</Link>
+            <Link href={shopperSignup}>Get started</Link>
           </Button>
           <button
             type="button"
@@ -80,6 +86,24 @@ export function MarketingHeader() {
                 </Link>
               </li>
             ))}
+            <li>
+              <Link
+                href={shopperLogin}
+                className="block rounded-glass-md px-2 py-2.5 text-sm font-medium text-ink"
+                onClick={() => setOpen(false)}
+              >
+                Sign in
+              </Link>
+            </li>
+            <li>
+              <Link
+                href={shopperSignup}
+                className="block rounded-glass-md px-2 py-2.5 text-sm font-medium text-ink"
+                onClick={() => setOpen(false)}
+              >
+                Get started
+              </Link>
+            </li>
           </ul>
         </nav>
       ) : null}

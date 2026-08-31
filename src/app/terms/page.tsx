@@ -68,12 +68,12 @@ export default function TermsPage() {
         in the <Link href="/business-terms">Business Terms</Link>.
       </p>
 
-      <h2>Pilot and paid plans</h2>
+      <h2>Plans and billing</h2>
       <p>
-        FINDIT is operating a closed pilot. There is currently no in-app
-        billing. Plan names, Find caps, and store routing limits may change.
-        If we start charging, we will say so in the product before collecting
-        payment.
+        Shoppers can use FINDIT on the free plan. Stores apply and, if
+        approved, get a trial. There is currently no live card charging. Plan
+        names, Find caps, and store routing limits may change. If we start
+        charging, we will say so in the product before collecting payment.
       </p>
 
       <h2>Auto-renewal</h2>
@@ -81,8 +81,8 @@ export default function TermsPage() {
         Paid FINDIT subscriptions (when billing is live) renew automatically
         at the end of each billing period until you cancel. Before we take a
         payment we will show the price, the length of the period, and the date
-        of the next charge. During the unpaid pilot, nothing auto-renews and no
-        card is charged.
+        of the next charge. Until paid billing is turned on, nothing auto-renews
+        and no card is charged.
       </p>
 
       <h2>Apple App Store and Google Play billing</h2>

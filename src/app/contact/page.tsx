@@ -22,11 +22,15 @@ export default function ContactPage() {
         .
       </p>
       <p>
-        FINDIT is waitlisting, so public sign-in is off. Join at{" "}
-        <a className="font-semibold text-ink underline" href="/#waitlist">
-          askfindit.com
+        Shoppers create an account at{" "}
+        <a className="font-semibold text-ink underline" href="https://dashboard.askfindit.com/signup">
+          dashboard.askfindit.com/signup
         </a>
-        .
+        . Stores apply at{" "}
+        <a className="font-semibold text-ink underline" href="/join">
+          askfindit.com/join
+        </a>
+        , then sign in at store.askfindit.com.
       </p>
     </LegalShell>
   );

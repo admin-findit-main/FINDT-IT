@@ -217,7 +217,7 @@ export const APP_TAGLINE = "Who has it? FINDIT.";
 export const APP_POSITIONING =
   "Looking for something? Ask nearby stores at once.";
 
-/** Pilot messaging — no Stripe during pilot */
+/** Shown while live store charges are still off. */
 export const PILOT_STORE_BANNER =
-  "Your store is part of the FINDIT Pilot. No payment is required during the pilot.";
+  "FINDIT is not charging stores yet. You can use the full store app."
 export const PILOT_CUSTOMER_BADGE = "Beta";
