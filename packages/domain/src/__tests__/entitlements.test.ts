@@ -29,8 +29,8 @@ describe("product architecture config", () => {
     expect(CUSTOMER_PLANS.plus.monthlyRequests).toBe(PLUS_MONTHLY_REQUEST_LIMIT);
   });
 
-  it("does not invent a FINDIT+ checkout price", () => {
-    expect(CUSTOMER_PLANS.plus.priceMonthly).toBeNull();
+  it("prices FINDIT+ at $4.99/month from one constant", () => {
+    expect(CUSTOMER_PLANS.plus.priceMonthly).toBe(4.99);
   });
 
   it("models FINDIT+ Business as $99/month with every store feature", () => {
@@ -101,9 +101,9 @@ describe("getConsumerEntitlements", () => {
     expect(isMonthlyFindCapError("Couldn't create your request.")).toBe(false);
   });
 
-  it("explains FINDIT vs FINDIT+ without inventing a Plus price", () => {
+  it("shows the FINDIT+ price but keeps purchase gated", () => {
     expect(customerPlanPriceLabel("free")).toBe("Free");
-    expect(customerPlanPriceLabel("plus")).toBe("Not for sale yet");
+    expect(customerPlanPriceLabel("plus")).toBe("$4.99 / month");
     const catalog = customerPlanCatalog();
     expect(catalog.billingLive).toBe(false);
     expect(catalog.plans.map((p) => p.id)).toEqual(["free", "plus"]);

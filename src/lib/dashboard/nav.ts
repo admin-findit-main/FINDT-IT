@@ -28,7 +28,7 @@ export const ownerDashItems: DashItem[] = [
   { href: "/store/demand", label: "Demand", icon: "demand" },
   { href: "/store/hub", label: "FINDIT Hub", icon: "hub" },
   { href: "/store/devices", label: "Devices", icon: "devices" },
-  { href: "/store/subscription", label: "Subscription", icon: "plan" },
+  { href: "/store/subscription", label: "Billing", icon: "plan" },
 ];
 
 export const employeeDashItems: DashItem[] = [
@@ -41,7 +41,7 @@ export const adminDashItems: DashItem[] = [
   { href: "/admin", label: "Overview", icon: "overview" },
   { href: "/admin/applications", label: "Applications", icon: "applications" },
   { href: "/admin/stores", label: "Stores", icon: "stores" },
-  { href: "/admin/subscriptions", label: "Subscriptions", icon: "plan" },
+  { href: "/admin/subscriptions", label: "Billing", icon: "plan" },
   { href: "/admin/hubs", label: "FINDIT Hubs", icon: "devices" },
   { href: "/admin/reports", label: "Reports", icon: "reports" },
   { href: "/admin/analytics", label: "Analytics", icon: "analytics" },
@@ -57,13 +57,13 @@ export function dashTitle(pathname: string): { title: string; subtitle: string }
     "/store/team": { title: "Team", subtitle: "Who can answer on FINDIT" },
     "/store/devices": { title: "Devices", subtitle: "Counter tablets connected to this store" },
     "/store/settings": { title: "Store profile", subtitle: "How this location appears" },
-    "/store/subscription": { title: "Subscription", subtitle: "Plan for this location — no charges yet" },
+    "/store/subscription": { title: "Billing", subtitle: "FINDIT Business · FastSpring test mode until launch" },
     "/store/notifications": { title: "Notifications", subtitle: "New asks and team updates" },
     "/store/account": { title: "Account", subtitle: "Your login" },
     "/admin": { title: "Overview", subtitle: "FINDIT network" },
     "/admin/applications": { title: "Applications", subtitle: "Businesses waiting to join" },
     "/admin/stores": { title: "Stores", subtitle: "Open a location for its people and settings" },
-    "/admin/subscriptions": { title: "Subscription", subtitle: "Trials and plans — no card charges" },
+    "/admin/subscriptions": { title: "Billing", subtitle: "Store subscriptions — live charges stay off until approved" },
     "/admin/hubs": { title: "Hubs", subtitle: "Registered counter devices" },
     "/admin/reports": { title: "Reports", subtitle: "Moderation queue" },
     "/admin/analytics": { title: "Analytics", subtitle: "Network size — stores and accounts" },

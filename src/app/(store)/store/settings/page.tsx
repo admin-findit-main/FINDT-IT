@@ -739,7 +739,7 @@ export default function StoreSettingsPage() {
         {role === "owner" || role === "manager" ? (
           <MenuLink
             href="/store/subscription"
-            title="Plan"
+            title="Billing"
             body={`${plan.name} — ${plan.tagline}`}
           />
         ) : null}

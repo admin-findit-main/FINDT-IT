@@ -98,7 +98,7 @@ export async function provisionStoreFromApplication(applicationId: string, revie
       is_verified: true,
       is_suspended: false,
       subscription_plan: "free",
-      subscription_status: "active",
+      subscription_status: "trial",
       trial_ends_at: trialEnds,
       service_radius_miles: 10,
       age_restricted: Boolean(application.requires_customer_id),
@@ -162,8 +162,12 @@ export async function provisionStoreFromApplication(applicationId: string, revie
   await admin.from("subscriptions").upsert(
     {
       store_id: store.id,
+      provider: "fastspring",
       plan: "free",
-      status: "active",
+      plan_id: "trial",
+      status: "trial",
+      trial_started_at: new Date().toISOString(),
+      trial_ends_at: trialEnds,
       current_period_end: trialEnds,
     },
     { onConflict: "store_id" }

@@ -12,6 +12,15 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional().or(z.literal("")),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional().or(z.literal("")),
   STRIPE_WEBHOOK_SECRET: z.string().optional().or(z.literal("")),
+  FASTSPRING_API_USERNAME: z.string().optional().or(z.literal("")),
+  FASTSPRING_API_PASSWORD: z.string().optional().or(z.literal("")),
+  FASTSPRING_WEBHOOK_SECRET: z.string().optional().or(z.literal("")),
+  FASTSPRING_STOREFRONT: z.string().optional().or(z.literal("")),
+  FASTSPRING_CHECKOUT_PATH: z.string().optional().or(z.literal("")),
+  FASTSPRING_BUSINESS_PRODUCT: z.string().optional().or(z.literal("")),
+  FASTSPRING_PLUS_PRODUCT: z.string().optional().or(z.literal("")),
+  /** Must stay false until the 20-point launch checklist is confirmed. */
+  FASTSPRING_LIVE_MODE: z.string().optional().or(z.literal("")),
   FINDIT_DEMO_MODE: z.string().optional().or(z.literal("")),
   FINDIT_BYPASS_PLAN_LIMITS: z.string().optional().or(z.literal("")),
   FINDIT_PILOT_MODE: z.string().optional().or(z.literal("")),
@@ -55,6 +64,14 @@ export function getEnv(): AppEnv {
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    FASTSPRING_API_USERNAME: process.env.FASTSPRING_API_USERNAME,
+    FASTSPRING_API_PASSWORD: process.env.FASTSPRING_API_PASSWORD,
+    FASTSPRING_WEBHOOK_SECRET: process.env.FASTSPRING_WEBHOOK_SECRET,
+    FASTSPRING_STOREFRONT: process.env.FASTSPRING_STOREFRONT,
+    FASTSPRING_CHECKOUT_PATH: process.env.FASTSPRING_CHECKOUT_PATH,
+    FASTSPRING_BUSINESS_PRODUCT: process.env.FASTSPRING_BUSINESS_PRODUCT,
+    FASTSPRING_PLUS_PRODUCT: process.env.FASTSPRING_PLUS_PRODUCT,
+    FASTSPRING_LIVE_MODE: process.env.FASTSPRING_LIVE_MODE,
     FINDIT_DEMO_MODE: process.env.FINDIT_DEMO_MODE,
     FINDIT_BYPASS_PLAN_LIMITS: process.env.FINDIT_BYPASS_PLAN_LIMITS,
     FINDIT_PILOT_MODE: process.env.FINDIT_PILOT_MODE,
@@ -114,9 +131,32 @@ export function bypassConsumerPlanLimits(): boolean {
   return getEnv().FINDIT_BYPASS_PLAN_LIMITS === "true";
 }
 
-/** Closed pilot: relax usage limits, show Beta, no Stripe. */
+/** Closed pilot: relax usage limits, show Beta, no live charges. */
 export function isPilotMode(): boolean {
   return getEnv().FINDIT_PILOT_MODE === "true";
+}
+
+export function isFastSpringLiveMode(): boolean {
+  return getEnv().FASTSPRING_LIVE_MODE === "true";
+}
+
+export function fastSpringConfig() {
+  const env = getEnv();
+  return {
+    apiUsername: env.FASTSPRING_API_USERNAME || "",
+    apiPassword: env.FASTSPRING_API_PASSWORD || "",
+    webhookSecret: env.FASTSPRING_WEBHOOK_SECRET || "",
+    storefront: env.FASTSPRING_STOREFRONT || "",
+    checkoutPath: env.FASTSPRING_CHECKOUT_PATH || "",
+    businessProduct: env.FASTSPRING_BUSINESS_PRODUCT || "findit-business",
+    plusProduct: env.FASTSPRING_PLUS_PRODUCT || "findit-plus",
+    liveMode: env.FASTSPRING_LIVE_MODE === "true",
+  };
+}
+
+export function isFastSpringConfigured(): boolean {
+  const cfg = fastSpringConfig();
+  return Boolean(cfg.apiUsername && cfg.apiPassword);
 }
 
 export function appUrl(): string {

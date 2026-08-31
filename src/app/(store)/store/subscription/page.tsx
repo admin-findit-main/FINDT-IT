@@ -1,67 +1,127 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { Panel } from "@/components/dashboard/shell";
-import { Skeleton } from "@/components/ui/primitives";
-import { STORE_PLANS, STORE_TRIAL_DAYS } from "@/lib/config/constants";
-import { getStoreWorkspaceAction } from "@/lib/services/actions";
-import type { Store } from "@/types/database";
+import { StoreBillingActions } from "@/components/store/billing-actions";
+import { getStoreBillingAction } from "@/lib/billing/actions";
+import { BILLING_METHOD_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/config/constants";
+import { PILOT_STORE_BANNER } from "@findit/domain";
 
-export default function StoreSubscriptionPage() {
-  const [store, setStore] = useState<Store | null>(null);
-  const [loading, setLoading] = useState(true);
+function fmtDate(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString();
+}
 
-  useEffect(() => {
-    getStoreWorkspaceAction().then((ws) => {
-      setStore(ws?.store ?? null);
-      setLoading(false);
-    });
-  }, []);
+export default async function StoreSubscriptionPage() {
+  const billing = await getStoreBillingAction();
+  if (!billing) {
+    return <p className="text-sm text-ink-muted">No store linked.</p>;
+  }
 
-  if (loading) return <Skeleton className="h-40" />;
-  if (!store) return <p className="text-sm text-ink-muted">No store linked.</p>;
-
-  const trialEnds = store.trial_ends_at ? new Date(store.trial_ends_at) : null;
-  const trialActive = trialEnds ? trialEnds.getTime() > Date.now() : store.subscription_plan === "free";
-  const plan = STORE_PLANS[(store.subscription_plan as keyof typeof STORE_PLANS) || "free"] || STORE_PLANS.free;
+  const { store, subscription, invoices, settings, plan, priceLabel, statusLabel } =
+    billing;
+  const trialEnds = subscription?.trial_ends_at || store.trial_ends_at;
 
   return (
     <div className="space-y-6">
-      <Panel title="FINDIT+ Business">
+      {!settings.billing_required ? (
+        <p className="text-sm text-ink-muted">{PILOT_STORE_BANNER}</p>
+      ) : null}
+
+      <Panel title={plan.name}>
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-ink-muted">Current plan</dt>
+            <dt className="text-ink-muted">Plan</dt>
             <dd className="mt-1 text-lg font-semibold">{plan.name}</dd>
-            <dd className="text-ink-muted">{plan.tagline}</dd>
+            <dd className="text-ink-muted">{priceLabel}</dd>
           </div>
           <div>
             <dt className="text-ink-muted">Status</dt>
-            <dd className="mt-1 font-medium capitalize">{store.subscription_status || "active"}</dd>
+            <dd className="mt-1 font-medium">{statusLabel}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Payment</dt>
+            <dd className="mt-1">
+              {PAYMENT_STATUS_LABELS[
+                (subscription?.payment_status || "none") as keyof typeof PAYMENT_STATUS_LABELS
+              ] || "None"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Billing method</dt>
+            <dd className="mt-1">
+              {BILLING_METHOD_LABELS[
+                (subscription?.billing_method || "none") as keyof typeof BILLING_METHOD_LABELS
+              ] || "Not set"}
+            </dd>
           </div>
           <div>
             <dt className="text-ink-muted">Trial</dt>
+            <dd className="mt-1">{trialEnds ? `Ends ${fmtDate(trialEnds)}` : "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Current period</dt>
             <dd className="mt-1">
-              {trialActive && trialEnds
-                ? `Ends ${trialEnds.toLocaleDateString()} (${STORE_TRIAL_DAYS}-day trial)`
-                : trialEnds
-                  ? "Trial ended"
-                  : `${STORE_TRIAL_DAYS}-day trial on approval`}
+              {subscription?.current_period_start
+                ? `${fmtDate(subscription.current_period_start)} – ${fmtDate(subscription.current_period_end)}`
+                : "—"}
             </dd>
           </div>
           <div>
-            <dt className="text-ink-muted">After trial</dt>
-            <dd className="mt-1">
-              ${STORE_PLANS.starter.priceMonthly}/month per location, every
-              store feature — billing is not connected yet.
-            </dd>
+            <dt className="text-ink-muted">Last payment</dt>
+            <dd className="mt-1">{fmtDate(subscription?.last_payment_at)}</dd>
+          </div>
+          <div>
+            <dt className="text-ink-muted">Next renewal</dt>
+            <dd className="mt-1">{fmtDate(subscription?.next_payment_at)}</dd>
           </div>
         </dl>
+        {subscription?.cancel_at_period_end ? (
+          <p className="mt-4 text-sm text-ink-muted">
+            Cancellation is scheduled for the end of this period.
+          </p>
+        ) : null}
+        <div className="mt-6">
+          <StoreBillingActions
+            canManage={billing.canManage}
+            hasAccount={Boolean(subscription?.provider_customer_id)}
+            hasSubscription={Boolean(subscription?.provider_subscription_id)}
+            testMode={billing.testMode}
+          />
+        </div>
       </Panel>
-      <Panel title="Payments">
+
+      <Panel title="Bank account & invoices">
         <p className="text-sm text-ink-muted">
-          Payment method, invoices, and renewals will appear here when Stripe is wired. FINDIT
-          will not show fake charges or card data.
+          FastSpring collects routing and account numbers on their secure checkout.
+          FINDIT never stores bank account numbers, cards, or CVVs.
         </p>
+        {invoices.length === 0 ? (
+          <p className="mt-4 text-sm text-ink-muted">No invoices yet.</p>
+        ) : (
+          <ul className="mt-4 divide-y divide-black/[0.06] text-sm">
+            {invoices.map((invoice) => (
+              <li key={invoice.id} className="flex justify-between gap-3 py-3">
+                <div>
+                  <p className="font-medium capitalize">{invoice.payment_status}</p>
+                  <p className="text-ink-muted">
+                    {fmtDate(invoice.occurred_at)}
+                    {invoice.reference ? ` · ${invoice.reference}` : ""}
+                  </p>
+                </div>
+                {invoice.invoice_url ? (
+                  <a
+                    href={invoice.invoice_url}
+                    className="shrink-0 text-ink underline-offset-2 hover:underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Receipt
+                  </a>
+                ) : (
+                  <span className="text-ink-muted">—</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
     </div>
   );

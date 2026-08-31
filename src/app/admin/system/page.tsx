@@ -23,7 +23,7 @@ export default function AdminSystemPage() {
         </div>
         <div>
           <dt className="text-ink-muted">Billing</dt>
-          <dd>Not connected (no Stripe keys in use)</dd>
+          <dd>FastSpring sandbox — live charges stay off until launch</dd>
         </div>
         <div>
           <dt className="text-ink-muted">Secrets</dt>

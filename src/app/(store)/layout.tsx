@@ -15,6 +15,8 @@ import {
   getCurrentProfile,
   getStoreWorkspaceAction,
 } from "@/lib/services/actions";
+import { getStoreBillingAccessAction } from "@/lib/billing/actions";
+import { StoreBillingAccessGate } from "@/components/store/billing-access-gate";
 import { StoreNotifyHost } from "@/components/store/notify-host";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +34,10 @@ export default async function StoreLayout({
   if (!profile) redirect("/login/business?next=/store");
   if (isSoloAdmin(profile)) redirect("/admin");
 
-  const access = await canAccessStoreDashboardAction();
+  const [access, workspace] = await Promise.all([
+    canAccessStoreDashboardAction(),
+    getStoreWorkspaceAction(),
+  ]);
   if (!access.allowed) {
     return (
       <div className="app-canvas min-h-screen bg-canvas">
@@ -80,10 +85,10 @@ export default async function StoreLayout({
     );
   }
 
-  const workspace = await getStoreWorkspaceAction();
   const role = workspace?.role || "employee";
   const canManage = workspace?.canManageStore ?? false;
   const storeName = workspace?.store?.name || "Store";
+  const billingAccess = await getStoreBillingAccessAction(workspace?.store);
 
   return (
     <DashboardShell
@@ -96,7 +101,9 @@ export default async function StoreLayout({
       logoutHref="/login/business"
     >
       <StoreNotifyHost userId={profile.id} />
-      {children}
+      <StoreBillingAccessGate allowed={billingAccess.allowed}>
+        {children}
+      </StoreBillingAccessGate>
     </DashboardShell>
   );
 }

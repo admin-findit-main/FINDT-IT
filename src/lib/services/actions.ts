@@ -1814,8 +1814,10 @@ export async function createStoreAction(raw: unknown) {
   );
   await supabase.from("subscriptions").insert({
     store_id: store.id,
+    provider: "fastspring",
     plan: "free",
-    status: "active",
+    plan_id: "trial",
+    status: "trial",
   });
 
   return { store: store as Store };

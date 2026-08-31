@@ -27,8 +27,11 @@ export function PlusUpgradeCard({
         open next month.
       </p>
       <p className="text-xs text-ink-muted">
-        {plus.name} will raise the monthly cap when billing is live. It is not
-        available to buy from this screen.
+        {plus.name} is {plus.priceMonthly != null
+          ? `$${plus.priceMonthly.toFixed(2)}/month`
+          : "priced"}{" "}
+        when billing is live. You can review it on the Plan page — live charges
+        are still off.
       </p>
       <Button asChild variant="outline" size="sm">
         <Link href="/plan">See plans</Link>

@@ -121,12 +121,15 @@ export const PLUS_MONTHLY_REQUEST_LIMIT = 25;
 export const FREE_MAX_RADIUS_MILES = 10;
 export const PLUS_MAX_RADIUS_MILES = 40;
 
-/** FINDIT+ Business price after trial. Billing is not connected yet. */
+/** FINDIT Business price after trial. Change here — payment code reads this. */
 export const BUSINESS_PRICE_MONTHLY = 99;
+
+/** FINDIT+ shopper price. Change here — payment code reads this. */
+export const PLUS_PRICE_MONTHLY = 4.99;
 
 /**
  * Consumer plans — FINDIT+ is a PLAN, not a role.
- * Plus price is omitted until billing exists (do not invent checkout).
+ * Price is configured; live shopper charges stay off until launch.
  */
 export const CUSTOMER_PLANS = {
   free: {
@@ -144,7 +147,7 @@ export const CUSTOMER_PLANS = {
     id: "plus",
     name: "FINDIT+",
     tagline: "More Finds, 40-mile search, Expand Search",
-    priceMonthly: null as number | null,
+    priceMonthly: PLUS_PRICE_MONTHLY as number | null,
     monthlyRequests: PLUS_MONTHLY_REQUEST_LIMIT as number | null,
     maxRadiusMiles: PLUS_MAX_RADIUS_MILES,
     savedSearches: true,
@@ -156,11 +159,11 @@ export const CUSTOMER_PLANS = {
 export type CustomerPlanId = keyof typeof CUSTOMER_PLANS;
 
 /**
- * FINDIT+ Business: $99/month per location, every store feature.
+ * FINDIT Business: $99/month per location, every store feature.
  * `starter` / `pro` keys remain so existing store rows still resolve.
  */
 const FINDIT_PLUS_BUSINESS = {
-  name: "FINDIT+ Business",
+  name: "FINDIT Business",
   tagline: "$99/month. Every store feature.",
   monthlyRequests: null as number | null,
   analytics: true,

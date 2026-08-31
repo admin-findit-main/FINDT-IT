@@ -60,7 +60,7 @@ export interface Profile {
   display_name: string | null;
   avatar_url: string | null;
   account_type: AccountType;
-  /** Customer billing plan — UI-ready; Stripe later */
+  /** Customer billing plan. FINDIT+ is granted from customer_subscriptions. */
   subscription_plan: CustomerSubscriptionPlan;
   default_city: string | null;
   default_state: string | null;
@@ -330,6 +330,89 @@ export interface StoreDevice {
   last_seen_at: string | null;
   revoked_at: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export interface StoreSubscription {
+  id: string;
+  store_id: string;
+  provider: string;
+  provider_customer_id: string | null;
+  provider_subscription_id: string | null;
+  plan: string;
+  plan_id: string;
+  status: string;
+  billing_method: string;
+  payment_status: string;
+  access_override: string;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
+  subscription_started_at: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  last_payment_at: string | null;
+  next_payment_at: string | null;
+  last_order_id: string | null;
+  last_invoice_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CustomerSubscription {
+  id: string;
+  profile_id: string;
+  provider: string;
+  provider_customer_id: string | null;
+  provider_subscription_id: string | null;
+  plan_id: string;
+  status: string;
+  billing_method: string;
+  payment_status: string;
+  access_override: string;
+  subscription_started_at: string | null;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  canceled_at: string | null;
+  last_payment_at: string | null;
+  next_payment_at: string | null;
+  last_order_id: string | null;
+  last_invoice_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillingInvoice {
+  id: string;
+  audience: "store" | "customer";
+  store_id: string | null;
+  profile_id: string | null;
+  provider: string;
+  provider_order_id: string | null;
+  provider_subscription_id: string | null;
+  reference: string | null;
+  amount_cents: number | null;
+  currency: string;
+  payment_method: string | null;
+  payment_status: string;
+  invoice_url: string | null;
+  occurred_at: string;
+  created_at: string;
+}
+
+export interface BillingSettings {
+  id: number;
+  billing_required: boolean;
+  shopper_billing_required: boolean;
+  live_billing_approved: boolean;
+  live_billing_approved_at: string | null;
+  live_billing_approved_by: string | null;
+  allow_past_due_access: boolean;
+  allow_failed_payment_access: boolean;
+  allow_pending_payment_access: boolean;
+  launch_checklist: Record<string, boolean>;
   updated_at: string;
 }
 

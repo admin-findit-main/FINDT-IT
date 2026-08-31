@@ -1,3 +1,4 @@
+import { SHOPPER_BILLING_LIVE } from "./billing";
 import {
   BUSINESS_PRICE_MONTHLY,
   CUSTOMER_PLANS,
@@ -101,7 +102,7 @@ export type CustomerPlanCompare = {
   cons: string[];
 };
 
-/** Copy for the customer Plan screen. Do not invent a FINDIT+ checkout price. */
+/** Copy for the customer Plan screen. Price is real; live charges stay gated. */
 export function customerPlanCatalog(): {
   billingLive: boolean;
   plans: CustomerPlanCompare[];
@@ -114,7 +115,7 @@ export function customerPlanCatalog(): {
   const free = CUSTOMER_PLANS.free;
   const plus = CUSTOMER_PLANS.plus;
   return {
-    billingLive: plus.priceMonthly != null,
+    billingLive: SHOPPER_BILLING_LIVE && plus.priceMonthly != null,
     plans: [
       {
         id: "free",
@@ -153,14 +154,14 @@ export function customerPlanCatalog(): {
           "Still a monthly cap — not unlimited",
           "Canceling a Find still spends it",
           "A wider radius only helps if stores in that range participate",
-          plus.priceMonthly == null
+          !SHOPPER_BILLING_LIVE
             ? "Billing is not live, so FINDIT+ cannot be purchased yet"
             : "Paid each month after you subscribe",
         ],
       },
     ],
     business: {
-      name: "FINDIT+ Business",
+      name: "FINDIT Business",
       priceLabel: `$${BUSINESS_PRICE_MONTHLY}/month. Every store feature.`,
       detail:
         "For stores, not customers. Owners apply separately. Floor staff join with an invite.",

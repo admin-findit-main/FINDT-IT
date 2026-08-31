@@ -9,6 +9,7 @@ import {
   customerPlanCatalog,
   getConsumerEntitlements,
 } from "@/lib/config/constants";
+import { CustomerPlanBilling } from "@/components/customer/billing-actions";
 import {
   getCurrentProfile,
   getCustomerPlanUsageAction,
@@ -36,8 +37,8 @@ export default function PlanPage() {
     <div className="mx-auto max-w-xl px-5 py-8 pb-12 sm:px-8">
       <h1 className="text-2xl font-bold tracking-tight text-ink">Plan</h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        FINDIT is free. FINDIT+ is the same account with more Finds and a
-        wider search. Billing is not live, so you cannot buy FINDIT+ yet.
+        FINDIT is free. FINDIT+ is ${catalog.plans[1].priceLabel} for more
+        Finds and a wider search. Live shopper billing is off until launch.
       </p>
       {planName ? (
         <p className="mt-3 text-sm font-medium text-ink">
@@ -127,6 +128,8 @@ export default function PlanPage() {
           );
         })}
       </div>
+
+      <CustomerPlanBilling />
 
       <Card level="subtle" className="mt-4 space-y-3 p-5">
         <p className="text-sm font-semibold text-ink">{catalog.business.name}</p>

@@ -4,6 +4,7 @@ import {
   canAccessStoreDashboardAction,
   getCurrentProfile,
 } from "@/lib/services/actions";
+import { getStoreBillingAccessAction } from "@/lib/billing/actions";
 import { getHubRuntimeAction } from "@/lib/services/hub-devices";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,17 @@ export default async function HubLayout({
   children: React.ReactNode;
 }) {
   const runtime = await getHubRuntimeAction();
-  if (runtime?.store) return children;
+  if (runtime?.store) {
+    const billing = await getStoreBillingAccessAction(runtime.store);
+    if (!billing.allowed) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-black p-8 text-center text-white">
+          <p>This Hub is paused until billing is current.</p>
+        </div>
+      );
+    }
+    return children;
+  }
 
   const profile = await getCurrentProfile();
   if (!profile) return children;
