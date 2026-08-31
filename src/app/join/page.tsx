@@ -262,7 +262,7 @@ export default function JoinAsStorePage() {
       emailCode,
     });
     setLoading(false);
-    if (result.error) {
+    if ("error" in result && result.error) {
       if ("code" in result && result.code === "existing_account") {
         setExistingAccount(true);
         return;
