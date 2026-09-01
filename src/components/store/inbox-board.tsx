@@ -19,7 +19,6 @@ import { StatusBadge } from "@/components/shared/status";
 import { AVAILABILITY_OPTIONS, HOLD_OPTIONS, STOCK_AMOUNT_OPTIONS } from "@/lib/config/constants";
 import {
   getCurrentProfile,
-  getStoreIncomingRequestsAction,
   getStoreMetricsAction,
   getStoreWorkspaceAction,
   getUserStoresAction,
@@ -67,9 +66,13 @@ export function StoreInboxBoard() {
 
   const loadInbox = useCallback(async (sid = storeId) => {
     if (!sid) return;
-    const list = await getStoreIncomingRequestsAction(sid, filter, range);
-    setItems(list);
-    writeCached(`inbox:${sid}:${filter}:${range}`, list);
+    const res = await fetch(
+      `/api/hub/inbox?storeId=${encodeURIComponent(sid)}&filter=${encodeURIComponent(filter)}&range=${encodeURIComponent(range)}&t=${Date.now()}`,
+      { cache: "no-store", credentials: "same-origin" }
+    );
+    const list = res.ok ? ((await res.json()) as Incoming[]) : [];
+    setItems(Array.isArray(list) ? list : []);
+    writeCached(`inbox:${sid}:${filter}:${range}`, Array.isArray(list) ? list : []);
     setLoading(false);
   }, [storeId, filter, range]);
 

@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Settings } from "lucide-react";
 import { estimateRoutingDistanceMiles, isRequestExpired } from "@findit/domain";
 import {
-  getStoreIncomingRequestsAction,
   markStoreRequestOpenedAction,
   respondToRequestAction,
   signOutAction,
@@ -103,7 +102,7 @@ export default function FinditHubPage() {
   const [deviceName, setDeviceName] = useState<string | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
   const primed = useRef(false);
-  const queueBusy = useRef(false);
+  const queueSeq = useRef(0);
   const queueSignature = useRef("");
   const storeId = store?.id;
 
@@ -140,11 +139,16 @@ export default function FinditHubPage() {
   }, [router]);
 
   const loadQueue = useCallback(async (id: string, opts?: { silent?: boolean }) => {
-    if (queueBusy.current) return;
-    queueBusy.current = true;
+    const seq = ++queueSeq.current;
     try {
-      const rows = await getStoreIncomingRequestsAction(id, "unanswered", "7d");
-      const pending = (rows as HubRequest[])
+      const res = await fetch(
+        `/api/hub/inbox?storeId=${encodeURIComponent(id)}&filter=unanswered&range=7d&t=${Date.now()}`,
+        { cache: "no-store", credentials: "same-origin" }
+      );
+      if (seq !== queueSeq.current) return;
+      if (!res.ok) throw new Error("inbox");
+      const rows = (await res.json()) as HubRequest[];
+      const pending = (Array.isArray(rows) ? rows : [])
         .filter((row) => !row.response)
         .filter((row) => !isRequestExpired(row.expires_at, row.status))
         .sort(
@@ -171,12 +175,11 @@ export default function FinditHubPage() {
       setError(null);
       setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
     } catch (err) {
+      if (seq !== queueSeq.current) return;
       console.error("[FINDIT Hub] load failed", err);
       if (!opts?.silent) {
         setError("Couldn't refresh requests. Trying again…");
       }
-    } finally {
-      queueBusy.current = false;
     }
   }, []);
 

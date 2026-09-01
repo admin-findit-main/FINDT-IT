@@ -1708,13 +1708,10 @@ export async function getStoreIncomingRequestsAction(
     })[];
   }
 
-  // Device sessions have no store_members row, so they read via service role
-  // after getStoreActor verified the hashed device cookie.
+  // Always read with the service role after getStoreActor checks membership
+  // or the Hub device cookie. The user client can return a cached empty inbox.
   const { createServiceClient } = await import("@/lib/supabase/admin");
-  const supabase =
-    actor.kind === "device"
-      ? createServiceClient()
-      : (await getSupabaseUser()).supabase;
+  const supabase = createServiceClient();
   const start = new Date();
   if (range === "today") start.setHours(0, 0, 0, 0);
   else if (range === "7d") start.setDate(start.getDate() - 7);
