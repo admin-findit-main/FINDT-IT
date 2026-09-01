@@ -143,8 +143,8 @@ export function NotificationPrompt({
           {waiting
             ? "Turn on notifications to know when a nearby store finds your item."
             : audience === "store"
-              ? "Allow notifications so FINDIT can ping this phone when a nearby shopper asks — including after you close the app."
-              : "We’ll notify this phone when a nearby store answers a Find — including after you close the app."}
+              ? "Allow notifications so FINDIT can ping this phone when a nearby shopper asks, including after you close the app."
+              : "We’ll notify this phone when a nearby store answers a Find, including after you close the app."}
         </p>
         {iosHomeScreen ? (
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">

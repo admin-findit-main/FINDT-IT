@@ -27,11 +27,8 @@ export function PlusUpgradeCard({
         open next month.
       </p>
       <p className="text-xs text-ink-muted">
-        {plus.name} is {plus.priceMonthly != null
-          ? `$${plus.priceMonthly.toFixed(2)}/month`
-          : "priced"}{" "}
-        when billing is live. You can review it on the Plan page — live charges
-        are still off.
+        {plus.name} includes more Finds and a wider search. See plans for
+        details.
       </p>
       <Button asChild variant="outline" size="sm">
         <Link href="/plan">See plans</Link>

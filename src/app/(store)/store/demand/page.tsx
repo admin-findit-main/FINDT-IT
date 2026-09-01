@@ -55,7 +55,7 @@ export default function DemandPage() {
             Customer Demand
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
-            Anonymous insights from nearby product asks.
+            What people nearby keep asking for.
           </p>
         </div>
         {stores.length > 1 ? (
@@ -82,8 +82,8 @@ export default function DemandPage() {
       ) : demand.length === 0 ? (
         <div className="mt-8">
           <EmptyState
-            title="Demand insights will appear as customers make requests in your area."
-            description="No fake analytics — only real request data."
+            title="No demand yet"
+            description="Answer requests and this will fill in."
           />
         </div>
       ) : (
@@ -130,7 +130,10 @@ export default function DemandPage() {
             </p>
             <div className="mt-4 space-y-3">
               {missing.length === 0 ? (
-                <EmptyState title="No stocking ideas yet — keep answering requests." />
+                <EmptyState
+                  title="No stocking ideas yet"
+                  description="Keep answering requests and this will fill in."
+                />
               ) : (
                 missing.slice(0, 8).map((item) => (
                   <Card key={item.normalized_product_name} className="p-5">

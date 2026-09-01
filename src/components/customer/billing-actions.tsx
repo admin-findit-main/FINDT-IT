@@ -48,9 +48,9 @@ export function CustomerBillingActions({
         >
           {busy === "start"
             ? "Opening…"
-            : hasSubscription
-              ? "Upgrade / change payment"
-              : "Start FINDIT+"}
+              : hasSubscription
+              ? "Update payment"
+              : "Get FINDIT+"}
         </Button>
         {hasAccount ? (
           <Button
@@ -59,7 +59,7 @@ export function CustomerBillingActions({
             disabled={busy !== null}
             onClick={() => run("manage", manageCustomerBillingAction)}
           >
-            Manage subscription
+            Billing
           </Button>
         ) : null}
         {hasSubscription ? (
@@ -78,15 +78,9 @@ export function CustomerBillingActions({
           </Button>
         ) : null}
       </div>
-      {!configured ? (
+      {!configured || testMode ? (
         <p className="text-xs text-ink-muted">
-          FINDIT+ checkout is prepared but FastSpring is not connected yet. No
-          shopper will be charged.
-        </p>
-      ) : testMode ? (
-        <p className="text-xs text-ink-muted">
-          Shopper checkout is test/sandbox only. Live FINDIT+ billing stays off
-          until launch.
+          You’ll be notified before any paid subscription begins.
         </p>
       ) : null}
       {error ? <p className="text-sm text-accent-ink">{error}</p> : null}

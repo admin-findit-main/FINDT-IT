@@ -91,8 +91,8 @@ export default function NotificationsPage() {
           <Skeleton className="h-24 w-full" />
         ) : items.length === 0 ? (
           <EmptyState
-            title="No alerts yet."
-            description="When a store answers, it shows up here."
+            title="No notifications yet"
+            description="Updates about your requests will appear here."
           />
         ) : (
           <Card padded={false} className="overflow-hidden">

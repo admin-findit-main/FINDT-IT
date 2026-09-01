@@ -26,8 +26,8 @@ export default function PricingPage() {
     <LegalShell title="FINDIT pricing">
       <p>
         Shoppers start free. Stores get a {STORE_TRIAL_DAYS}-day trial after
-        approval. Live card charges stay off until FINDIT turns billing on in
-        Admin — checkout will show the price before anything is due.
+        approval. Payments are coming soon. You’ll be notified before any paid
+        subscription begins.
       </p>
       <BrandLogo kind="plus" className="mt-2 h-6" />
       <h2>Shoppers</h2>
@@ -37,25 +37,17 @@ export default function PricingPage() {
       </p>
       <p>
         <strong className="text-ink">{CUSTOMER_PLANS.plus.name}.</strong>{" "}
-        {CUSTOMER_PLANS.plus.tagline}. {PLUS_PRICE}/month when shopper billing
-        is live.
+        {CUSTOMER_PLANS.plus.tagline}. {PLUS_PRICE}/month.
       </p>
       <BrandLogo kind="business" className="mt-6 h-6" />
       <h2>Stores</h2>
       <p>
         The store app is {STORE_PRICE}/month per location after trial. That
-        includes every store feature: Hub at the counter, incoming Finds,
-        demand, team, and settings. There aren’t extra paid tiers.
+        includes the Hub, incoming Finds, demand, team, and settings.
       </p>
       <p>
         Apply at <a href="/join">askfindit.com/join</a>. We review before a
         store goes live.
-      </p>
-      <h2>Cancel</h2>
-      <p>
-        When paid billing is live, cancel any time in the store subscription
-        screen or the shopper Plan screen. No cancellation fee. Access
-        continues through the paid period.
       </p>
     </LegalShell>
   );

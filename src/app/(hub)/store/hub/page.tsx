@@ -19,6 +19,11 @@ import {
   HUB_INBOX_POLL_MS,
 } from "@/lib/hub/constants";
 import { armAlertSoundUnlock, playHubAlert } from "@/lib/alert-sound";
+import {
+  hubRequestsToAlert,
+  readHubSeenIds,
+  writeHubSeenIds,
+} from "@/lib/hub/arrivals";
 import { readCached, writeCached } from "@/lib/data/client-cache";
 import { BrandLogo } from "@/components/brand/logo";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
@@ -131,14 +136,19 @@ export default function FinditHubPage() {
         );
 
       const previous = seenIds.current;
-      const arrived = pending.filter((row) => primed.current && !previous.has(row.id));
-      if (arrived.length > 0) {
+      const arrivedIds = hubRequestsToAlert({
+        primed: primed.current,
+        seenIds: previous,
+        pending,
+      });
+      if (arrivedIds.length > 0) {
         playHubAlert();
         setNewFlash(true);
         window.setTimeout(() => setNewFlash(false), 1600);
       }
       pending.forEach((row) => previous.add(row.id));
       primed.current = true;
+      if (id) writeHubSeenIds(id, previous, sessionStorage);
 
       const signature = pending.map((row) => row.id).join(",");
       if (signature !== queueSignature.current) {
@@ -175,8 +185,13 @@ export default function FinditHubPage() {
 
   useEffect(() => {
     const cached = storeId ? readCached<HubRequest[]>(`hub-queue:${storeId}`, 180_000) : null;
+    if (storeId) {
+      const remembered = readHubSeenIds(storeId, sessionStorage);
+      remembered.forEach((rowId) => seenIds.current.add(rowId));
+    }
     if (cached?.length) {
       queueSignature.current = cached.map((row) => row.id).join(",");
+      cached.forEach((row) => seenIds.current.add(row.id));
       setQueue(cached);
       setLoading(false);
     }

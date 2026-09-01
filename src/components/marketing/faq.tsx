@@ -1,31 +1,31 @@
 const QUESTIONS = [
   {
     q: "What is FINDIT?",
-    a: "FINDIT is how you ask nearby stores if they have a product — without calling around. You send one Find. Participating shops answer from the counter: in stock, out of stock, or they can order it. Then you go pick it up.",
+    a: "You ask nearby stores if they have a product. Stores answer from the counter. Then you go pick it up.",
   },
   {
-    q: "Is FINDIT delivery or shipping?",
-    a: "No. FINDIT never sends a driver and never ships a box. You choose the store and pick the product up yourself.",
+    q: "Is FINDIT delivery?",
+    a: "No. FINDIT never sends a driver. You choose the store and pick the product up yourself.",
   },
   {
     q: "How do shoppers sign in?",
-    a: "With your phone. We text a 6-digit code. No email or password for shoppers.",
+    a: "With your phone. We text a 6-digit code.",
   },
   {
-    q: "Do stores see my name or phone number?",
-    a: "No. Stores see the product you asked for and the area. They do not get your name, phone, or email.",
+    q: "Do stores see my phone number?",
+    a: "No. Stores see the product you asked for and the area. Not your name or phone.",
   },
   {
     q: "What does it cost?",
-    a: "Shoppers start free — 5 Finds each month. FINDIT+ is $4.99/month for more Finds and a wider search when shopper billing is on. Stores are $99/month per location after a 30-day trial. We are not charging cards until billing is turned on.",
+    a: "Shoppers start free, with 5 Finds each month. FINDIT+ is $4.99/month for more Finds and a wider search. Stores are $99/month per location after a 30-day trial. Payments are coming soon. Enjoy the free trial until then.",
   },
   {
     q: "How do stores join?",
-    a: "Apply at askfindit.com/join. We review the business, then the owner gets the store app — Hub at the counter, incoming Finds, demand, and team logins.",
+    a: "Apply at askfindit.com/join. We review the business, then the owner gets the store app.",
   },
   {
     q: "What is the Hub?",
-    a: "A landscape tablet at the counter. Staff tap answers there. It pairs with a code, so nobody types the owner password on the floor.",
+    a: "A tablet at the counter. Staff tap answers there.",
   },
 ] as const;
 
@@ -33,11 +33,8 @@ export function MarketingFaq() {
   return (
     <section id="faq" className="border-t border-hairline-strong bg-white py-16 md:py-20">
       <div className="mx-auto max-w-3xl px-5 sm:px-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">
+        <h2 className="text-2xl font-bold tracking-tight text-ink md:text-3xl">
           Questions
-        </p>
-        <h2 className="mt-2 text-2xl font-bold tracking-tight text-ink md:text-3xl">
-          Q&A
         </h2>
         <div className="mt-8 divide-y divide-hairline-strong border-y border-hairline-strong">
           {QUESTIONS.map((item) => (

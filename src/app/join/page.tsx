@@ -362,8 +362,8 @@ export default function JoinAsStorePage() {
               answering nearby Asks. Approved stores get{" "}
               <strong className="font-semibold text-ink">
                 {STORE_TRIAL_DAYS} days free
-              </strong>{" "}
-              — no credit card.
+              </strong>
+              .
             </p>
             <Button asChild className="mt-8" size="lg">
               <Link href={storeLogin}>Store login</Link>
@@ -606,7 +606,7 @@ export default function JoinAsStorePage() {
                     <p className="mt-1 text-xs text-ink-muted">
                       {ein
                         ? `Reading ${formatEin(ein)}${ein.length === 9 ? " · 9 digits" : ` · ${ein.length} of 9 digits`}`
-                        : "9 digits. Paste with or without the dash — FINDIT will read it."}
+                        : "9 digits. Paste with or without the dash. FINDIT will read it."}
                     </p>
                   </div>
                   <div>
@@ -783,8 +783,8 @@ export default function JoinAsStorePage() {
                   <span>
                     I confirm this is a real, legitimate business. The EIN and
                     legal name are accurate. After FINDIT accepts this application
-                    I can open the dashboard and connect devices ({STORE_TRIAL_DAYS}
-                    -day free trial — no credit card).
+                    I can open the dashboard and connect devices. Approved stores
+                    get a {STORE_TRIAL_DAYS}-day free trial.
                   </span>
                 </label>
               </>

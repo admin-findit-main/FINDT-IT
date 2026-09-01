@@ -195,9 +195,9 @@ export function StoreInboxBoard() {
   if (!loading && stores.length === 0) {
     return (
       <div className="px-5 pt-10 md:px-8">
-        <EmptyState
-          title="No store assigned yet"
-          description="Owners apply their business on FINDIT. Staff join with an invite link from their owner — not the public apply form."
+          <EmptyState
+            title="No store assigned yet"
+            description="Owners apply on FINDIT. Staff join with an invite from their owner."
           action={
             <Button asChild>
               <Link href="/join">Apply your business</Link>
@@ -347,8 +347,8 @@ export function StoreInboxBoard() {
           </div>
         ) : items.length === 0 ? (
           <EmptyState
-            title="No asks in this view"
-            description="When customers near your ZIP look for something, it shows up here."
+            title="You're all caught up"
+            description="New shopper requests will appear here."
           />
         ) : (
           items.map((item) => (

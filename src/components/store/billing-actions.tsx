@@ -58,9 +58,9 @@ export function StoreBillingActions({
         >
           {busy === "start"
             ? "Opening…"
-            : hasSubscription
-              ? "Update payment method"
-              : "Set up bank account"}
+              : hasSubscription
+              ? "Update payment"
+              : "Set up billing"}
         </Button>
         {hasAccount ? (
           <Button
@@ -69,7 +69,7 @@ export function StoreBillingActions({
             disabled={busy !== null}
             onClick={() => run("manage", manageStoreBillingAction)}
           >
-            {busy === "manage" ? "Opening…" : "Manage billing"}
+            {busy === "manage" ? "Opening…" : "Billing"}
           </Button>
         ) : null}
         {hasSubscription ? (
@@ -94,8 +94,7 @@ export function StoreBillingActions({
       </div>
       {testMode ? (
         <p className="text-xs text-ink-muted">
-          Checkout is FastSpring test/sandbox mode. FINDIT will not take a real
-          payment until live billing is approved.
+          You’ll be notified before any paid subscription begins.
         </p>
       ) : null}
       {error ? <p className="text-sm text-accent-ink">{error}</p> : null}

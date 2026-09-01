@@ -23,6 +23,7 @@ export type ShopperOnboardingState = {
   /** User tapped “Do this later” on the install step. Not the same as installed. */
   installSkipped: boolean;
   notificationEducationSeen: boolean;
+  locationEducationSeen: boolean;
   installHintDismissedAt: number | null;
 };
 
@@ -30,6 +31,7 @@ export type ShopperOnboardingStepId =
   | "welcome"
   | "how"
   | "install"
+  | "location"
   | "notify"
   | "ready";
 
@@ -39,6 +41,7 @@ const DEFAULT_STATE: ShopperOnboardingState = {
   installEducationSeen: false,
   installSkipped: false,
   notificationEducationSeen: false,
+  locationEducationSeen: false,
   installHintDismissedAt: null,
 };
 
@@ -66,6 +69,7 @@ function parseState(raw: string | null): ShopperOnboardingState {
       installEducationSeen: Boolean(parsed.installEducationSeen),
       installSkipped: Boolean(parsed.installSkipped),
       notificationEducationSeen: Boolean(parsed.notificationEducationSeen),
+      locationEducationSeen: Boolean(parsed.locationEducationSeen),
       installHintDismissedAt:
         typeof parsed.installHintDismissedAt === "number"
           ? parsed.installHintDismissedAt
@@ -171,9 +175,11 @@ export function shouldShowInstallHint(input: {
 export function shopperOnboardingSteps(input: {
   standalone: boolean;
   notification: "granted" | "denied" | "default" | "unsupported";
+  needsLocation: boolean;
 }): ShopperOnboardingStepId[] {
   const steps: ShopperOnboardingStepId[] = ["welcome", "how"];
   if (!input.standalone) steps.push("install");
+  if (input.needsLocation) steps.push("location");
   if (input.notification === "default" || input.notification === "denied") {
     steps.push("notify");
   }

@@ -135,7 +135,7 @@ export const CUSTOMER_PLANS = {
   free: {
     id: "free",
     name: "FINDIT",
-    tagline: "Ask nearby stores — 5 Finds each month",
+    tagline: "Ask nearby stores. 5 Finds each month",
     priceMonthly: 0 as number | null,
     monthlyRequests: FREE_MONTHLY_REQUEST_LIMIT as number | null,
     maxRadiusMiles: FREE_MAX_RADIUS_MILES,
@@ -214,10 +214,15 @@ export const REQUEST_IMAGES_BUCKET = "request-images";
 
 export const APP_NAME = "FINDIT";
 export const APP_TAGLINE = "Who has it? FINDIT.";
-export const APP_POSITIONING =
-  "Looking for something? Ask nearby stores at once.";
+export const APP_POSITIONING = "Ask nearby stores who has it.";
 
 /** Shown while live store charges are still off. */
 export const PILOT_STORE_BANNER =
-  "FINDIT is not charging stores yet. You can use the full store app."
+  "Payments aren't on yet. Enjoy your free trial.";
 export const PILOT_CUSTOMER_BADGE = "Beta";
+
+export const PAYMENTS_COMING_SOON_TITLE = "Payments coming soon";
+export const PAYMENTS_COMING_SOON_BODY =
+  "Enjoy your free trial while we finish setting up billing.";
+export const PAYMENTS_COMING_SOON_NOTE =
+  "You'll be notified before any paid subscription begins.";

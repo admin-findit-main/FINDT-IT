@@ -23,12 +23,12 @@ import {
   AGE_RESTRICTED_ID_TITLE,
   CUSTOMER_PLANS,
   PRODUCT_CATEGORIES,
-  RADIUS_OPTIONS,
   findPlaceholderForCategory,
   getConsumerEntitlements,
   isAgeRestrictedCategory,
   isAgeRestrictedFind,
   planLimitReachedMessage,
+  radiusOptionsForPlan,
 } from "@/lib/config/constants";
 import {
   FindSendOverlay,
@@ -123,7 +123,13 @@ export default function CustomerHomePage() {
   }, []);
 
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
-  const radiusChoices = RADIUS_OPTIONS;
+  const radiusChoices = radiusOptionsForPlan(entitlements.maxSearchRadiusMiles);
+
+  useEffect(() => {
+    if (radiusMiles > entitlements.maxSearchRadiusMiles) {
+      setRadiusMiles(entitlements.maxSearchRadiusMiles);
+    }
+  }, [entitlements.maxSearchRadiusMiles, radiusMiles]);
   const plus = CUSTOMER_PLANS.plus;
   const restricted = isAgeRestrictedFind({
     category,
@@ -224,7 +230,7 @@ export default function CustomerHomePage() {
     toast.success(
       isCompleteShortPlace(nextPlace)
         ? `Using ${formatShortPlace(nextPlace)}`
-        : "Got your location — confirm your city below"
+        : "Got your location. Confirm your city below"
     );
   }
 
@@ -454,7 +460,7 @@ export default function CustomerHomePage() {
                       Add a photo
                     </span>
                     <span className="mt-1 block text-xs text-ink-muted">
-                      Optional — or just type the name above
+                      Optional. Or just type the name above.
                     </span>
                   </span>
                 )}
@@ -540,7 +546,7 @@ export default function CustomerHomePage() {
               Category
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-              Optional — helps us ask the right stores. Tobacco & vape asks for ID first.
+              Optional. Helps us ask the right stores. Tobacco and vape asks for ID first.
             </p>
             {needsCategoryConfirm ? (
               <div className="mt-4 rounded-2xl border border-hairline-strong bg-white p-4">
@@ -594,7 +600,8 @@ export default function CustomerHomePage() {
               How far should we look?
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-              We’ll look this far from your location — up to 40 miles.
+              We’ll look this far from your location, up to{" "}
+              {entitlements.maxSearchRadiusMiles} miles on {entitlements.brandName}.
             </p>
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-hairline-strong bg-white">

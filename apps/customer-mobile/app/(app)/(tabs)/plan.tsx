@@ -3,6 +3,9 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   customerPlanCatalog,
   getConsumerEntitlements,
+  PAYMENTS_COMING_SOON_BODY,
+  PAYMENTS_COMING_SOON_NOTE,
+  PAYMENTS_COMING_SOON_TITLE,
 } from "@findit/domain";
 import { spacing, typography } from "@findit/theme";
 import { GlassCard, useAppTheme } from "@findit/theme/native";
@@ -35,7 +38,7 @@ export default function PlanScreen() {
       >
         <Text style={[styles.intro, { color: theme.inkMuted }]}>
           FINDIT is free. FINDIT+ is the same account with more Finds and a wider
-          search. Billing is not live, so you cannot buy FINDIT+ yet.
+          search.
         </Text>
         <Text style={[styles.current, { color: theme.ink }]}>
           You’re on {entitlements.brandName}
@@ -71,7 +74,6 @@ export default function PlanScreen() {
                   <Text style={[styles.tagline, { color: theme.inkMuted }]}>
                     {plan.tagline}
                   </Text>
-                  <Text style={[styles.who, { color: theme.ink }]}>{plan.who}</Text>
                 </View>
                 <View style={styles.selectCol}>
                   <Text style={[styles.price, { color: theme.ink }]}>
@@ -95,17 +97,8 @@ export default function PlanScreen() {
                 </View>
               ) : null}
 
-              <Text style={[styles.group, { color: theme.inkMuted }]}>Pros</Text>
               {plan.pros.map((item) => (
                 <Text key={item} style={[styles.bullet, { color: theme.ink }]}>
-                  • {item}
-                </Text>
-              ))}
-              <Text style={[styles.group, { color: theme.inkMuted, marginTop: spacing.md }]}>
-                Cons
-              </Text>
-              {plan.cons.map((item) => (
-                <Text key={item} style={[styles.bullet, { color: theme.inkMuted }]}>
                   • {item}
                 </Text>
               ))}
@@ -113,17 +106,20 @@ export default function PlanScreen() {
           );
         })}
 
-        <GlassCard>
-          <Text style={[styles.planName, { color: theme.ink }]}>
-            {catalog.business.name}
-          </Text>
-          <Text style={[styles.who, { color: theme.ink, marginTop: 6 }]}>
-            {catalog.business.priceLabel}
-          </Text>
-          <Text style={[styles.tagline, { color: theme.inkMuted, marginTop: 8 }]}>
-            {catalog.business.detail}
-          </Text>
-        </GlassCard>
+        {catalog.billingLive ? null : (
+          <View style={{ alignItems: "center", paddingVertical: spacing.lg }}>
+            <Text style={{ fontSize: 22 }}>🔒</Text>
+            <Text style={[styles.planName, { color: theme.ink, marginTop: spacing.sm }]}>
+              {PAYMENTS_COMING_SOON_TITLE}
+            </Text>
+            <Text style={[styles.tagline, { color: theme.inkMuted, textAlign: "center" }]}>
+              {PAYMENTS_COMING_SOON_BODY}
+            </Text>
+            <Text style={[styles.tagline, { color: theme.inkMuted, textAlign: "center" }]}>
+              {PAYMENTS_COMING_SOON_NOTE}
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </AppChrome>
   );

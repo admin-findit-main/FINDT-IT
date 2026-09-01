@@ -7,8 +7,8 @@ const YEAR = new Date().getFullYear();
 
 const PRODUCT = [
   { href: "/#how", label: "How it works" },
-  { href: "/#start", label: "Get started" },
-  { href: "/#faq", label: "Q&A" },
+  { href: "/#shoppers", label: "For shoppers" },
+  { href: "/#stores", label: "For stores" },
   { href: "/pricing", label: "Pricing" },
 ] as const;
 

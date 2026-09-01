@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { armAlertSoundUnlock, playCustomerAlert } from "@/lib/alert-sound";
 import { showBrowserNotification } from "@/lib/browser-notify";
 import { createClient } from "@/lib/supabase/client";
+import { isCustomerStoreAnswerNotification } from "@findit/domain";
 
 /**
  * Live in-app toast (and optional browser notification) when a store answers.
@@ -44,23 +45,27 @@ export function CustomerAlertListener({ userId }: { userId: string }) {
             },
             (payload) => {
               const row = payload.new as {
+                type?: string;
                 title?: string;
                 body?: string;
                 related_request_id?: string | null;
               };
+              const storeAnswered = isCustomerStoreAnswerNotification(row.type);
               const title = row.title || "FINDIT";
               const body = row.body || "A store answered your Find.";
               const url = row.related_request_id
                 ? `/requests/${row.related_request_id}`
                 : "/notifications";
               toast.success(title, { description: body, duration: 12000 });
-              playCustomerAlert();
-              void showBrowserNotification({
-                title,
-                body,
-                tag: row.related_request_id || title,
-                url,
-              });
+              if (storeAnswered) {
+                playCustomerAlert();
+                void showBrowserNotification({
+                  title,
+                  body,
+                  tag: row.related_request_id || title,
+                  url,
+                });
+              }
             }
           )
           .subscribe();

@@ -161,14 +161,26 @@ describe("shopper onboarding persistence", () => {
 
   it("skips install when already standalone and notify when already granted", () => {
     expect(
-      shopperOnboardingSteps({ standalone: true, notification: "granted" })
+      shopperOnboardingSteps({
+        standalone: true,
+        notification: "granted",
+        needsLocation: false,
+      })
     ).toEqual(["welcome", "how", "ready"]);
     expect(
-      shopperOnboardingSteps({ standalone: false, notification: "granted" })
+      shopperOnboardingSteps({
+        standalone: false,
+        notification: "granted",
+        needsLocation: false,
+      })
     ).toEqual(["welcome", "how", "install", "ready"]);
     expect(
-      shopperOnboardingSteps({ standalone: false, notification: "default" })
-    ).toEqual(["welcome", "how", "install", "notify", "ready"]);
+      shopperOnboardingSteps({
+        standalone: false,
+        notification: "default",
+        needsLocation: true,
+      })
+    ).toEqual(["welcome", "how", "install", "location", "notify", "ready"]);
   });
 
   it("does not show the later install hint on every visit", () => {

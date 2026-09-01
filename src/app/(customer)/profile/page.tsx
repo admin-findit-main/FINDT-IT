@@ -64,7 +64,7 @@ export default function ProfilePage() {
         <div>
           <Label>Place</Label>
           <p className="mb-2 text-xs text-ink-subtle">
-            Type your city, or tap Locate me and we’ll add the ZIP — you don’t have to know it.
+            Type your city, or tap Locate me and we’ll add the ZIP. You don’t have to know it.
           </p>
           <PlaceFields
             value={{
@@ -102,7 +102,7 @@ export default function ProfilePage() {
               toast.success(
                 isCompleteShortPlace(result.place)
                   ? `Using ${formatShortPlace(result.place)}`
-                  : "Location added — confirm your city above"
+                  : "Location added. Confirm your city above"
               );
             }}
           />

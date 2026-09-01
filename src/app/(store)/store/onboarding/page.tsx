@@ -30,7 +30,7 @@ export default async function StoreOnboardingPage() {
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-muted">
           Store dashboards are for approved businesses. Apply for a{" "}
-          {STORE_TRIAL_DAYS}-day free trial — we review before granting access.
+          {STORE_TRIAL_DAYS}-day free trial. We review before granting access.
           Staff join later through an invite from the owner.
         </p>
         <Button asChild className="mt-8" size="lg">

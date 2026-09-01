@@ -33,8 +33,9 @@ import {
   getConsumerEntitlements,
   isAgeRestrictedFind,
   isSoloAdmin,
-  MAX_CUSTOMER_RADIUS_MILES,
   RADIUS_OPTIONS,
+  radiusExceedsPlan,
+  radiusLimitMessage,
   normalizeStoreLocation,
 } from "@findit/domain";
 import { selectEligibleStores } from "@/lib/services/routing";
@@ -929,11 +930,11 @@ export function demoCreateRequest(input: {
     }
   }
 
-  if (input.radiusMiles > MAX_CUSTOMER_RADIUS_MILES) {
+  if (radiusExceedsPlan(input.radiusMiles, entitlements.maxSearchRadiusMiles)) {
     return {
       request: null as unknown as CustomerRequest,
       storesTargeted: 0,
-      blocked: `FINDIT searches up to ${MAX_CUSTOMER_RADIUS_MILES} miles.`,
+      blocked: radiusLimitMessage(entitlements),
     };
   }
 
@@ -1000,8 +1001,10 @@ export function demoExpandRequestRadius(input: {
   ) {
     throw new Error("Pick a farther distance.");
   }
-  if (input.radiusMiles > MAX_CUSTOMER_RADIUS_MILES) {
-    throw new Error(`FINDIT searches up to ${MAX_CUSTOMER_RADIUS_MILES} miles.`);
+  const customer = state.profiles.find((p) => p.id === input.customerId);
+  const entitlements = getConsumerEntitlements(customer?.subscription_plan);
+  if (radiusExceedsPlan(input.radiusMiles, entitlements.maxSearchRadiusMiles)) {
+    throw new Error(radiusLimitMessage(entitlements));
   }
   if (input.radiusMiles <= request.radius_miles) {
     throw new Error("Pick a farther distance than this Find already uses.");

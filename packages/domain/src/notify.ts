@@ -1,5 +1,12 @@
 export type CustomerReplyType = "in_stock" | "out_of_stock" | "can_order";
 
+/** Shopper sound/push for a live store answer — not expired, not other account mail. */
+export function isCustomerStoreAnswerNotification(
+  type: string | null | undefined
+): boolean {
+  return type === "in_stock" || type === "can_order";
+}
+
 export function shouldNotifyCustomerOfReply(
   responseType: CustomerReplyType | string,
   prefs: {

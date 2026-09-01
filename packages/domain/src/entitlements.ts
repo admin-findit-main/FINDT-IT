@@ -58,6 +58,13 @@ export function radiusOptionsForPlan(maxSearchRadiusMiles: number) {
   return RADIUS_OPTIONS.filter((o) => o.miles <= maxSearchRadiusMiles);
 }
 
+export function radiusExceedsPlan(
+  miles: number,
+  maxSearchRadiusMiles: number
+): boolean {
+  return !Number.isFinite(miles) || miles > maxSearchRadiusMiles;
+}
+
 /** Wider chips a shopper can pick after a Find is already out. */
 export function widerRadiusOptions(
   currentMiles: number,
@@ -141,7 +148,7 @@ export function customerPlanCatalog(): {
           "No card required",
         ],
         cons: [
-          "Five Finds is a hard monthly cap — canceling does not return one",
+          "Five Finds is a hard monthly cap. Canceling does not return one",
           `Cannot search past ${free.maxRadiusMiles} miles`,
           "No Expand Search if nearby stores don’t have it",
           "No saved searches",
@@ -158,15 +165,12 @@ export function customerPlanCatalog(): {
           `Search up to ${plus.maxRadiusMiles} miles`,
           "Expand Search when nothing nearby has it",
           "Saved searches",
-          "Same FINDIT account — not a new login",
+          "Same FINDIT account. Not a new login",
         ],
         cons: [
-          "Still a monthly cap — not unlimited",
+          "Still a monthly cap, not unlimited",
           "Canceling a Find still spends it",
           "A wider radius only helps if stores in that range participate",
-          !SHOPPER_BILLING_LIVE
-            ? "Billing is not live, so FINDIT+ cannot be purchased yet"
-            : "Paid each month after you subscribe",
         ],
       },
     ],

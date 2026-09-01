@@ -1,8 +1,8 @@
 import { Panel } from "@/components/dashboard/shell";
+import { PaymentsComingSoon } from "@/components/shared/coming-soon";
 import { StoreBillingActions } from "@/components/store/billing-actions";
 import { getStoreBillingAction } from "@/lib/billing/actions";
 import { BILLING_METHOD_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/config/constants";
-import { PILOT_STORE_BANNER } from "@findit/domain";
 
 function fmtDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -19,12 +19,20 @@ export default async function StoreSubscriptionPage() {
     billing;
   const trialEnds = subscription?.trial_ends_at || store.trial_ends_at;
 
+  if (!settings.billing_required) {
+    return (
+      <div>
+        <p className="text-sm text-ink-muted">
+          {plan.name}
+          {trialEnds ? `. Trial ends ${fmtDate(trialEnds)}.` : "."}
+        </p>
+        <PaymentsComingSoon />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {!settings.billing_required ? (
-        <p className="text-sm text-ink-muted">{PILOT_STORE_BANNER}</p>
-      ) : null}
-
       <Panel title={plan.name}>
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
           <div>
@@ -88,15 +96,11 @@ export default async function StoreSubscriptionPage() {
         </div>
       </Panel>
 
-      <Panel title="Bank account & invoices">
-        <p className="text-sm text-ink-muted">
-          FastSpring collects routing and account numbers on their secure checkout.
-          FINDIT never stores bank account numbers, cards, or CVVs.
-        </p>
+      <Panel title="Invoices">
         {invoices.length === 0 ? (
-          <p className="mt-4 text-sm text-ink-muted">No invoices yet.</p>
+          <p className="text-sm text-ink-muted">No invoices yet.</p>
         ) : (
-          <ul className="mt-4 divide-y divide-black/[0.06] text-sm">
+          <ul className="divide-y divide-black/[0.06] text-sm">
             {invoices.map((invoice) => (
               <li key={invoice.id} className="flex justify-between gap-3 py-3">
                 <div>

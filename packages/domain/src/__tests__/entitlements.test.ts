@@ -116,7 +116,7 @@ describe("getConsumerEntitlements", () => {
     expect(catalog.plans.map((p) => p.id)).toEqual(["free", "plus"]);
     expect(catalog.plans[1].pros.some((p) => /25 Finds/i.test(p))).toBe(true);
     expect(catalog.plans[1].cons.some((c) => /cannot be purchased/i.test(c))).toBe(
-      true
+      false
     );
     expect(catalog.business.priceLabel).toMatch(/\$99/);
   });

@@ -36,6 +36,7 @@ export function StoreAlertListener({ userId }: { userId: string }) {
             },
             (payload) => {
               const row = payload.new as {
+                type?: string;
                 title?: string;
                 body?: string;
                 related_request_id?: string | null;
@@ -46,12 +47,14 @@ export function StoreAlertListener({ userId }: { userId: string }) {
                 ? `/store/requests/${row.related_request_id}`
                 : "/store";
               toast.success(title, { description: body });
-              void showBrowserNotification({
-                title,
-                body,
-                tag: row.related_request_id || title,
-                url,
-              });
+              if (row.type === "new_request") {
+                void showBrowserNotification({
+                  title,
+                  body,
+                  tag: row.related_request_id || title,
+                  url,
+                });
+              }
             }
           )
           .subscribe();

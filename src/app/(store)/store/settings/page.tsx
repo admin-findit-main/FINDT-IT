@@ -745,7 +745,7 @@ export default function StoreSettingsPage() {
           <MenuLink
             href="/store/subscription"
             title="Billing"
-            body={`${plan.name} — ${plan.tagline}`}
+            body={plan.name}
           />
         ) : null}
 

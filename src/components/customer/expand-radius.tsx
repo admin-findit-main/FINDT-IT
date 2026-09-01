@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { GlassChip } from "@/components/ui/glass";
+import { useCustomerProfile } from "@/components/customer/session";
 import { expandCustomerRequestRadiusAction } from "@/lib/services/actions";
-import { MAX_CUSTOMER_RADIUS_MILES, widerRadiusOptions } from "@/lib/config/constants";
+import { getConsumerEntitlements, widerRadiusOptions } from "@/lib/config/constants";
 
 export function ExpandRadiusControls({
   requestId,
@@ -15,7 +16,9 @@ export function ExpandRadiusControls({
   currentMiles: number;
   onExpanded?: () => void;
 }) {
-  const options = widerRadiusOptions(currentMiles, MAX_CUSTOMER_RADIUS_MILES);
+  const profile = useCustomerProfile();
+  const entitlements = getConsumerEntitlements(profile?.subscription_plan);
+  const options = widerRadiusOptions(currentMiles, entitlements.maxSearchRadiusMiles);
   const [busy, setBusy] = useState<number | null>(null);
   if (!options.length) return null;
 

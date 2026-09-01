@@ -151,7 +151,7 @@ function SignupForm() {
         Create a shopper account
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        We’ll text a 6-digit code. That’s the shopper login — no email or
+        We’ll text a 6-digit code. That’s the shopper login. No email or
         password. Stores apply from the Store tab.
       </p>
       <PhoneOtpForm

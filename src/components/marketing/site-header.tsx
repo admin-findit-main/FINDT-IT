@@ -8,10 +8,8 @@ import { useSurfaceHref } from "@/components/host/host-surface";
 import { cn } from "@/lib/utils";
 
 const LINKS = [
-  { href: "/#how", label: "How it works" },
+  { href: "/#shoppers", label: "For shoppers" },
   { href: "/#stores", label: "For stores" },
-  { href: "/#faq", label: "Q&A" },
-  { href: "/pricing", label: "Pricing" },
 ] as const;
 
 export function MarketingHeader() {
@@ -46,7 +44,7 @@ export function MarketingHeader() {
           </Button>
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-glass-md text-ink md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-glass-md text-ink md:hidden"
             aria-expanded={open}
             aria-controls="marketing-menu"
             onClick={() => setOpen((value) => !value)}

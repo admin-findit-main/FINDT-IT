@@ -14,7 +14,7 @@ const geistSans = Geist({
 
 export const metadata: Metadata = {
   title: {
-    default: "FINDIT — Find it locally.",
+    default: "FINDIT",
     template: "%s · FINDIT",
   },
   description:
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     title: "FINDIT",
   },
   openGraph: {
-    title: "FINDIT — Find it locally.",
+    title: "FINDIT",
     description: "Ask once. Nearby stores tell you if they have it.",
     type: "website",
   },

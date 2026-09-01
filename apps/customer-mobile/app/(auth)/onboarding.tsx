@@ -45,7 +45,7 @@ const PAGES = [
   {
     kicker: "FINDIT+",
     title: "Save what you need.",
-    body: "Save Finds and get alerts when it’s worth checking again. Billing is not live yet — you can start on free FINDIT today.",
+    body: "Save Finds and get alerts when it’s worth checking again.",
     perks: ["Saved searches", "Alerts when a Find is worth checking again"],
   },
 ] as const;

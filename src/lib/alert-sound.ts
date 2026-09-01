@@ -172,25 +172,9 @@ async function playKind(kind: AlertKind): Promise<void> {
 }
 
 async function unlockFromGesture(): Promise<void> {
-  const first = !unlocked;
   unlocked = true;
-  if (!first) {
-    await resumeAudioCtx();
-    return;
-  }
-  const el = audioFor("hub");
-  if (el) {
-    const previous = el.volume;
-    el.volume = 0.01;
-    try {
-      await el.play();
-      el.pause();
-      el.currentTime = 0;
-    } catch {
-      // First gesture may still be required on some WebViews.
-    }
-    el.volume = previous || 1;
-  }
+  // Resume the audio context only. Do not play a chirp — shoppers should hear
+  // nothing until a store answers, and Hub only chimes on a new Find.
   await resumeAudioCtx();
   if (pendingKind) {
     const kind = pendingKind;
@@ -216,7 +200,10 @@ export function playHubAlert(): void {
   armAlertSoundUnlock();
   if (!unlocked) {
     pendingKind = "hub";
-    void playKind("hub");
+    // Native Hub WebView can beep without a gesture. Browsers wait for unlock.
+    if (nativeHubBeep()) {
+      pendingKind = null;
+    }
     return;
   }
   void playKind("hub");
@@ -226,8 +213,7 @@ export function playCustomerAlert(): void {
   if (typeof window === "undefined") return;
   armAlertSoundUnlock();
   if (!unlocked) {
-    pendingKind = pendingKind || "customer";
-    void playKind("customer");
+    pendingKind = "customer";
     return;
   }
   void playKind("customer");

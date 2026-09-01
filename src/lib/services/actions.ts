@@ -76,6 +76,8 @@ import {
   isMonthlyFindCapError,
   monthlyFindWindowStart,
   planLimitReachedMessage,
+  radiusExceedsPlan,
+  radiusLimitMessage,
   MAX_CUSTOMER_RADIUS_MILES,
   RADIUS_OPTIONS,
   normalizeStoreLocation,
@@ -161,6 +163,26 @@ export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   if (!profile) return null;
   const resolved = coerceSoloAdminProfile(profile, user.email) as Profile;
   if (resolved.is_suspended && !isSoloAdmin(resolved)) return null;
+  if (
+    resolved.account_type === "customer" &&
+    resolved.subscription_plan !== "plus"
+  ) {
+    try {
+      const { data: sub } = await supabase
+        .from("customer_subscriptions")
+        .select("plan_id, status")
+        .eq("profile_id", resolved.id)
+        .maybeSingle();
+      if (
+        sub?.plan_id === "plus" &&
+        (sub.status === "active" || sub.status === "trialing")
+      ) {
+        return { ...resolved, subscription_plan: "plus" };
+      }
+    } catch {
+      // Billing table may be absent in older local DBs.
+    }
+  }
   return resolved;
   });
 });
@@ -1015,10 +1037,11 @@ export async function createCustomerRequestAction(raw: unknown) {
         upgradeRequired: entitlements.planId === "free",
       };
     }
-    if (parsed.data.radiusMiles > MAX_CUSTOMER_RADIUS_MILES) {
+    if (radiusExceedsPlan(parsed.data.radiusMiles, entitlements.maxSearchRadiusMiles)) {
       return {
-        error: `FINDIT searches up to ${MAX_CUSTOMER_RADIUS_MILES} miles.`,
+        error: radiusLimitMessage(entitlements),
         code: "radius_limit" as const,
+        upgradeRequired: entitlements.planId === "free",
       };
     }
   }
@@ -3064,6 +3087,10 @@ export async function expandCustomerRequestRadiusAction(
 
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Please sign in", needsAuth: true };
+  const entitlements = getConsumerEntitlements(profile.subscription_plan);
+  if (radiusExceedsPlan(miles, entitlements.maxSearchRadiusMiles)) {
+    return { error: radiusLimitMessage(entitlements) };
+  }
 
   const expandLimit = await consumeRateLimit({
     bucket: "expand-radius",

@@ -86,17 +86,17 @@ export default function RequestsPage() {
           <EmptyState
             title={
               tab === "saved"
-                ? "Nothing saved yet."
+                ? "Nothing saved yet"
                 : tab === "past"
-                  ? "Nothing completed yet."
-                  : "No Finds yet."
+                  ? "No completed requests yet"
+                  : "No requests yet"
             }
             description={
               tab === "saved"
                 ? "Open a request and save it to find it here later."
                 : tab === "past"
-                  ? "Finished and expired Finds show up here."
-                  : "Ask nearby stores from Find."
+                  ? "Finished requests will appear here."
+                  : "Your requests will appear here."
             }
           />
         ) : (

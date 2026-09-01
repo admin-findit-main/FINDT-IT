@@ -21,10 +21,14 @@ import { usePwaInstall } from "@/lib/pwa-install";
 import { trackShopperOnboardingEventAction } from "@/lib/services/onboarding-actions";
 import { HowItWorksStep } from "./how-it-works-step";
 import { InstallStep } from "./install-step";
+import { LocationStep } from "./location-step";
 import { NotificationsStep } from "./notifications-step";
 import { ReadyStep } from "./ready-step";
 import { OnboardingEnter, OnboardingProgress, OnboardingShell } from "./shell";
 import { WelcomeStep } from "./welcome-step";
+import { useCustomerProfile } from "@/components/customer/session";
+import { getConsumerEntitlements } from "@/lib/config/constants";
+import { isCompleteShortPlace, shortPlaceFromProfile } from "@findit/domain";
 
 function markNotifyPromptDismissed() {
   try {
@@ -35,6 +39,8 @@ function markNotifyPromptDismissed() {
 }
 
 export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
+  const profile = useCustomerProfile();
+  const entitlements = getConsumerEntitlements(profile?.subscription_plan);
   const { canInstall } = usePwaInstall();
   const [permission, setPermission] = useState<BrowserNotifyPermission>("default");
   const [standalone, setStandalone] = useState(false);
@@ -54,13 +60,18 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
     void trackShopperOnboardingEventAction("onboarding_started");
   }, [hydrated]);
 
+  const needsLocation = !isCompleteShortPlace(
+    shortPlaceFromProfile(profile || {})
+  );
+
   const steps = useMemo(
     () =>
       shopperOnboardingSteps({
         standalone,
         notification: permission,
+        needsLocation,
       }),
-    [standalone, permission]
+    [standalone, permission, needsLocation]
   );
 
   const step = steps[Math.min(index, steps.length - 1)] ?? "welcome";
@@ -79,6 +90,11 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
       installEducationSeen: true,
       installSkipped: skipped,
     });
+    goNext();
+  }
+
+  function finishLocation() {
+    writeShopperOnboardingState({ locationEducationSeen: true });
     goNext();
   }
 
@@ -115,6 +131,9 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
               onSkip={() => finishInstall(true)}
             />
           ) : null}
+          {step === "location" ? (
+            <LocationStep onContinue={finishLocation} />
+          ) : null}
           {step === "notify" ? (
             <NotificationsStep
               permission={permission}
@@ -122,7 +141,14 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
               onContinue={finishNotify}
             />
           ) : null}
-          {step === "ready" ? <ReadyStep onFinish={finish} /> : null}
+          {step === "ready" ? (
+            <ReadyStep
+              planName={entitlements.brandName}
+              monthlyFinds={entitlements.monthlyRequestLimit}
+              maxMiles={entitlements.maxSearchRadiusMiles}
+              onFinish={finish}
+            />
+          ) : null}
         </OnboardingEnter>
       </div>
     </OnboardingShell>

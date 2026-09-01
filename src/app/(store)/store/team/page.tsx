@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, EmptyState, Input, Label } from "@/components/ui/primitives";
+import { Card, EmptyState, Input, Label, Skeleton } from "@/components/ui/primitives";
 import { GlassBadge, GlassChip } from "@/components/ui/glass";
 import {
   getUserStoresAction,
@@ -59,7 +59,12 @@ export default function TeamPage() {
   }, []);
 
   if (loading) {
-    return <p className="text-sm text-ink-muted">Loading team…</p>;
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
   }
 
   if (store && store.role === "employee") {
@@ -158,7 +163,7 @@ export default function TeamPage() {
       <div className="mt-8 space-y-3">
         <h2 className="font-semibold text-ink">Members</h2>
         {members.length === 0 ? (
-          <EmptyState title="No team members yet" />
+          <EmptyState title="No employees yet" description="Invite someone when you're ready." />
         ) : (
           members.map((m) => (
             <Card key={m.id} className="flex items-center justify-between gap-3 p-4">

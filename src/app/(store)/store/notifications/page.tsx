@@ -68,7 +68,7 @@ export default function StoreNotificationsPage() {
   return (
     <div>
       <p className="text-sm text-ink-muted">
-        New customer asks and status updates for your store.
+        New shopper requests and updates for your store.
       </p>
       {browserPermission === "default" ? (
         <div className="mt-4">
@@ -77,7 +77,7 @@ export default function StoreNotificationsPage() {
           </Button>
           <p className="mt-2 text-sm text-ink-muted">
             FINDIT will ask this browser for permission, then ping you when a nearby
-            shopper asks — including after you close the tab.
+            shopper asks. Including after you close the tab.
           </p>
         </div>
       ) : null}
@@ -98,7 +98,7 @@ export default function StoreNotificationsPage() {
         ) : items.length === 0 ? (
           <EmptyState
             title="No notifications yet"
-            description="When customers ask near your store, alerts show up here."
+            description="New shopper requests will appear here."
             action={
               <Link
                 href={inboxHref}
