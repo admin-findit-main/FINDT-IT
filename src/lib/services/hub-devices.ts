@@ -23,6 +23,7 @@ import {
   setHubPairingCookie,
 } from "@/lib/hub/session";
 import { getCurrentProfile, getStoreWorkspaceAction } from "@/lib/services/actions";
+import { boundUuid } from "@findit/domain";
 
 export type HubRuntime = {
   store: Store;
@@ -40,6 +41,7 @@ export type StoreDeviceView = {
   paired_at: string;
   last_seen_at: string | null;
   revoked_at: string | null;
+  enabled: boolean;
   online: boolean;
 };
 
@@ -369,15 +371,20 @@ export async function renameStoreDeviceAction(deviceId: string, deviceName: stri
   return { ok: true as const, device: toView(data as StoreDevice) };
 }
 
-export async function revokeStoreDeviceAction(deviceId: string) {
+export async function setStoreDeviceEnabledAction(
+  deviceId: string,
+  enabled: boolean
+) {
+  const id = boundUuid(deviceId);
+  if (!id) return { error: "Device not found." };
   const manager = await requireStoreManager();
   if (manager.error || !manager.storeId) return { error: manager.error || "Unauthorized" };
 
   if (isDemoMode()) {
-    const { demoRevokeStoreDevice } = await import("@/lib/demo/store");
-    const result = demoRevokeStoreDevice(manager.storeId, deviceId);
+    const { demoSetStoreDeviceEnabled } = await import("@/lib/demo/store");
+    const result = demoSetStoreDeviceEnabled(manager.storeId, id, enabled);
     if ("error" in result) return result;
-    return { ok: true as const };
+    return { ok: true as const, device: toView(result) };
   }
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
@@ -385,16 +392,25 @@ export async function revokeStoreDeviceAction(deviceId: string) {
   const { data, error } = await admin
     .from("store_devices")
     .update({
-      revoked_at: new Date().toISOString(),
+      revoked_at: enabled ? null : new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", deviceId)
+    .eq("id", id)
     .eq("store_id", manager.storeId)
-    .is("revoked_at", null)
-    .select("id")
+    .select("*")
     .maybeSingle();
-  if (error || !data) return { error: "Couldn't remove that device." };
-  return { ok: true as const };
+  if (error || !data) return { error: "Couldn't update that device." };
+  void logSecurityEvent({
+    actorId: manager.profile?.id,
+    action: enabled ? "hub_device_enabled" : "hub_device_disabled",
+    resource: id,
+    metadata: { storeId: manager.storeId },
+  });
+  return { ok: true as const, device: toView(data as StoreDevice) };
+}
+
+export async function revokeStoreDeviceAction(deviceId: string) {
+  return setStoreDeviceEnabledAction(deviceId, false);
 }
 
 export async function touchHubDeviceAction() {
@@ -419,6 +435,7 @@ export async function touchHubDeviceAction() {
 }
 
 function toView(device: StoreDevice): StoreDeviceView {
+  const enabled = !device.revoked_at;
   return {
     id: device.id,
     store_id: device.store_id,
@@ -426,6 +443,7 @@ function toView(device: StoreDevice): StoreDeviceView {
     paired_at: device.paired_at,
     last_seen_at: device.last_seen_at,
     revoked_at: device.revoked_at,
-    online: !device.revoked_at && deviceIsOnline(device.last_seen_at, Date.now(), HUB_DEVICE_ONLINE_MS),
+    enabled,
+    online: enabled && deviceIsOnline(device.last_seen_at, Date.now(), HUB_DEVICE_ONLINE_MS),
   };
 }

@@ -7,13 +7,14 @@ import { toast } from "sonner";
 import { Panel } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
+import { IosSwitch } from "@/components/ui/ios-switch";
 import { formatRelativeTime } from "@/lib/utils";
 import {
   claimHubPairingAction,
   listStoreDevicesAction,
   previewHubPairingAction,
   renameStoreDeviceAction,
-  revokeStoreDeviceAction,
+  setStoreDeviceEnabledAction,
   type StoreDeviceView,
 } from "@/lib/services/hub-devices";
 
@@ -34,6 +35,7 @@ function StoreDevicesClient() {
   const [busy, setBusy] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setDevices(await listStoreDevicesAction());
@@ -58,9 +60,6 @@ function StoreDevicesClient() {
       cancelled = true;
     };
   }, [params]);
-
-  const active = devices.filter((d) => !d.revoked_at);
-  const removed = devices.filter((d) => d.revoked_at);
 
   return (
     <div className="space-y-6">
@@ -157,88 +156,101 @@ function StoreDevicesClient() {
 
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-ink">Connected devices</h2>
-        {active.length === 0 ? (
+        {devices.length === 0 ? (
           <p className="text-sm text-ink-muted">No devices connected yet.</p>
         ) : (
-          active.map((device) => (
-            <Card key={device.id} className="p-4 sm:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  {renaming === device.id ? (
-                    <Input
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      className="max-w-xs"
-                    />
-                  ) : (
-                    <p className="text-base font-semibold text-ink">{device.device_name}</p>
-                  )}
-                  <p className="mt-1 text-sm text-ink-muted">
-                    <span className={device.online ? "text-emerald-700" : "text-ink-subtle"}>
-                      {device.online ? "Online" : "Offline"}
-                    </span>
-                    {" · "}
-                    Last active:{" "}
-                    {device.last_seen_at ? formatRelativeTime(device.last_seen_at) : "Never"}
-                  </p>
-                  <p className="mt-1 text-xs text-ink-subtle">
-                    Connected {formatRelativeTime(device.paired_at)}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {renaming === device.id ? (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        const result = await renameStoreDeviceAction(device.id, renameValue);
-                        if ("error" in result && result.error) toast.error(result.error);
-                        else {
-                          setRenaming(null);
-                          await load();
+          devices.map((device) => {
+            const enabled = !device.revoked_at;
+            return (
+              <Card key={device.id} className="p-4 sm:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    {renaming === device.id ? (
+                      <Input
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        className="max-w-xs"
+                      />
+                    ) : (
+                      <p className="text-base font-semibold text-ink">{device.device_name}</p>
+                    )}
+                    <p className="mt-1 text-sm text-ink-muted">
+                      <span
+                        className={
+                          enabled && device.online ? "text-emerald-700" : "text-ink-subtle"
                         }
-                      }}
-                    >
-                      Save
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setRenaming(device.id);
-                        setRenameValue(device.device_name);
-                      }}
-                    >
-                      Rename
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      const result = await revokeStoreDeviceAction(device.id);
-                      if ("error" in result && result.error) toast.error(result.error);
-                      else {
-                        toast.success("Device removed");
-                        await load();
+                      >
+                        {!enabled ? "Disabled" : device.online ? "Online" : "Offline"}
+                      </span>
+                      {" · "}
+                      Last active:{" "}
+                      {device.last_seen_at ? formatRelativeTime(device.last_seen_at) : "Never"}
+                    </p>
+                    <p className="mt-1 text-xs text-ink-subtle">
+                      Connected {formatRelativeTime(device.paired_at)}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {renaming === device.id ? (
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          const result = await renameStoreDeviceAction(
+                            device.id,
+                            renameValue
+                          );
+                          if ("error" in result && result.error) toast.error(result.error);
+                          else {
+                            setRenaming(null);
+                            await load();
+                          }
+                        }}
+                      >
+                        Save
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!enabled}
+                        onClick={() => {
+                          setRenaming(device.id);
+                          setRenameValue(device.device_name);
+                        }}
+                      >
+                        Rename
+                      </Button>
+                    )}
+                    <IosSwitch
+                      label={
+                        enabled
+                          ? `Disable ${device.device_name}`
+                          : `Enable ${device.device_name}`
                       }
-                    }}
-                  >
-                    Remove
-                  </Button>
+                      checked={enabled}
+                      disabled={busyId === device.id}
+                      onCheckedChange={async (next) => {
+                        setBusyId(device.id);
+                        const result = await setStoreDeviceEnabledAction(
+                          device.id,
+                          next
+                        );
+                        setBusyId(null);
+                        if ("error" in result && result.error) {
+                          toast.error(result.error);
+                          return;
+                        }
+                        toast.success(next ? "Device is on" : "Device is off");
+                        await load();
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))
+              </Card>
+            );
+          })
         )}
       </div>
-
-      {removed.length ? (
-        <p className="text-xs text-ink-subtle">
-          {removed.length} previously removed device{removed.length === 1 ? "" : "s"} no longer
-          have access.
-        </p>
-      ) : null}
     </div>
   );
 }

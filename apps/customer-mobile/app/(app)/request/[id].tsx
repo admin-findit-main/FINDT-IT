@@ -1,6 +1,6 @@
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Linking, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Platform, StyleSheet, Text, View } from "react-native";
 import {
   buildAnalyticsEvent,
   formatExpiresIn,
@@ -37,6 +37,7 @@ const STORES_PAGE_SIZE = 5;
 
 export default function RequestDetailScreen() {
   const theme = useAppTheme();
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [detail, setDetail] = useState<Detail>(null);
   const [loading, setLoading] = useState(true);
@@ -108,6 +109,18 @@ export default function RequestDetailScreen() {
     }
     setNotice(ok);
     load();
+  };
+
+  const saveAndGoToRequests = async () => {
+    if (busy) return;
+    setBusy(true);
+    const result = await saveRequest(detail.id);
+    setBusy(false);
+    if (result.error) {
+      setNotice(result.error);
+      return;
+    }
+    router.replace("/(app)/(tabs)/requests");
   };
 
   return (
@@ -186,12 +199,21 @@ export default function RequestDetailScreen() {
                     <Text
                       style={[styles.link, { color: theme.inkMuted }]}
                       onPress={async () => {
-                        const url = mapsDirectionsUrl({
-                          street_address: store.street_address!,
-                          city: store.city || "",
-                          state: store.state || "",
-                          postal_code: store.postal_code || "",
-                        });
+                        const url = mapsDirectionsUrl(
+                          {
+                            street_address: store.street_address!,
+                            city: store.city || "",
+                            state: store.state || "",
+                            postal_code: store.postal_code || "",
+                            latitude: store.latitude,
+                            longitude: store.longitude,
+                          },
+                          Platform.OS === "ios"
+                            ? "iPhone"
+                            : Platform.OS === "android"
+                              ? "Android"
+                              : ""
+                        );
                         const row = buildAnalyticsEvent("directions_tapped", {
                           requestId: detail.id,
                           storeId: r.store_id,
@@ -309,10 +331,7 @@ export default function RequestDetailScreen() {
                   variant="glass"
                   style={styles.half}
                   disabled={busy}
-                  onPress={() => {
-                    if (busy) return;
-                    run(() => saveRequest(detail.id), "Saved");
-                  }}
+                  onPress={() => void saveAndGoToRequests()}
                 />
                 <GlassButton
                   title="Cancel"
@@ -343,10 +362,7 @@ export default function RequestDetailScreen() {
               title="Save"
               variant="glass"
               disabled={busy}
-              onPress={() => {
-                if (busy) return;
-                run(() => saveRequest(detail.id), "Saved");
-              }}
+              onPress={() => void saveAndGoToRequests()}
             />
           )}
         </View>

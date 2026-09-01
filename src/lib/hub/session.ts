@@ -81,14 +81,15 @@ export async function getHubDeviceSession(): Promise<HubDeviceSession | null> {
   if (!parsed) return null;
 
   if (isDemoMode()) {
-    const { demoGetStoreDeviceBySession, getDemoState } = await import(
+    const { getDemoState } = await import(
       "@/lib/demo/store"
     );
-    const device = demoGetStoreDeviceBySession(parsed.deviceId, parsed.token);
-    if (!device) {
+    const device = getDemoState().storeDevices.find((d) => d.id === parsed.deviceId);
+    if (!device || device.token_hash !== sha256Hex(parsed.token)) {
       await clearHubDeviceCookie();
       return null;
     }
+    if (device.revoked_at) return null;
     const store = getDemoState().stores.find((s) => s.id === device.store_id);
     if (!store || store.is_suspended || !store.is_active) {
       await clearHubDeviceCookie();
@@ -103,12 +104,12 @@ export async function getHubDeviceSession(): Promise<HubDeviceSession | null> {
     .from("store_devices")
     .select("*")
     .eq("id", parsed.deviceId)
-    .is("revoked_at", null)
     .maybeSingle();
   if (!device || device.token_hash !== sha256Hex(parsed.token)) {
     await clearHubDeviceCookie();
     return null;
   }
+  if (device.revoked_at) return null;
   const { data: store } = await admin
     .from("stores")
     .select("*")

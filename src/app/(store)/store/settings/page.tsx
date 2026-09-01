@@ -32,8 +32,13 @@ import {
 } from "@findit/domain";
 import { IosSwitch } from "@/components/ui/ios-switch";
 import { StoreAddressFields } from "@/components/store/store-address-fields";
+import { StoreDeviceEnableList } from "@/components/store/store-device-enable-list";
 import { cn } from "@/lib/utils";
 import type { Store } from "@/types/database";
+import {
+  listStoreDevicesAction,
+  type StoreDeviceView,
+} from "@/lib/services/hub-devices";
 
 type HourRow = {
   day_of_week: number;
@@ -42,7 +47,7 @@ type HourRow = {
   is_closed: boolean;
 };
 
-type OpenSection = "profile" | "hours" | "area" | "categories" | "plan" | null;
+type OpenSection = "profile" | "hours" | "area" | "categories" | "plan" | "devices" | null;
 
 function clockLabel(hhmm: string) {
   const [hStr, mStr] = hhmm.slice(0, 5).split(":");
@@ -156,6 +161,7 @@ function MenuLink({
 }
 
 export default function StoreSettingsPage() {
+  const devicesHref = usePublicHref("/store/devices");
   const [store, setStore] = useState<(Store & { role: string }) | null>(null);
   const [role, setRole] = useState<string>("employee");
   const [hours, setHours] = useState<HourRow[]>(() => normalizeHours([]));
@@ -180,6 +186,7 @@ export default function StoreSettingsPage() {
   const [ready, setReady] = useState(false);
   const [requiresCustomerId, setRequiresCustomerId] = useState(false);
   const [openSection, setOpenSection] = useState<OpenSection>(null);
+  const [devices, setDevices] = useState<StoreDeviceView[]>([]);
 
   const canManage = role === "owner" || role === "manager";
 
@@ -191,7 +198,8 @@ export default function StoreSettingsPage() {
         id === "hours" ||
         id === "area" ||
         id === "categories" ||
-        id === "plan"
+        id === "plan" ||
+        id === "devices"
       ) {
         setOpenSection(id);
       }
@@ -204,10 +212,11 @@ export default function StoreSettingsPage() {
   useEffect(() => {
     let cancelled = false;
     setLoadPercent(18);
-    getMyStoreSettingsAction()
-      .then((settings) => {
+    Promise.all([getMyStoreSettingsAction(), listStoreDevicesAction()])
+      .then(([settings, hubDevices]) => {
         if (cancelled) return;
         setLoadPercent(82);
+        setDevices(hubDevices);
         if (!settings) {
           setReady(true);
           setLoadPercent(100);
@@ -692,6 +701,29 @@ export default function StoreSettingsPage() {
             >
               {saving ? "Saving…" : "Save categories"}
             </Button>
+          ) : null}
+        </SectionCard>
+
+        <SectionCard
+          title="Hub devices"
+          body="Turn counter tablets on or off without unpairing them"
+          open={openSection === "devices"}
+          onToggle={() => toggleSection("devices")}
+        >
+          <StoreDeviceEnableList
+            devices={devices}
+            canManage={canManage}
+            onChanged={() => {
+              void listStoreDevicesAction().then(setDevices);
+            }}
+          />
+          {canManage ? (
+            <Link
+              href={devicesHref}
+              className="mt-4 inline-block text-sm font-semibold text-accent-ink underline underline-offset-2"
+            >
+              Pair or rename a device
+            </Link>
           ) : null}
         </SectionCard>
 

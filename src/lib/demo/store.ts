@@ -2022,11 +2022,19 @@ export function demoRevokeStoreDevice(
   storeId: string,
   deviceId: string
 ): StoreDevice | { error: string } {
+  return demoSetStoreDeviceEnabled(storeId, deviceId, false);
+}
+
+export function demoSetStoreDeviceEnabled(
+  storeId: string,
+  deviceId: string,
+  enabled: boolean
+): StoreDevice | { error: string } {
   const device = getDemoState().storeDevices.find(
     (d) => d.id === deviceId && d.store_id === storeId
   );
   if (!device) return { error: "Device not found." };
-  device.revoked_at = now();
+  device.revoked_at = enabled ? null : device.revoked_at || now();
   device.updated_at = now();
   return device;
 }

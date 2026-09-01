@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
 import { VerifiedStoreBadge } from "@/components/ui/glass";
 import { DAYS_OF_WEEK } from "@/lib/config/constants";
-import { mapsDirectionsUrl } from "@/lib/utils";
+import { mapsDirectionsAnchorProps } from "@/lib/utils";
 
 export type StoreProfileStore = {
   name: string;
@@ -74,7 +74,7 @@ export function StoreProfile({ store }: { store: StoreProfileStore }) {
             : "Response time data coming soon"}
         </p>
         <Button asChild className="mt-6" size="lg">
-          <a href={mapsDirectionsUrl(store)} target="_blank" rel="noreferrer">
+          <a {...mapsDirectionsAnchorProps(store)}>
             Get directions
             <ExternalLink className="h-4 w-4" />
           </a>

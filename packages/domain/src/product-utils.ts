@@ -41,16 +41,66 @@ export function isRequestExpired(expiresAt: string, status?: string): boolean {
   return new Date(expiresAt).getTime() < Date.now();
 }
 
-export function mapsDirectionsUrl(store: {
+export type MapsDestination = {
   street_address: string;
   city: string;
   state: string;
   postal_code: string;
-}): string {
-  const q = encodeURIComponent(
-    `${store.street_address}, ${store.city}, ${store.state} ${store.postal_code}`
-  );
-  return `https://www.google.com/maps/dir/?api=1&destination=${q}`;
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
+function mapsQuery(store: MapsDestination): string {
+  return [store.street_address, store.city, store.state, store.postal_code]
+    .filter((part) => part && String(part).trim())
+    .join(", ");
+}
+
+function mapsUserAgent(override?: string): string {
+  if (override != null) return override;
+  if (typeof navigator === "undefined") return "";
+  return navigator.userAgent || "";
+}
+
+function isAppleHandheld(ua: string, inferTouchMac: boolean): boolean {
+  if (/iPad|iPhone|iPod/i.test(ua)) return true;
+  if (!inferTouchMac || typeof navigator === "undefined") return false;
+  return navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+}
+
+/** Opens the device’s default maps app on phones; Google Maps in a desktop browser. */
+export function mapsDirectionsUrl(
+  store: MapsDestination,
+  userAgent?: string
+): string {
+  const address = mapsQuery(store);
+  const q = encodeURIComponent(address);
+  const lat = Number(store.latitude);
+  const lng = Number(store.longitude);
+  const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+  const ua = mapsUserAgent(userAgent);
+
+  if (isAppleHandheld(ua, userAgent == null)) {
+    const daddr = hasCoords ? `${lat},${lng}` : q;
+    return `https://maps.apple.com/?daddr=${daddr}&dirflg=d`;
+  }
+  if (/Android/i.test(ua)) {
+    return hasCoords ? `geo:${lat},${lng}?q=${q}` : `geo:0,0?q=${q}`;
+  }
+  const destination = hasCoords ? `${lat},${lng}` : q;
+  return `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+}
+
+/** Native map URLs must not use target=_blank or the OS won’t hand off to Maps. */
+export function mapsDirectionsAnchorProps(
+  store: MapsDestination,
+  userAgent?: string
+): { href: string; target?: "_blank"; rel?: string } {
+  const href = mapsDirectionsUrl(store, userAgent);
+  if (href.startsWith("geo:") || href.includes("maps.apple.com")) {
+    return { href };
+  }
+  return { href, target: "_blank", rel: "noreferrer" };
 }
 
 export function displayName(profile: {

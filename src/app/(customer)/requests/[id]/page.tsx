@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { GlassNotice, VerifiedStoreBadge } from "@/components/ui/glass";
 import { Card, EmptyState } from "@/components/ui/primitives";
@@ -43,7 +43,7 @@ import {
   formatPrice,
   formatRelativeTime,
   isRequestExpired,
-  mapsDirectionsUrl,
+  mapsDirectionsAnchorProps,
 } from "@/lib/utils";
 import {
   estimateRoutingDistanceMiles,
@@ -53,6 +53,7 @@ import {
 } from "@findit/domain";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
 import { toast } from "sonner";
+import { clearCached } from "@/lib/data/client-cache";
 
 type Detail = CustomerRequest & {
   responses?: (StoreResponse & { store?: Store })[];
@@ -118,7 +119,9 @@ function SearchingStoresCard({
 
 export default function RequestDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [data, setData] = useState<Detail | null>(null);
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [foundStep, setFoundStep] = useState<"idle" | "ask" | "done">("idle");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
@@ -251,6 +254,22 @@ export default function RequestDetailPage() {
   async function markFound(storeId?: string | null) {
     setSelectedStoreId(storeId || null);
     setFoundStep("ask");
+  }
+
+  async function saveAndLeave() {
+    if (!data || saving) return;
+    setSaving(true);
+    const result = await saveRequestAction(data.id);
+    if (result && "error" in result && result.error) {
+      setSaving(false);
+      toast.error(result.error);
+      return;
+    }
+    clearCached("requests:active");
+    clearCached("requests:past");
+    clearCached("requests:saved");
+    toast.success("Saved");
+    router.push("/requests");
   }
 
   async function confirmFound(foundWithFindit: boolean | null) {
@@ -521,9 +540,7 @@ export default function RequestDetailPage() {
                           {canVisit ? (
                             <Button asChild size="lg" variant="secondary" className="w-full">
                               <a
-                                href={mapsDirectionsUrl(store)}
-                                target="_blank"
-                                rel="noreferrer"
+                                {...mapsDirectionsAnchorProps(store)}
                                 onClick={() =>
                                   trackDirectionsClickAction(data.id, store.id)
                                 }
@@ -671,12 +688,10 @@ export default function RequestDetailPage() {
                 variant="outline"
                 size="lg"
                 className="w-full"
-                onClick={async () => {
-                  await saveRequestAction(data.id);
-                  toast.success("Saved");
-                }}
+                disabled={saving}
+                onClick={() => void saveAndLeave()}
               >
-                Save
+                {saving ? "Saving…" : "Save"}
               </Button>
               <Button
                 variant="ghost"
@@ -697,12 +712,10 @@ export default function RequestDetailPage() {
             variant="outline"
             size="lg"
             className="w-full"
-            onClick={async () => {
-              await saveRequestAction(data.id);
-              toast.success("Saved");
-            }}
+            disabled={saving}
+            onClick={() => void saveAndLeave()}
           >
-            Save
+            {saving ? "Saving…" : "Save"}
           </Button>
         )}
       </div>

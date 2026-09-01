@@ -8,6 +8,7 @@ export {
   formatExpiresIn,
   isRequestExpired,
   mapsDirectionsUrl,
+  mapsDirectionsAnchorProps,
   displayName,
   greetingForHour,
 } from "@findit/domain";

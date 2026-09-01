@@ -7,6 +7,7 @@ import {
   demoLogin,
   demoRedeemHubPairing,
   demoRevokeStoreDevice,
+  demoSetStoreDeviceEnabled,
   getDemoState,
   resetDemoState,
 } from "@/lib/demo/store";
@@ -125,6 +126,12 @@ describe("FINDIT Hub device pairing", () => {
 
     demoRevokeStoreDevice(store.id, redeemed.deviceId);
     expect(demoGetStoreDeviceBySession(redeemed.deviceId, redeemed.token)).toBeNull();
+
+    const restored = demoSetStoreDeviceEnabled(store.id, redeemed.deviceId, true);
+    expect("error" in restored).toBe(false);
+    expect(demoGetStoreDeviceBySession(redeemed.deviceId, redeemed.token)?.id).toBe(
+      redeemed.deviceId
+    );
   });
 
   it("serializes a device cookie without storing the raw token in the listing", () => {

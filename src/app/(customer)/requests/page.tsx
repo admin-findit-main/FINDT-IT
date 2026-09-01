@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { GlassBadge } from "@/components/ui/glass";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { getCustomerRequestsAction } from "@/lib/services/actions";
@@ -10,10 +11,25 @@ import { formatRelativeTime } from "@/lib/utils";
 import { formatShortPlace } from "@findit/domain";
 import type { CustomerRequest } from "@/types/database";
 
+type RequestsTab = "active" | "past" | "saved";
+
+function tabFromParam(value: string | null): RequestsTab {
+  if (value === "past" || value === "saved" || value === "active") return value;
+  return "active";
+}
+
 export default function RequestsPage() {
-  const [tab, setTab] = useState<"active" | "past" | "saved">("active");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<RequestsTab>(() =>
+    tabFromParam(searchParams.get("tab"))
+  );
   const [items, setItems] = useState<CustomerRequest[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setTab(tabFromParam(searchParams.get("tab")));
+  }, [searchParams]);
 
   useEffect(() => {
     const cached = readCached<CustomerRequest[]>(`requests:${tab}`, 60_000);
@@ -45,7 +61,10 @@ export default function RequestsPage() {
             key={t}
             type="button"
             aria-pressed={tab === t}
-            onClick={() => setTab(t)}
+            onClick={() => {
+              setTab(t);
+              router.replace(t === "active" ? "/requests" : `/requests?tab=${t}`);
+            }}
             className={`rounded-lg py-2 text-sm font-semibold transition-colors ${
               tab === t
                 ? "bg-white text-ink shadow-sm"
