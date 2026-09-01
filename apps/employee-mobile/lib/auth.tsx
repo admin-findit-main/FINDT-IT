@@ -8,7 +8,7 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Profile, Store, StoreMemberRole } from "@findit/types";
-import { coerceSoloAdminProfile, isSoloAdminEmail } from "@findit/domain";
+import { coerceSoloAdminProfile, isSoloAdminEmail, mapEmailOtpError, maskEmail, normalizeEmail } from "@findit/domain";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { captureException } from "./monitoring";
 
@@ -22,7 +22,13 @@ type AuthState = {
   activeStore: StoreMembership | null;
   setActiveStoreId: (id: string) => void;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: string }>;
+  sendEmailOtp: (input: {
+    email: string;
+  }) => Promise<{ error?: string; email?: string; masked?: string }>;
+  verifyEmailOtp: (input: {
+    email: string;
+    token: string;
+  }) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -107,15 +113,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       activeStore,
       setActiveStoreId,
       loading,
-      signIn: async (email, password) => {
-        if (isSoloAdminEmail(email)) {
+      sendEmailOtp: async ({ email }) => {
+        const parsed = normalizeEmail(email);
+        if (!parsed.ok) return { error: parsed.error };
+        if (isSoloAdminEmail(parsed.email)) {
           return {
             error:
               "Operator accounts use the FINDIT website at /admin, not the store app.",
           };
         }
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        return error ? { error: error.message } : {};
+        const { error } = await supabase.auth.signInWithOtp({
+          email: parsed.email,
+          options: { shouldCreateUser: false },
+        });
+        if (error) return { error: mapEmailOtpError(error.message, "send") };
+        return { email: parsed.email, masked: maskEmail(parsed.email) };
+      },
+      verifyEmailOtp: async ({ email, token }) => {
+        const parsed = normalizeEmail(email);
+        if (!parsed.ok) return { error: parsed.error };
+        const code = token.replace(/\D/g, "");
+        if (code.length !== 6) return { error: "Enter the 6-digit code." };
+        const { error } = await supabase.auth.verifyOtp({
+          email: parsed.email,
+          token: code,
+          type: "email",
+        });
+        return error ? { error: mapEmailOtpError(error.message, "verify") } : {};
       },
       signOut: async () => {
         await supabase.auth.signOut();

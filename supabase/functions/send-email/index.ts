@@ -57,7 +57,8 @@ Deno.serve(async (req) => {
   const to = event.user.email?.trim();
   if (!to) return jsonError(400, "Missing user email");
 
-  const action = event.email_data.email_action_type || "signup";
+  const rawAction = event.email_data.email_action_type || "signup";
+  const action = rawAction === "magiclink" ? "email_otp" : rawAction;
   const firstName =
     event.user.user_metadata?.first_name ||
     event.user.user_metadata?.display_name ||
@@ -71,10 +72,13 @@ Deno.serve(async (req) => {
       ? authEmailConfirmationUrl({
           appUrl: APP_URL || event.email_data.site_url || "",
           tokenHash: event.email_data.token_hash,
-          action,
+          action: rawAction,
         })
       : null;
-  const code = action === "reauthentication" ? event.email_data.token : null;
+  const code =
+    action === "email_otp" || action === "reauthentication"
+      ? event.email_data.token || null
+      : null;
 
   const resend = new Resend(apiKey);
   const { error } = await resend.emails.send({

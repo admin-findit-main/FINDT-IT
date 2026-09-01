@@ -71,6 +71,14 @@ export function authEmailCopy(
         button: "Sign in",
         footnote: "If you didn’t ask to sign in, you can ignore this email.",
       };
+    case "email_otp":
+      return {
+        subject: "Your FINDIT sign-in code",
+        heading: "Your sign-in code",
+        body: "Enter this 6-digit code in FINDIT. It expires shortly and works once.",
+        button: null,
+        footnote: "If you didn’t ask to sign in, you can ignore this email.",
+      };
     case "invite":
       return {
         subject: "You’re invited to FINDIT",

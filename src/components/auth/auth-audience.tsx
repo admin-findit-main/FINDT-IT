@@ -14,6 +14,51 @@ import { useMarketingHomeHref, useSurfaceHref } from "@/components/host/host-sur
 import { cn } from "@/lib/utils";
 
 export type AuthAudience = "shopper" | "store";
+export type ContactMethod = "phone" | "email";
+
+export function ContactMethodSwitch({
+  value,
+  onChange,
+  emailFirst = false,
+  ariaLabel = "Phone or email",
+}: {
+  value: ContactMethod;
+  onChange: (next: ContactMethod) => void;
+  emailFirst?: boolean;
+  ariaLabel?: string;
+}) {
+  const tabs = emailFirst
+    ? ([["email", "Email"], ["phone", "Phone"]] as const)
+    : ([["phone", "Phone"], ["email", "Email"]] as const);
+  return (
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className="mt-6 grid grid-cols-2 gap-1 rounded-glass-lg bg-[var(--solid-3)] p-1"
+    >
+      {tabs.map(([id, label]) => {
+        const selected = value === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(id)}
+            className={cn(
+              "min-h-10 rounded-glass-md px-3 text-sm font-semibold transition-colors",
+              selected
+                ? "bg-[var(--solid-1)] text-ink shadow-sm"
+                : "text-ink-muted hover:text-ink"
+            )}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function shopperLoginPath(next?: string | null) {
   if (
@@ -174,7 +219,7 @@ export function AuthPageLinks({
           href={shopperSignup}
           className="font-semibold text-ink underline-offset-2 hover:underline"
         >
-          Create an account with your phone
+          Create an account
         </Link>
       </p>
       <p className="text-center text-sm text-ink-muted">

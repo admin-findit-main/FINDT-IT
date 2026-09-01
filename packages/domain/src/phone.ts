@@ -2,6 +2,11 @@ export const OTP_RESEND_SECONDS = 60;
 export const DEMO_PHONE_OTP = "123456";
 export const E164_PATTERN = /^\+[1-9][0-9]{7,14}$/;
 
+/** Phone OTP stays in the codebase, but the UI and send/verify paths stay off until SMS is ready. */
+export const PHONE_OTP_ENABLED = false;
+export const PHONE_OTP_DISABLED_MESSAGE =
+  "Text codes are paused for now. Use your email instead.";
+
 export type PhoneNormalizeResult =
   | { ok: true; e164: string }
   | { ok: false; error: string };

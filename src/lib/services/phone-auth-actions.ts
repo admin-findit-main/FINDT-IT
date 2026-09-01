@@ -7,16 +7,23 @@ import { consumeRateLimit } from "@/lib/security/rate-limit";
 import {
   customerNeedsFirstName,
   loginAudienceForAccount,
+  mapEmailOtpError,
   mapPhoneOtpError,
+  maskEmail,
   maskPhoneE164,
+  normalizeEmail,
   normalizePhoneToE164,
+  PHONE_OTP_DISABLED_MESSAGE,
+  PHONE_OTP_ENABLED,
   wrongLoginSideMessage,
   type LoginAudience,
 } from "@findit/domain";
 import {
   demoCurrentUser,
+  demoSendEmailOtp,
   demoSendPhoneOtp,
   demoSetFirstName,
+  demoVerifyEmailOtp,
   demoVerifyPhoneOtp,
   getDemoState,
 } from "@/lib/demo/store";
@@ -85,6 +92,7 @@ export async function sendPhoneOtpAction(input: {
   phone?: string;
   masked?: string;
 }> {
+  if (!PHONE_OTP_ENABLED) return { error: PHONE_OTP_DISABLED_MESSAGE };
   const parsed = normalizePhoneToE164(input.phone);
   if (!parsed.ok) return { error: parsed.error };
   const audience = input.audience ?? "shopper";
@@ -190,6 +198,7 @@ export async function verifyPhoneOtpAction(input: {
   needsName?: boolean;
   homePath?: AppHomePath;
 }> {
+  if (!PHONE_OTP_ENABLED) return { error: PHONE_OTP_DISABLED_MESSAGE };
   const parsed = normalizePhoneToE164(input.phone);
   if (!parsed.ok) return { error: parsed.error };
   const token = input.token.replace(/\D/g, "");
@@ -295,13 +304,233 @@ export async function verifyPhoneOtpAction(input: {
   }
 }
 
-export async function completeCustomerFirstNameAction(firstName: string): Promise<{
+export async function sendEmailOtpAction(input: {
+  email: string;
+  createIfMissing: boolean;
+  audience?: LoginAudience;
+}): Promise<{
+  error?: string;
+  code?: "wrong_side";
+  requiredAudience?: LoginAudience;
+  email?: string;
+  masked?: string;
+}> {
+  const parsed = normalizeEmail(input.email);
+  if (!parsed.ok) return { error: parsed.error };
+  const audience = input.audience ?? "shopper";
+  const createIfMissing = audience === "store" ? false : input.createIfMissing;
+
+  const limited = await consumeRateLimit({
+    bucket: "email-otp",
+    limit: 8,
+    windowMs: 60 * 60_000,
+    key: parsed.email,
+  });
+  if (!limited.ok) return { error: limited.error };
+
+  if (isDemoMode()) {
+    const profile = getDemoState().profiles.find(
+      (row) => row.email && row.email.toLowerCase() === parsed.email
+    );
+    if (profile) {
+      const belongs = sideForAccount({
+        email: profile.email,
+        accountType: profile.account_type,
+        hasActiveStoreMembership: getDemoState().storeMembers.some(
+          (member) => member.user_id === profile.id && member.status === "active"
+        ),
+      });
+      if (audience && belongs !== audience) return wrongSideResult(belongs);
+    } else if (!createIfMissing) {
+      return { error: "No FINDIT account for this email yet. Sign up to continue." };
+    }
+    demoSendEmailOtp(parsed.email);
+    return { email: parsed.email, masked: maskEmail(parsed.email) };
+  }
+
+  try {
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const admin = createServiceClient();
+    if (isSoloAdminEmail(parsed.email) && audience !== "store") {
+      return wrongSideResult("store");
+    }
+    const { data: profile } = await admin
+      .from("profiles")
+      .select("id, email, account_type")
+      .eq("email", parsed.email)
+      .maybeSingle();
+    if (profile) {
+      const { count } = await admin
+        .from("store_members")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("status", "active");
+      const belongs = sideForAccount({
+        email: profile.email,
+        accountType: profile.account_type,
+        hasActiveStoreMembership: (count || 0) > 0,
+      });
+      if (audience && belongs !== audience) return wrongSideResult(belongs);
+    }
+
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email: parsed.email,
+      options: {
+        shouldCreateUser: createIfMissing,
+        data: audience === "shopper" ? { account_type: "customer" } : undefined,
+      },
+    });
+    if (!error) {
+      return { email: parsed.email, masked: maskEmail(parsed.email) };
+    }
+    return { error: mapEmailOtpError(error.message, "send") };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "";
+    return { error: mapEmailOtpError(message, "send") };
+  }
+}
+
+export async function verifyEmailOtpAction(input: {
+  email: string;
+  token: string;
+  createIfMissing: boolean;
+  audience?: LoginAudience;
+}): Promise<{
+  error?: string;
+  code?: "wrong_side";
+  requiredAudience?: LoginAudience;
+  needsName?: boolean;
+  homePath?: AppHomePath;
+}> {
+  const parsed = normalizeEmail(input.email);
+  if (!parsed.ok) return { error: parsed.error };
+  const token = input.token.replace(/\D/g, "");
+  if (token.length !== 6) return { error: "Enter the 6-digit code." };
+  const audience = input.audience ?? "shopper";
+  const createIfMissing = audience === "store" ? false : input.createIfMissing;
+
+  if (isDemoMode()) {
+    try {
+      const result = demoVerifyEmailOtp(
+        parsed.email,
+        token,
+        createIfMissing,
+        audience
+      );
+      await setDemoSessionCookie(result.sessionId);
+      const stores = getDemoState().storeMembers.filter(
+        (m) => m.user_id === result.profile.id && m.status === "active"
+      );
+      return {
+        needsName: result.needsName,
+        homePath: resolvePostAuthDestination({
+          profile: result.profile,
+          authEmail: result.profile.email,
+          hasActiveStoreMembership: stores.length > 0,
+          needsName: result.needsName,
+        }) as AppHomePath,
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "That code didn't work. Try again.";
+      if (message.includes("Store sign in")) return wrongSideResult("store");
+      if (message.includes("Shopper sign in")) return wrongSideResult("shopper");
+      return { error: message };
+    }
+  }
+
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: parsed.email,
+      token,
+      type: "email",
+    });
+    if (error) return { error: mapEmailOtpError(error.message, "verify") };
+    const user = data.user;
+    if (!user) return { error: "Could not start your session. Try again." };
+
+    let profile = await waitForProfile(supabase, user.id);
+    if (!profile) {
+      const { createServiceClient } = await import("@/lib/supabase/admin");
+      const admin = createServiceClient();
+      const accountType = isSoloAdminEmail(user.email || parsed.email)
+        ? "admin"
+        : "customer";
+      await admin.from("profiles").upsert(
+        {
+          id: user.id,
+          email: user.email || parsed.email,
+          first_name: "",
+          display_name: accountType === "admin" ? "FINDIT Admin" : "Customer",
+          account_type: accountType,
+        },
+        { onConflict: "id" }
+      );
+      profile = await waitForProfile(supabase, user.id);
+    } else if (!profile.email) {
+      const { createServiceClient } = await import("@/lib/supabase/admin");
+      const admin = createServiceClient();
+      await admin
+        .from("profiles")
+        .update({ email: user.email || parsed.email })
+        .eq("id", user.id);
+      profile = { ...profile, email: user.email || parsed.email };
+    }
+
+    if (!profile) {
+      return { error: "Account created, but profile is missing. Refresh and try again." };
+    }
+
+    const coerced = coerceSoloAdminProfile(profile, user.email) as Profile;
+    if (coerced.is_suspended) {
+      await supabase.auth.signOut();
+      return { error: "This account is suspended." };
+    }
+    const { count } = await supabase
+      .from("store_members")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "active");
+    const belongs = sideForAccount({
+      email: user.email || coerced.email,
+      accountType: coerced.account_type,
+      hasActiveStoreMembership: (count || 0) > 0,
+    });
+    if (audience && belongs !== audience) {
+      await supabase.auth.signOut();
+      return wrongSideResult(belongs);
+    }
+
+    return {
+      needsName: customerNeedsFirstName(coerced),
+      homePath: resolvePostAuthDestination({
+        profile: coerced,
+        authEmail: user.email,
+        hasActiveStoreMembership: (count || 0) > 0,
+        needsName: customerNeedsFirstName(coerced),
+      }) as AppHomePath,
+    };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "";
+    return { error: mapEmailOtpError(message, "verify") };
+  }
+}
+
+export async function completeCustomerFirstNameAction(
+  firstName: string,
+  lastName?: string
+): Promise<{
   error?: string;
   profile?: Profile;
 }> {
   const name = firstName.trim();
   if (!name) return { error: "What's your first name?" };
   if (name.length > 60) return { error: "Use a shorter first name." };
+  const last = lastName !== undefined ? lastName.trim() : undefined;
+  if (last && last.length > 60) return { error: "Use a shorter last name." };
 
   if (isDemoMode()) {
     const { cookies } = await import("next/headers");
@@ -309,7 +538,7 @@ export async function completeCustomerFirstNameAction(firstName: string): Promis
     const jar = await cookies();
     const sessionId = jar.get(DEMO_SESSION_COOKIE)?.value || null;
     const profile = demoCurrentUser(sessionId);
-    if (!profile) return { error: "Please verify your phone first." };
+    if (!profile) return { error: "Please sign in first." };
     return { profile: demoSetFirstName(profile.id, name) };
   }
 
@@ -318,11 +547,24 @@ export async function completeCustomerFirstNameAction(firstName: string): Promis
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Please verify your phone first." };
+  if (!user) return { error: "Please sign in first." };
+
+  const patch: {
+    first_name: string;
+    display_name: string;
+    last_name?: string;
+  } = {
+    first_name: name,
+    display_name: name,
+  };
+  if (last !== undefined) {
+    patch.last_name = last;
+    patch.display_name = [name, last].filter(Boolean).join(" ");
+  }
 
   const { data, error } = await supabase
     .from("profiles")
-    .update({ first_name: name, display_name: name })
+    .update(patch)
     .eq("id", user.id)
     .select("*")
     .single();

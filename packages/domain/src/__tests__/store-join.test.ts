@@ -6,8 +6,6 @@ const base = {
   ownerName: "Casey Owner",
   ownerEmail: "casey@testhardware.example",
   ownerPhone: "703-555-0111",
-  password: "Riverstone-49",
-  confirmPassword: "Riverstone-49",
   legalName: "Test Hardware LLC",
   ein: "12-3456789",
   entityType: "LLC" as const,

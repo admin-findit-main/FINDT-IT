@@ -2669,7 +2669,6 @@ export async function submitStoreApplicationAction(raw: unknown) {
   });
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email: ownerEmail,
-    password: parsed.data.password,
     email_confirm: true,
     user_metadata: {
       first_name: firstName,

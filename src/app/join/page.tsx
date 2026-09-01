@@ -18,14 +18,12 @@ import {
   formatEin,
   normalizeEin,
   normalizeStoreLocation,
-  passwordRejectReason,
   storeSelectionSuggestsCustomerId,
 } from "@findit/domain";
 import {
   sendStoreJoinEmailCodeAction,
   submitStoreApplicationAction,
 } from "@/lib/services/actions";
-import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { AuthAudienceSwitch } from "@/components/auth/auth-audience";
 import { StoreAddressFields } from "@/components/store/store-address-fields";
 import {
@@ -52,8 +50,6 @@ export default function JoinAsStorePage() {
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [legalName, setLegalName] = useState("");
   const [ein, setEin] = useState("");
@@ -98,8 +94,6 @@ export default function JoinAsStorePage() {
       ownerName,
       ownerEmail,
       ownerPhone,
-      password,
-      confirmPassword,
       legalName,
       ein: normalizeEin(ein),
       entityType,
@@ -157,19 +151,6 @@ export default function JoinAsStorePage() {
       }
       if (!ownerEmail.includes("@")) {
         toast.error("Enter a valid email");
-        return false;
-      }
-      if (password.length < 8) {
-        toast.error("Password must be at least 8 characters");
-        return false;
-      }
-      const weak = passwordRejectReason(password, ownerEmail);
-      if (weak) {
-        toast.error(weak);
-        return false;
-      }
-      if (password !== confirmPassword) {
-        toast.error("Passwords do not match");
         return false;
       }
     }
@@ -482,8 +463,9 @@ export default function JoinAsStorePage() {
           Apply your business
         </h1>
         <p className="mt-3 max-w-xl leading-relaxed text-ink-muted">
-          Complete each step so we can verify you. We email a code to confirm
-          this address before we create a store login or send the application.
+          Complete each step so we can verify you. We email a 6-digit code to
+          confirm this address before we send the application. After we accept
+          you, sign in with another email code — FINDIT does not use passwords.
         </p>
         <GlassNotice tone="accent" className="mt-4 font-semibold">
           {STORE_TRIAL_DAYS} DAYS FREE · NO CREDIT CARD REQUIRED
@@ -530,7 +512,8 @@ export default function JoinAsStorePage() {
                       required
                     />
                     <p className="mt-1 text-xs text-ink-muted">
-                      This is the login you&apos;ll use after we accept you.
+                      After we accept you, we&apos;ll email a 6-digit code to
+                      this address to sign in. No password.
                     </p>
                   </div>
                   <div>
@@ -540,33 +523,6 @@ export default function JoinAsStorePage() {
                       type="tel"
                       value={ownerPhone}
                       onChange={(e) => setOwnerPhone(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      minLength={8}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      autoComplete="new-password"
-                    />
-                    <PasswordStrengthMeter password={password} email={ownerEmail} />
-                  </div>
-                  <div>
-                    <Label htmlFor="confirmPassword">Confirm password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      minLength={8}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      autoComplete="new-password"
                     />
                   </div>
                 </div>

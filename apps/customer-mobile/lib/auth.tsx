@@ -5,9 +5,14 @@ import {
   coerceSoloAdminProfile,
   customerNeedsFirstName,
   isSoloAdminEmail,
+  mapEmailOtpError,
   mapPhoneOtpError,
+  maskEmail,
   maskPhoneE164,
+  normalizeEmail,
   normalizePhoneToE164,
+  PHONE_OTP_DISABLED_MESSAGE,
+  PHONE_OTP_ENABLED,
 } from "@findit/domain";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { captureException } from "./monitoring";
@@ -29,6 +34,14 @@ type AuthState = {
   }) => Promise<{ error?: string; phone?: string; masked?: string }>;
   verifyPhoneOtp: (input: {
     phone: string;
+    token: string;
+  }) => Promise<{ error?: string; needsName?: boolean }>;
+  sendEmailOtp: (input: {
+    email: string;
+    createIfMissing: boolean;
+  }) => Promise<{ error?: string; email?: string; masked?: string }>;
+  verifyEmailOtp: (input: {
+    email: string;
     token: string;
   }) => Promise<{ error?: string; needsName?: boolean }>;
   completeFirstName: (firstName: string) => Promise<{ error?: string }>;
@@ -157,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return {};
       },
       sendPhoneOtp: async ({ phone, createIfMissing }) => {
+        if (!PHONE_OTP_ENABLED) return { error: PHONE_OTP_DISABLED_MESSAGE };
         const parsed = normalizePhoneToE164(phone);
         if (!parsed.ok) return { error: parsed.error };
         const { error } = await supabase.auth.signInWithOtp({
@@ -171,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { phone: parsed.e164, masked: maskPhoneE164(parsed.e164) };
       },
       verifyPhoneOtp: async ({ phone, token }) => {
+        if (!PHONE_OTP_ENABLED) return { error: PHONE_OTP_DISABLED_MESSAGE };
         const parsed = normalizePhoneToE164(phone);
         if (!parsed.ok) return { error: parsed.error };
         const code = token.replace(/\D/g, "");
@@ -192,6 +207,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const coerced = coerceSoloAdminProfile(row || { email: user.email }, user.email);
         return { needsName: customerNeedsFirstName(coerced) };
       },
+      sendEmailOtp: async ({ email, createIfMissing }) => {
+        const parsed = normalizeEmail(email);
+        if (!parsed.ok) return { error: parsed.error };
+        if (isSoloAdminEmail(parsed.email)) {
+          return {
+            error:
+              "This app is for shoppers. Sign in on the FINDIT website, then open /admin.",
+          };
+        }
+        const { error } = await supabase.auth.signInWithOtp({
+          email: parsed.email,
+          options: {
+            shouldCreateUser: createIfMissing,
+            data: { account_type: "customer" },
+          },
+        });
+        if (error) return { error: mapEmailOtpError(error.message, "send") };
+        return { email: parsed.email, masked: maskEmail(parsed.email) };
+      },
+      verifyEmailOtp: async ({ email, token }) => {
+        const parsed = normalizeEmail(email);
+        if (!parsed.ok) return { error: parsed.error };
+        const code = token.replace(/\D/g, "");
+        if (code.length !== 6) return { error: "Enter the 6-digit code." };
+        const { data, error } = await supabase.auth.verifyOtp({
+          email: parsed.email,
+          token: code,
+          type: "email",
+        });
+        if (error) return { error: mapEmailOtpError(error.message, "verify") };
+        const user = data.user;
+        if (!user) return { error: "Could not start your session. Try again." };
+        await loadProfile(user);
+        const { data: row } = await supabase
+          .from("profiles")
+          .select("first_name, account_type, email")
+          .eq("id", user.id)
+          .maybeSingle();
+        const coerced = coerceSoloAdminProfile(row || { email: user.email }, user.email);
+        return { needsName: customerNeedsFirstName(coerced) };
+      },
       completeFirstName: async (firstName) => {
         const name = firstName.trim();
         if (!name) return { error: "What's your first name?" };
@@ -199,7 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) return { error: "Please verify your phone first." };
+        if (!user) return { error: "Please sign in first." };
         const { error } = await supabase
           .from("profiles")
           .update({ first_name: name, display_name: name })

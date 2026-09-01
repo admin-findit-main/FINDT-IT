@@ -16,6 +16,7 @@ export * from "./product-utils";
 export * from "./analytics";
 export * from "./deep-links";
 export * from "./phone";
+export * from "./email-otp";
 export * from "./entitlements";
 export * from "./place";
 export * from "./notify";

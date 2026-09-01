@@ -4,27 +4,23 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Input, Label, Card } from "@/components/ui/primitives";
 import { destinationAfterAuth, isSafeNextPath } from "@/lib/auth/home-path";
 import {
   AuthAudienceSwitch,
   AuthSignupLinks,
 } from "@/components/auth/auth-audience";
-import { PhoneOtpForm } from "@/components/auth/phone-otp-form";
-import { PasswordStrengthMeter } from "@/components/auth/password-strength";
-import { signUpAction } from "@/lib/services/actions";
+import { EmailOtpForm } from "@/components/auth/email-otp-form";
+import { completeCustomerFirstNameAction } from "@/lib/services/phone-auth-actions";
 import { useSurfaceHref } from "@/components/host/host-surface";
-import { passwordStrength } from "@findit/domain";
 
 function SignupForm() {
   const router = useRouter();
   const params = useSearchParams();
   const joinHref = useSurfaceHref("www", "/join");
   const signupHref = useSurfaceHref("dashboard", "/signup");
-  const [loading, setLoading] = useState(false);
-  const [staffPassword, setStaffPassword] = useState("");
-  const [staffEmail, setStaffEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
   useEffect(() => {
     if (params.get("type") === "business") {
@@ -38,39 +34,6 @@ function SignupForm() {
     ? `/login?next=${encodeURIComponent(next)}`
     : "/login";
 
-  async function onStaffSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    const fd = new FormData(e.currentTarget);
-    const result = await signUpAction({
-      firstName: String(fd.get("firstName")),
-      lastName: String(fd.get("lastName") || ""),
-      email: String(fd.get("email")),
-      password: String(fd.get("password")),
-      accountType: "customer",
-      city: String(fd.get("city") || ""),
-      state: String(fd.get("state") || "VA"),
-      postalCode: String(fd.get("postalCode") || ""),
-    });
-    setLoading(false);
-    if ("error" in result && result.error) {
-      toast.error(result.error);
-      return;
-    }
-    if ("needsEmailConfirm" in result && result.needsEmailConfirm) {
-      toast.message("Open the email we just sent — tapping the link signs you in.");
-      return;
-    }
-    toast.success("Account created");
-    router.push(
-      destinationAfterAuth({
-        homePath: "homePath" in result && result.homePath ? result.homePath : "/home",
-        next,
-      })
-    );
-    router.refresh();
-  }
-
   if (isStaffInvite) {
     return (
       <Card className="p-6 sm:p-8">
@@ -78,54 +41,53 @@ function SignupForm() {
           Create your staff account
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Use the email from your invite. After signup you&apos;ll join the store
-          team.
+          Use the email from your invite. We’ll send a 6-digit code. After that,
+          this device stays signed in and you can join the store team.
         </p>
-        <form onSubmit={onStaffSubmit} className="mt-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="firstName">First name</Label>
-              <Input id="firstName" name="firstName" required />
-            </div>
-            <div>
-              <Label htmlFor="lastName">Last name</Label>
-              <Input id="lastName" name="lastName" />
-            </div>
-          </div>
+        <div className="mt-6 grid grid-cols-2 gap-3">
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="firstName">First name</Label>
             <Input
-              id="email"
-              name="email"
-              type="email"
+              id="firstName"
+              name="firstName"
               required
-              value={staffEmail}
-              onChange={(e) => setStaffEmail(e.target.value)}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
             />
           </div>
           <div>
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="lastName">Last name</Label>
             <Input
-              id="password"
-              name="password"
-              type="password"
-              minLength={8}
-              required
-              autoComplete="new-password"
-              value={staffPassword}
-              onChange={(e) => setStaffPassword(e.target.value)}
+              id="lastName"
+              name="lastName"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
             />
-            <PasswordStrengthMeter password={staffPassword} email={staffEmail} />
           </div>
-          <Button
-            type="submit"
-            className="w-full"
-            size="lg"
-            disabled={loading || !passwordStrength(staffPassword, staffEmail).ok}
-          >
-            {loading ? "Creating…" : "Create account & continue"}
-          </Button>
-        </form>
+        </div>
+        <EmailOtpForm
+          createIfMissing
+          audience="shopper"
+          emailInputId="staff-invite-email"
+          continueLabel="Email me a code"
+          sendDisabled={!firstName.trim()}
+          sendBlockedMessage="Enter your first name first."
+          onFinished={async ({ homePath }) => {
+            const named = await completeCustomerFirstNameAction(
+              firstName,
+              lastName
+            );
+            if (named.error) toast.error(named.error);
+            router.push(
+              destinationAfterAuth({
+                homePath,
+                next,
+                needsName: Boolean(named.error),
+              })
+            );
+            router.refresh();
+          }}
+        />
         <p className="mt-5 text-center text-sm text-ink-muted">
           Already have FINDIT?{" "}
           <Link
@@ -151,13 +113,13 @@ function SignupForm() {
         Create a shopper account
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        We’ll text a 6-digit code. That’s the shopper login. No email or
-        password. Stores apply from the Store tab.
+        We’ll email a 6-digit code. No password. After that, this device stays
+        signed in. Stores apply from the Store tab.
       </p>
-      <PhoneOtpForm
+      <EmailOtpForm
         createIfMissing
         audience="shopper"
-        continueLabel="Text me a code"
+        continueLabel="Email me a code"
         onFinished={({ homePath, needsName }) => {
           router.push(destinationAfterAuth({ homePath, next, needsName }));
           router.refresh();

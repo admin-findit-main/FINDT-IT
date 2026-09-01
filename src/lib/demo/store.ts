@@ -25,6 +25,7 @@ import { bypassConsumerPlanLimits, bypassPlanLimits } from "@/lib/config/env";
 import {
   AGE_RESTRICTED_ID_REQUIRED,
   DEMO_PHONE_OTP,
+  DEMO_EMAIL_OTP,
   accountDeletionBlockReason,
   createdInMonthlyFindWindow,
   customerNeedsFirstName,
@@ -103,6 +104,7 @@ interface DemoState {
   sessions: Record<string, SessionUser>;
   currentSessionId: string | null;
   phoneOtps: Record<string, { sentAt: number }>;
+  emailOtps: Record<string, { sentAt: number }>;
 }
 
 const g = globalThis as typeof globalThis & { __finditDemo?: DemoState };
@@ -454,6 +456,7 @@ function seedState(): DemoState {
     sessions: {},
     currentSessionId: null,
     phoneOtps: {},
+    emailOtps: {},
   };
 }
 
@@ -605,6 +608,79 @@ export function demoVerifyPhoneOtp(
       id: randomUUID(),
       email: null,
       phone_e164: phoneE164,
+      first_name: "",
+      last_name: null,
+      display_name: "Customer",
+      avatar_url: null,
+      account_type: "customer",
+      subscription_plan: "free",
+      default_city: null,
+      default_state: "VA",
+      default_postal_code: null,
+      notify_in_stock: true,
+      notify_can_order: true,
+      notify_request_expired: true,
+      notify_new_request: true,
+      notify_demand_alerts: true,
+      is_suspended: false,
+      created_at: now(),
+      updated_at: now(),
+    };
+    state.profiles.push(profile);
+    track("account_created", { user_id: profile.id });
+  }
+  const sessionId = randomUUID();
+  state.sessions[sessionId] = { id: profile.id, email: profile.email };
+  state.currentSessionId = sessionId;
+  return {
+    profile,
+    sessionId,
+    needsName: customerNeedsFirstName(profile),
+  };
+}
+
+export function demoSendEmailOtp(email: string): { email: string } {
+  const state = getDemoState();
+  state.emailOtps[email] = { sentAt: Date.now() };
+  return { email };
+}
+
+export function demoVerifyEmailOtp(
+  email: string,
+  token: string,
+  createIfMissing: boolean,
+  audience?: "shopper" | "store"
+): { profile: Profile; sessionId: string; needsName: boolean } {
+  if (token !== DEMO_EMAIL_OTP) {
+    throw new Error("That code is incorrect.");
+  }
+  const state = getDemoState();
+  let profile =
+    state.profiles.find((p) => p.email && p.email.toLowerCase() === email) ||
+    null;
+  if (profile) {
+    const belongs = loginAudienceForAccount({
+      isAdmin: isSoloAdmin(profile),
+      accountType: profile.account_type,
+      hasActiveStoreMembership: state.storeMembers.some(
+        (member) => member.user_id === profile!.id && member.status === "active"
+      ),
+    });
+    if (audience && belongs !== audience) {
+      throw new Error(wrongLoginSideMessage(belongs));
+    }
+  }
+  if (!profile) {
+    if (audience === "store") {
+      throw new Error("No store account for this email. Apply your business.");
+    }
+    if (!createIfMissing) {
+      throw new Error("No FINDIT account for this email yet. Sign up to continue.");
+    }
+    profile = {
+      id: randomUUID(),
+      email,
+      phone_e164: null,
       first_name: "",
       last_name: null,
       display_name: "Customer",

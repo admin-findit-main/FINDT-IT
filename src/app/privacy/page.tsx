@@ -34,8 +34,8 @@ export default function PrivacyPage() {
       <ul>
         <li>
           <strong className="text-ink">Account.</strong> Name, email and/or
-          phone, password (stored by our auth provider, not in FINDIT source),
-          city, state, ZIP, and notification preferences.
+          phone, city, state, ZIP, and notification preferences. We send a
+          one-time email code to sign you in. We do not store account passwords.
         </li>
         <li>
           <strong className="text-ink">Finds.</strong> Product name, details,

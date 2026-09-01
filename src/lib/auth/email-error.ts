@@ -6,7 +6,7 @@ export function authEmailErrorMessage(error: string | null | undefined): string 
     text.includes("over_email_send_rate_limit") ||
     text.includes("email rate limit exceeded")
   ) {
-    return "Too many emails were just sent. Wait a few minutes, then request another link. You can still sign in with your password.";
+    return "Too many emails were just sent. Wait a few minutes, then request another code.";
   }
   if (
     text.includes("timeout") ||
@@ -14,7 +14,7 @@ export function authEmailErrorMessage(error: string | null | undefined): string 
     text.includes("504") ||
     text.includes("context deadline exceeded")
   ) {
-    return "Email delivery timed out. Try signing in with your password, or create the account again in a minute.";
+    return "Email delivery timed out. Request another code in a minute.";
   }
   return "Could not send email. Try again in a moment.";
 }

@@ -31,6 +31,8 @@ describe("auth email", () => {
     expect(authEmailCopy("recovery").button).toBe("Choose a new password");
     expect(authEmailCopy("store_join").button).toBeNull();
     expect(authEmailCopy("store_join").body).toMatch(/6-digit code/i);
+    expect(authEmailCopy("email_otp").button).toBeNull();
+    expect(authEmailCopy("email_otp").body).toMatch(/6-digit code/i);
   });
 
   it("escapes names inside HTML", () => {

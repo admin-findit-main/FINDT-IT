@@ -98,7 +98,7 @@ export default function LandingPage() {
               Find it before you drive there.
             </h2>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-ink-muted">
-              Sign in with a text code. Free accounts get{" "}
+              Sign in with a 6-digit code to your email. Free accounts get{" "}
               {FREE_MONTHLY_REQUEST_LIMIT} Finds a month. FINDIT+ is{" "}
               {PLUS_PRICE}/month for more Finds and a wider search. Stores never
               see your phone number.

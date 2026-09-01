@@ -9,7 +9,7 @@ const QUESTIONS = [
   },
   {
     q: "How do shoppers sign in?",
-    a: "With your phone. We text a 6-digit code.",
+    a: "With your email. We send a 6-digit code. After that, your device stays signed in.",
   },
   {
     q: "Do stores see my phone number?",

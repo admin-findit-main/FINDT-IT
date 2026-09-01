@@ -1,11 +1,7 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
-import {
-  OTP_RESEND_SECONDS,
-  formatUsNationalInput,
-  maskPhoneE164,
-} from "@findit/domain";
+import { OTP_RESEND_SECONDS, maskEmail } from "@findit/domain";
 import { spacing, typography } from "@findit/theme";
 import {
   GlassButton,
@@ -21,13 +17,13 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 
 export default function LoginScreen() {
   const theme = useAppTheme();
-  const { sendPhoneOtp, verifyPhoneOtp } = useAuth();
+  const { sendEmailOtp, verifyEmailOtp } = useAuth();
   const { reason } = useLocalSearchParams<{ reason?: string }>();
-  const [phoneDisplay, setPhoneDisplay] = useState("");
-  const [phoneE164, setPhoneE164] = useState("");
+  const [email, setEmail] = useState("");
+  const [sentEmail, setSentEmail] = useState("");
   const [masked, setMasked] = useState("");
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [step, setStep] = useState<"contact" | "otp">("contact");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -45,17 +41,17 @@ export default function LoginScreen() {
     );
   }, [reason]);
 
-  const sendCode = async (value: string) => {
+  const sendCode = async () => {
     setBusy(true);
     setError(null);
-    const res = await sendPhoneOtp({ phone: value, createIfMissing: false });
+    const res = await sendEmailOtp({ email, createIfMissing: false });
     setBusy(false);
     if (res.error) {
       setError(res.error);
       return;
     }
-    setPhoneE164(res.phone || value);
-    setMasked(res.masked || maskPhoneE164(res.phone || value));
+    setSentEmail(res.email || email);
+    setMasked(res.masked || maskEmail(res.email || email));
     setSeconds(OTP_RESEND_SECONDS);
     setCode("");
     setStep("otp");
@@ -64,17 +60,17 @@ export default function LoginScreen() {
   const onOtp = async () => {
     setBusy(true);
     setError(null);
-    const res = await verifyPhoneOtp({
-      phone: phoneE164 || phoneDisplay,
-      token: code,
-    });
+    const res = await verifyEmailOtp({ email: sentEmail || email, token: code });
     if (res.error) setError(res.error);
     setBusy(false);
   };
 
   return (
     <Screen variant="auth">
-      <AuthHeader title="Sign in" subtitle="We’ll text a 6-digit code." />
+      <AuthHeader
+        title="Sign in"
+        subtitle="We’ll email a 6-digit code. After that, this device stays signed in."
+      />
 
       <GlassCard>
         {!isSupabaseConfigured() && (
@@ -82,31 +78,26 @@ export default function LoginScreen() {
             Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env
           </GlassNotice>
         )}
-        {step === "phone" ? (
+        {step === "contact" ? (
           <>
             <GlassInput
               inset
               last
-              keyboardType="phone-pad"
-              placeholder="Phone number"
-              textContentType="telephoneNumber"
-              autoComplete="tel"
-              value={phoneDisplay}
-              onChangeText={(raw) => {
-                if (raw.trim().startsWith("+") && raw.replace(/\D/g, "").length > 11) {
-                  setPhoneDisplay(raw);
-                  return;
-                }
-                setPhoneDisplay(formatUsNationalInput(raw));
-              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="Email"
+              textContentType="emailAddress"
+              autoComplete="email"
+              value={email}
+              onChangeText={setEmail}
             />
             {error ? <GlassNotice>{error}</GlassNotice> : null}
             <GlassButton
-              title={busy ? "Sending…" : "Text me a code"}
+              title={busy ? "Sending…" : "Email me a code"}
               size="lg"
               loading={busy}
               disabled={busy}
-              onPress={() => sendCode(phoneDisplay)}
+              onPress={() => sendCode()}
               style={styles.cta}
             />
           </>
@@ -135,17 +126,17 @@ export default function LoginScreen() {
             />
             <Pressable
               onPress={() => {
-                setStep("phone");
+                setStep("contact");
                 setCode("");
                 setError(null);
               }}
               style={styles.altPress}
             >
-              <Text style={[styles.alt, { color: theme.inkMuted }]}>Use a different number</Text>
+              <Text style={[styles.alt, { color: theme.inkMuted }]}>Use a different email</Text>
             </Pressable>
             <Pressable
               disabled={busy || seconds > 0}
-              onPress={() => sendCode(phoneE164 || phoneDisplay)}
+              onPress={() => sendCode()}
               style={styles.altPress}
             >
               <Text style={[styles.alt, { color: theme.inkMuted }]}>

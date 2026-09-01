@@ -75,8 +75,8 @@ function StoreDevicesClient() {
         }
       >
         <p className="text-sm leading-relaxed text-ink-muted">
-          Pair a counter tablet or store computer without entering the owner password
-          on that device. Install the FINDIT Hub Android app, or open{" "}
+          Pair a counter tablet or store computer without signing in as the
+          owner on that device. Install the FINDIT Hub Android app, or open{" "}
           <span className="font-medium text-ink">/store/hub/connect</span> on
           the new device, then enter the code here.
         </p>

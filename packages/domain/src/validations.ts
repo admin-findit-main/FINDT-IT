@@ -119,8 +119,6 @@ export const storeJoinApplicationSchema = z.object({
     .pipe(z.string().min(2).max(100)),
   ownerEmail: z.string().trim().email(),
   ownerPhone: z.string().max(30).optional().or(z.literal("")),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string().min(8, "Confirm your password"),
   legalName: z.string().min(2, "Legal business name is required").max(120),
   ein: z
     .string()
@@ -154,18 +152,6 @@ export const storeJoinApplicationSchema = z.object({
   confirmedLegitimate: z.boolean().refine((v) => v === true, {
     message: "Confirm you are a legitimate business",
   }),
-}).superRefine((value, ctx) => {
-  if (value.password !== value.confirmPassword) {
-    ctx.addIssue({
-      code: "custom",
-      path: ["confirmPassword"],
-      message: "Passwords do not match",
-    });
-  }
-  const reason = passwordRejectReason(value.password, value.ownerEmail);
-  if (reason) {
-    ctx.addIssue({ code: "custom", path: ["password"], message: reason });
-  }
 });
 
 export const inviteEmployeeSchema = z.object({
