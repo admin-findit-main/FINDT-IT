@@ -22,6 +22,14 @@ export const ANALYTICS_EVENTS = [
   "store_application_needs_info",
   "pilot_feedback_submitted",
   "push_token_registered",
+  "onboarding_started",
+  "onboarding_completed",
+  "pwa_install_clicked",
+  "pwa_installed",
+  "pwa_install_dismissed",
+  "notifications_requested",
+  "notifications_granted",
+  "notifications_denied",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];

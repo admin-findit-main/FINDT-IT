@@ -13,6 +13,7 @@ import { PlusUpgradeCard } from "@/components/customer/plus-upgrade";
 import { useCustomerProfile } from "@/components/customer/session";
 import { PlaceFields } from "@/components/customer/place-fields";
 import { LocateMeButton } from "@/components/customer/locate-me-button";
+import { ShopperInstallHint } from "@/components/customer/install-hint";
 import { geolocateUsPlace } from "@/lib/customer/geolocate";
 import { marketingHomeHref } from "@/lib/config/product-hosts";
 import {
@@ -405,7 +406,7 @@ export default function CustomerHomePage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col px-5 py-8 sm:px-8 md:py-12">
+    <div className="flex min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] flex-col px-5 py-8 sm:px-8 md:py-12">
       <div className="mx-auto flex w-full max-w-xl flex-1 flex-col">
         {step === "query" ? (
           <div className="flex flex-1 flex-col justify-center pb-16">
@@ -418,6 +419,8 @@ export default function CustomerHomePage() {
             <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted sm:text-lg">
               Ask nearby stores at once. They tell you if they have it.
             </p>
+
+            <ShopperInstallHint />
 
             <form
               className="mt-10 space-y-4"

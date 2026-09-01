@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
 import { IosSwitch } from "@/components/ui/ios-switch";
 import { PlaceFields } from "@/components/customer/place-fields";
+import { NotificationDeniedHint } from "@/components/customer/notification-denied-hint";
 import { LocateMeButton } from "@/components/customer/locate-me-button";
 import { geolocateUsPlace } from "@/lib/customer/geolocate";
 import { SUPPORT_EMAIL } from "@/lib/auth/admin";
@@ -108,6 +109,7 @@ export default function ProfilePage() {
         </div>
         <div className="space-y-3 border-t border-hairline-strong pt-4">
           <p className="text-sm font-semibold text-ink">Alerts</p>
+          <NotificationDeniedHint />
           {(
             [
               ["notify_in_stock", "In Stock replies"],

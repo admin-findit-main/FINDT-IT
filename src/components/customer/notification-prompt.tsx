@@ -14,8 +14,10 @@ import {
   isStandaloneDisplay,
   subscribeWebPush,
 } from "@/lib/web-push-client";
-
-const DISMISS_KEY = "findit-web-notify-prompt-dismissed-v1";
+import {
+  readShopperOnboardingState,
+  WEB_NOTIFY_PROMPT_DISMISS_KEY,
+} from "@/lib/customer/onboarding-state";
 
 export function NotificationPrompt({
   compact = false,
@@ -39,7 +41,7 @@ export function NotificationPrompt({
     setPermission(browserNotifyPermission());
     setIosHomeScreen(isIosDevice() && !isStandaloneDisplay());
     try {
-      setDismissed(localStorage.getItem(DISMISS_KEY) === "1");
+      setDismissed(localStorage.getItem(WEB_NOTIFY_PROMPT_DISMISS_KEY) === "1");
     } catch {
       setDismissed(false);
     }
@@ -72,8 +74,19 @@ export function NotificationPrompt({
     return null;
   }
   if (!waiting && dismissed) return null;
+  if (
+    !waiting &&
+    audience === "customer" &&
+    readShopperOnboardingState().notificationEducationSeen
+  ) {
+    return null;
+  }
 
   async function enable() {
+    if (iosHomeScreen) {
+      toast.message("Add FINDIT to your Home Screen first. Then open FINDIT there to enable notifications.");
+      return;
+    }
     const next = await requestBrowserNotifyPermission();
     setPermission(next);
     if (next === "granted") {
@@ -96,7 +109,7 @@ export function NotificationPrompt({
 
   function dismiss() {
     try {
-      localStorage.setItem(DISMISS_KEY, "1");
+      localStorage.setItem(WEB_NOTIFY_PROMPT_DISMISS_KEY, "1");
     } catch {
       // Ignore private-mode storage failures.
     }
@@ -121,14 +134,14 @@ export function NotificationPrompt({
       >
         <p className="text-sm font-semibold text-ink">
           {waiting
-            ? "Get an alert when a store answers"
+            ? "Don’t miss store responses."
             : audience === "store"
               ? "Turn on store alerts"
               : "Turn on alerts"}
         </p>
         <p className="mt-1 text-sm leading-relaxed text-ink-muted">
           {waiting
-            ? "Allow alerts so we can ping this phone with the store name even after you close FINDIT."
+            ? "Turn on notifications to know when a nearby store finds your item."
             : audience === "store"
               ? "Allow notifications so FINDIT can ping this phone when a nearby shopper asks — including after you close the app."
               : "We’ll notify this phone when a nearby store answers a Find — including after you close the app."}

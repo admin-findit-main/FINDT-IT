@@ -2,6 +2,9 @@
 
 import { registerPushToken } from "@findit/supabase-client";
 import { createClient } from "@/lib/supabase/client";
+import { isIosDevice, isStandaloneDisplay } from "@/lib/pwa";
+
+export { isIosDevice, isStandaloneDisplay } from "@/lib/pwa";
 
 function vapidPublicKey(): string {
   return process.env.NEXT_PUBLIC_WEB_PUSH_VAPID_PUBLIC_KEY || "";
@@ -16,20 +19,6 @@ function urlBase64ToUint8Array(base64String: string): BufferSource {
     output[i] = raw.charCodeAt(i);
   }
   return output;
-}
-
-export function isIosDevice(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-}
-
-export function isStandaloneDisplay(): boolean {
-  if (typeof window === "undefined") return false;
-  const standalone =
-    window.matchMedia?.("(display-mode: standalone)").matches ||
-    ("standalone" in navigator &&
-      Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
-  return Boolean(standalone);
 }
 
 async function getPushRegistration(): Promise<ServiceWorkerRegistration | null> {

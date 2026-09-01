@@ -14,6 +14,7 @@ import {
   requestBrowserNotifyPermission,
 } from "@/lib/browser-notify";
 import { subscribeWebPush } from "@/lib/web-push-client";
+import { canRequestWebPush } from "@/lib/pwa";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Notification } from "@/types/database";
 
@@ -44,6 +45,12 @@ export default function NotificationsPage() {
   }, []);
 
   async function enableBrowserAlerts() {
+    if (!canRequestWebPush()) {
+      toast.message(
+        "Add FINDIT to your Home Screen first. Then open FINDIT there to enable notifications."
+      );
+      return;
+    }
     const next = await requestBrowserNotifyPermission();
     setBrowserPermission(next);
     if (next !== "granted") {
@@ -75,7 +82,8 @@ export default function NotificationsPage() {
       ) : null}
       {browserPermission === "denied" ? (
         <p className="mt-3 text-sm text-ink-muted">
-          Alerts are blocked in this browser. Turn them on in browser or device settings.
+          Notifications are off. Enable them in your device or browser settings to
+          receive store responses.
         </p>
       ) : null}
       <div className="mt-6">
