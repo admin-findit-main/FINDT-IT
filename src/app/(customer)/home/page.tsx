@@ -52,6 +52,7 @@ import {
   formatShortPlace,
   isCompleteShortPlace,
   lookupUsZip,
+  reverseGeocodeUs,
   shortPlaceFromProfile,
   type ShortPlace,
   classifyRequest,
@@ -94,7 +95,6 @@ export default function CustomerHomePage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageStoragePath, setImageStoragePath] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const autoLocated = useRef(false);
   const pendingSubmit = useRef<{ forceDuplicate: boolean } | null>(null);
   const submitKeyRef = useRef<string | null>(null);
   const ageGateAfterClose = useRef<(() => void) | null>(null);
@@ -199,14 +199,6 @@ export default function CustomerHomePage() {
     if (next) setCategoryConfirmed(true);
   }
 
-  useEffect(() => {
-    if (step !== "radius" || autoLocated.current) return;
-    if (isCompleteShortPlace(place)) return;
-    autoLocated.current = true;
-    void fillFromLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot when the radius step opens
-  }, [step]);
-
   function useMyLocation() {
     void fillFromLocation();
   }
@@ -221,12 +213,17 @@ export default function CustomerHomePage() {
       return;
     }
     setCoords(result.coords);
-    setPlace(result.place);
-    setEditPlace(!isCompleteShortPlace(result.place));
+    const nextPlace: ShortPlace = {
+      city: result.place.city || place.city,
+      state: result.place.state || place.state || "VA",
+      postalCode: result.place.postalCode || place.postalCode,
+    };
+    setPlace(nextPlace);
+    setEditPlace(!isCompleteShortPlace(nextPlace));
     toast.success(
-      result.place.postalCode
-        ? `Using ${formatShortPlace(result.place)}`
-        : "Location added — confirm your city below"
+      isCompleteShortPlace(nextPlace)
+        ? `Using ${formatShortPlace(nextPlace)}`
+        : "Got your location — confirm your city below"
     );
   }
 
@@ -288,11 +285,28 @@ export default function CustomerHomePage() {
       submitKeyRef.current = crypto.randomUUID();
     }
     let nextPlace = place;
-    if (!nextPlace.city.trim() && nextPlace.postalCode.trim()) {
+    if (nextPlace.postalCode.trim()) {
       const found = await lookupUsZip(nextPlace.postalCode);
       if (found) {
-        nextPlace = found;
-        setPlace(found);
+        nextPlace = {
+          city: nextPlace.city.trim() || found.city,
+          state: nextPlace.state || found.state,
+          postalCode: found.postalCode || nextPlace.postalCode,
+          latitude: found.latitude,
+          longitude: found.longitude,
+        };
+        setPlace(nextPlace);
+      }
+    }
+    if (!isCompleteShortPlace(nextPlace) && coords) {
+      const fromGps = await reverseGeocodeUs(coords.lat, coords.lng);
+      if (fromGps) {
+        nextPlace = {
+          city: nextPlace.city || fromGps.city,
+          state: nextPlace.state || fromGps.state,
+          postalCode: nextPlace.postalCode || fromGps.postalCode,
+        };
+        setPlace(nextPlace);
       }
     }
     if (!isCompleteShortPlace(nextPlace)) {
@@ -301,6 +315,11 @@ export default function CustomerHomePage() {
       toast.error("Add your city so we can ask nearby stores.");
       return;
     }
+    const zipPoint =
+      coords ||
+      (nextPlace.latitude != null && nextPlace.longitude != null
+        ? { lat: nextPlace.latitude, lng: nextPlace.longitude }
+        : null);
     let result;
     try {
       result = await createCustomerRequestAction({
@@ -317,8 +336,8 @@ export default function CustomerHomePage() {
       imageUrl,
       imageStoragePath,
       forceDuplicate,
-      latitude: coords?.lat ?? null,
-      longitude: coords?.lng ?? null,
+      latitude: zipPoint?.lat ?? null,
+      longitude: zipPoint?.lng ?? null,
       ageRestrictedConfirmed: !restricted || ageOk,
       clientRequestKey: submitKeyRef.current || undefined,
       });

@@ -10,6 +10,53 @@ export type GeolocateOk = {
 
 export type GeolocateFail = { ok: false; error: string };
 
+const POSITION_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  timeout: 20_000,
+  maximumAge: 60_000,
+};
+
+const GEOCODE_BUDGET_MS = 8_000;
+
+export function geolocationErrorMessage(err: unknown): string {
+  const code =
+    err && typeof err === "object" && "code" in err
+      ? Number((err as { code: number }).code)
+      : NaN;
+  if (code === 1) {
+    return "Allow location for this site, then tap Locate me again. Or type your city.";
+  }
+  if (code === 3) {
+    return "Location is taking too long. Try again near a window, or type your city.";
+  }
+  if (code === 2) {
+    return "Couldn’t read GPS. Type your city — nearby ZIPs still reach stores in your radius.";
+  }
+  return "Couldn’t get location. Type your city instead.";
+}
+
+function readPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, POSITION_OPTIONS);
+  });
+}
+
+async function reverseGeocodeWithBudget(
+  lat: number,
+  lng: number
+): Promise<ShortPlace | null> {
+  try {
+    return await Promise.race([
+      reverseGeocodeUs(lat, lng),
+      new Promise<null>((resolve) => {
+        window.setTimeout(() => resolve(null), GEOCODE_BUDGET_MS);
+      }),
+    ]);
+  } catch {
+    return null;
+  }
+}
+
 export async function geolocateUsPlace(): Promise<GeolocateOk | GeolocateFail> {
   if (typeof navigator === "undefined" || !navigator.geolocation) {
     return {
@@ -19,25 +66,15 @@ export async function geolocateUsPlace(): Promise<GeolocateOk | GeolocateFail> {
   }
 
   try {
-    const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: false,
-        timeout: 10000,
-      });
-    });
+    const pos = await readPosition();
     const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    const place = await reverseGeocodeUs(coords.lat, coords.lng);
-    if (place && (place.postalCode || place.city)) {
-      return { ok: true, place, coords };
-    }
+    const place = await reverseGeocodeWithBudget(coords.lat, coords.lng);
     return {
-      ok: false,
-      error: "Confirm your city so we can ask nearby stores.",
+      ok: true,
+      place: place || { city: "", state: "", postalCode: "" },
+      coords,
     };
-  } catch {
-    return {
-      ok: false,
-      error: "Couldn’t get location. Type your city instead.",
-    };
+  } catch (err) {
+    return { ok: false, error: geolocationErrorMessage(err) };
   }
 }

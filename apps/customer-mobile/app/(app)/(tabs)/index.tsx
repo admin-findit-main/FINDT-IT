@@ -95,7 +95,6 @@ export default function HomeFindItScreen() {
   const [pendingCategory, setPendingCategory] = useState("");
   const pendingSubmit = useRef(false);
   const [locating, setLocating] = useState(false);
-  const autoLocated = useRef(false);
 
   const loadUsage = useCallback(async () => {
     const usage = await fetchPlanUsage();
@@ -175,11 +174,7 @@ export default function HomeFindItScreen() {
       }
       setPlace(next);
       setEditPlace(!isCompleteShortPlace(next));
-      if (!isCompleteShortPlace(next)) {
-        setError("Confirm your city so we can ask nearby stores.");
-      } else {
-        setError(null);
-      }
+      setError(isCompleteShortPlace(next) ? null : "Confirm your city so we can ask nearby stores.");
     } catch {
       setError("Couldn’t get location. Type your city instead.");
       setEditPlace(true);
@@ -187,14 +182,6 @@ export default function HomeFindItScreen() {
       setLocating(false);
     }
   };
-
-  useEffect(() => {
-    if (step !== "radius" || autoLocated.current) return;
-    if (isCompleteShortPlace(place)) return;
-    autoLocated.current = true;
-    void useLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot when the radius step opens
-  }, [step]);
 
   const uploadImage = async (uri: string, userId: string) => {
     const ext = uri.split(".").pop()?.split("?")[0] || "jpg";

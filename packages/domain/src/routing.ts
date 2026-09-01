@@ -144,6 +144,13 @@ export function estimateZipDistanceMiles(
     if (diff <= 10) return 4;
     return 6;
   }
+  const cPrefix = Number(cZip.slice(0, 3));
+  const sPrefix = Number(sZip.slice(0, 3));
+  if (Number.isFinite(cPrefix) && Number.isFinite(sPrefix)) {
+    const prefixDiff = Math.abs(cPrefix - sPrefix);
+    if (prefixDiff === 1) return 8;
+    if (prefixDiff === 2) return 12;
+  }
   if (
     storeCity &&
     customerCity &&

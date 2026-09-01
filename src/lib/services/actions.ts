@@ -184,20 +184,25 @@ async function getStoreActor(storeId: string): Promise<StoreActor | null> {
       const member = getDemoState().storeMembers.find(
         (m) => m.store_id === id && m.user_id === profile.id && m.status === "active"
       );
-      if (!member) return null;
-      return { kind: "member", userId: profile.id, role: member.role, storeId: id };
+      if (member) {
+        return { kind: "member", userId: profile.id, role: member.role, storeId: id };
+      }
+    } else {
+      const { supabase, user } = await getSupabaseUser();
+      if (user) {
+        const { data: membership } = await supabase
+          .from("store_members")
+          .select("role")
+          .eq("store_id", id)
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .maybeSingle();
+        if (membership) {
+          return { kind: "member", userId: user.id, role: membership.role, storeId: id };
+        }
+      }
     }
-    const { supabase, user } = await getSupabaseUser();
-    if (!user) return null;
-    const { data: membership } = await supabase
-      .from("store_members")
-      .select("role")
-      .eq("store_id", id)
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .maybeSingle();
-    if (!membership) return null;
-    return { kind: "member", userId: user.id, role: membership.role, storeId: id };
+    // Shopper (or other) session on the same device must not hide a paired Hub.
   }
 
   const device = await getHubDeviceSession();

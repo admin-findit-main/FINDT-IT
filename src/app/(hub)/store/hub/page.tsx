@@ -14,7 +14,11 @@ import {
   getHubRuntimeAction,
   touchHubDeviceAction,
 } from "@/lib/services/hub-devices";
-import { LIVE_POLL_MS, useStoreInboxRealtime } from "@/lib/supabase/realtime";
+import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
+import {
+  HUB_DEVICE_HEARTBEAT_MS,
+  HUB_INBOX_POLL_MS,
+} from "@/lib/hub/constants";
 import { readCached, writeCached } from "@/lib/data/client-cache";
 import { BrandLogo } from "@/components/brand/logo";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
@@ -99,6 +103,8 @@ export default function FinditHubPage() {
   const [deviceName, setDeviceName] = useState<string | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
   const primed = useRef(false);
+  const queueBusy = useRef(false);
+  const queueSignature = useRef("");
   const storeId = store?.id;
 
   const loadRuntime = useCallback(async () => {
@@ -129,12 +135,13 @@ export default function FinditHubPage() {
       return runtime.store.id;
     } catch (err) {
       console.error("[FINDIT Hub] runtime failed", err);
-      setError("Couldn't refresh requests. Trying again…");
       return null;
     }
   }, [router]);
 
-  const loadQueue = useCallback(async (id: string) => {
+  const loadQueue = useCallback(async (id: string, opts?: { silent?: boolean }) => {
+    if (queueBusy.current) return;
+    queueBusy.current = true;
     try {
       const rows = await getStoreIncomingRequestsAction(id, "unanswered", "7d");
       const pending = (rows as HubRequest[])
@@ -154,34 +161,44 @@ export default function FinditHubPage() {
       pending.forEach((row) => previous.add(row.id));
       primed.current = true;
 
-      setQueue(pending);
-      writeCached(`hub-queue:${id}`, pending);
-      setIndex((current) => Math.min(current, Math.max(pending.length - 1, 0)));
+      const signature = pending.map((row) => row.id).join(",");
+      if (signature !== queueSignature.current) {
+        queueSignature.current = signature;
+        setQueue(pending);
+        writeCached(`hub-queue:${id}`, pending);
+        setIndex((current) => Math.min(current, Math.max(pending.length - 1, 0)));
+      }
       setError(null);
       setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
     } catch (err) {
       console.error("[FINDIT Hub] load failed", err);
-      setError("Couldn't refresh requests. Trying again…");
+      if (!opts?.silent) {
+        setError("Couldn't refresh requests. Trying again…");
+      }
+    } finally {
+      queueBusy.current = false;
     }
   }, []);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
+    const silent = opts?.silent ?? Boolean(store?.id);
+    if (!silent) setLoading(true);
     try {
       const id = store?.id || (await loadRuntime());
-      if (id) await loadQueue(id);
+      if (id) await loadQueue(id, { silent });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [store?.id, loadRuntime, loadQueue]);
 
   useEffect(() => {
     const cached = storeId ? readCached<HubRequest[]>(`hub-queue:${storeId}`, 180_000) : null;
     if (cached?.length) {
+      queueSignature.current = cached.map((row) => row.id).join(",");
       setQueue(cached);
       setLoading(false);
     }
-    void load();
+    void load({ silent: Boolean(storeId) });
   }, [load, storeId]);
 
   useEffect(() => {
@@ -205,22 +222,32 @@ export default function FinditHubPage() {
   }, [load]);
 
   const onRealtime = useCallback(() => {
-    if (storeId) void loadQueue(storeId);
+    if (storeId) void loadQueue(storeId, { silent: true });
   }, [storeId, loadQueue]);
-  const inboxSync = useStoreInboxRealtime(storeId, { onChange: onRealtime });
+  useStoreInboxRealtime(storeId, { onChange: onRealtime });
 
   useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.visibilityState !== "visible" || !storeId) return;
-      if (inboxSync.state !== "live") void loadQueue(storeId);
-      if (source === "device") {
-        void touchHubDeviceAction().catch((err) => {
-          console.error("[FINDIT Hub] device heartbeat failed", err);
-        });
-      }
-    }, inboxSync.state === "live" ? 30_000 : LIVE_POLL_MS);
+    if (!storeId) return;
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadQueue(storeId, { silent: true });
+    };
+    tick();
+    const id = window.setInterval(tick, HUB_INBOX_POLL_MS);
     return () => window.clearInterval(id);
-  }, [storeId, loadQueue, source, inboxSync.state]);
+  }, [storeId, loadQueue]);
+
+  useEffect(() => {
+    if (source !== "device") return;
+    const beat = () => {
+      if (document.visibilityState !== "visible") return;
+      void touchHubDeviceAction().catch((err) => {
+        console.error("[FINDIT Hub] device heartbeat failed", err);
+      });
+    };
+    const id = window.setInterval(beat, HUB_DEVICE_HEARTBEAT_MS);
+    return () => window.clearInterval(id);
+  }, [source]);
 
   useEffect(() => {
     let wake: WakeLockSentinel | null = null;

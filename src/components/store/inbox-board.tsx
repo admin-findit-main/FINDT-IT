@@ -25,7 +25,8 @@ import {
   getUserStoresAction,
   respondToRequestAction,
 } from "@/lib/services/actions";
-import { LIVE_POLL_MS, useStoreInboxRealtime } from "@/lib/supabase/realtime";
+import { HUB_INBOX_POLL_MS } from "@/lib/hub/constants";
+import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
 import { readCached, writeCached } from "@/lib/data/client-cache";
 import { isAgeRestrictedFind } from "@findit/domain";
 import {
@@ -103,7 +104,7 @@ export function StoreInboxBoard() {
     }
   }, []);
 
-  const inboxSync = useStoreInboxRealtime(storeId, { onChange: loadInbox });
+  useStoreInboxRealtime(storeId, { onChange: loadInbox });
 
   useEffect(() => {
     if (!storeId) return;
@@ -118,12 +119,12 @@ export function StoreInboxBoard() {
   }, [storeId, filter, range, load]);
 
   useEffect(() => {
-    if (!storeId || inboxSync.state === "live") return;
+    if (!storeId) return;
     const t = setInterval(() => {
       if (document.visibilityState === "visible") void loadInbox(storeId);
-    }, LIVE_POLL_MS);
+    }, HUB_INBOX_POLL_MS);
     return () => clearInterval(t);
-  }, [storeId, loadInbox, inboxSync.state]);
+  }, [storeId, loadInbox]);
 
   async function respond(
     type: "in_stock" | "out_of_stock" | "can_order" | "not_relevant",

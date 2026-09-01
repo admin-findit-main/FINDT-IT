@@ -22,6 +22,39 @@ describe("nearby ZIP radius", () => {
     expect(estimateZipDistanceMiles("20002", "20001")).toBe(2);
   });
 
+  it("treats close ZIPs with neighboring prefixes as nearby, not out of area", () => {
+    expect(estimateZipDistanceMiles("22046", "22101")).toBe(8);
+    expect(estimateZipDistanceMiles("22101", "22046")).toBe(8);
+    expect(estimateZipDistanceMiles("22046", "22201")).toBe(12);
+  });
+
+  it("routes neighboring ZIP prefixes inside a 10-mile search", () => {
+    const { eligible, excluded } = selectEligibleStores({
+      request: {
+        id: "r-mclean",
+        postal_code: "22101",
+        city: "McLean",
+        category: null,
+        radius_miles: 10,
+      },
+      stores: [
+        {
+          id: "falls-church",
+          is_active: true,
+          is_suspended: false,
+          postal_code: "22046",
+          city: "Falls Church",
+          service_radius_miles: 10,
+          categories: [],
+          service_zips: ["22046"],
+        },
+      ],
+    });
+    expect(eligible.map((e) => e.storeId)).toEqual(["falls-church"]);
+    expect(eligible[0]?.estimatedMiles).toBe(8);
+    expect(excluded).toEqual([]);
+  });
+
   it("routes a 20001 store to a 20002 customer within a 5-mile radius", () => {
     const { eligible, excluded } = selectEligibleStores({
       request: {
