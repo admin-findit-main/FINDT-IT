@@ -69,6 +69,13 @@ export function mapEmailOtpError(
   ) {
     return "Too many attempts. Wait a minute and try again.";
   }
+  if (
+    text.includes("timeout") ||
+    text.includes("deadline") ||
+    text.includes("504")
+  ) {
+    return "Email delivery timed out. Request another code in a minute.";
+  }
   return kind === "send"
     ? "We couldn't send a code. Try again."
     : "That code didn't work. Try again.";

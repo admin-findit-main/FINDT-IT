@@ -24,5 +24,6 @@ describe("mapEmailOtpError", () => {
       /expired|incorrect/i
     );
     expect(mapEmailOtpError("Signups not allowed for otp", "send")).toMatch(/Sign up/i);
+    expect(mapEmailOtpError("context deadline exceeded", "send")).toMatch(/timed out/i);
   });
 });

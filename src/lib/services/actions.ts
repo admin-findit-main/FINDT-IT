@@ -42,6 +42,7 @@ import { createRequestSchema, storeJoinApplicationSchema, storeOnboardingSchema 
 import { normalizeProductName } from "@/lib/utils";
 import { notifyCustomerDevices, notifyEmployeeDevices } from "@/lib/services/expo-push";
 import {
+  authEmailConfirmationUrl,
   authEmailCopy,
   customerReplyAlertCopy,
   customerReplyPushCopy,
@@ -423,22 +424,17 @@ export async function sendMagicLinkAction(
         if (belongs !== audience) return wrongLoginSideResult(belongs);
       }
     }
-    const { createClient } = await import("@/lib/supabase/server");
-    const supabase = await createClient();
-    const { error: sendError } = await supabase.auth.signInWithOtp({
+    const { data, error } = await admin.auth.admin.generateLink({
+      type: "magiclink",
       email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: MAGIC_LINK_REDIRECT,
-      },
+      options: { redirectTo: MAGIC_LINK_REDIRECT },
     });
-    if (sendError) {
-      const text = (sendError.message || "").toLowerCase();
+    if (error) {
+      const text = (error.message || "").toLowerCase();
       if (
         text.includes("user not found") ||
         text.includes("unable to find") ||
-        text.includes("no user") ||
-        text.includes("signups not allowed")
+        text.includes("no user")
       ) {
         return {
           error:
@@ -446,7 +442,54 @@ export async function sendMagicLinkAction(
           code: "no_account" as const,
         };
       }
-      return { error: authEmailErrorMessage(sendError.message) };
+      return { error: authEmailErrorMessage(error.message) };
+    }
+
+    const tokenHash = data.properties.hashed_token;
+    if (!tokenHash) {
+      return { error: "Could not create a sign-in link. Try your password." };
+    }
+
+    const buttonUrl = authEmailConfirmationUrl({
+      appUrl: "https://www.askfindit.com",
+      tokenHash,
+      action: "magiclink",
+    });
+    const copy = authEmailCopy("magiclink");
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM || "FINDIT <hello@askfindit.com>";
+    if (!apiKey) {
+      return { error: "Email sending is not configured. Use your password for now." };
+    }
+
+    const sent = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: copy.subject,
+        html: renderFinditEmailHtml({
+          heading: copy.heading,
+          body: copy.body,
+          buttonLabel: copy.button,
+          buttonUrl,
+          footnote: copy.footnote,
+        }),
+        text: renderFinditEmailText({
+          heading: copy.heading,
+          body: copy.body,
+          buttonUrl,
+          footnote: copy.footnote,
+        }),
+      }),
+    });
+    if (!sent.ok) {
+      const detail = await sent.text();
+      return { error: authEmailErrorMessage(detail || "Could not send the sign-in link.") };
     }
     return {
       ok: true as const,
