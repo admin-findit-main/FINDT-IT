@@ -4,6 +4,7 @@ import {
   authEmailConfirmationUrl,
   authEmailCopy,
   authEmailOtpCode,
+  authEmailSubjectWithCode,
   renderFinditEmailHtml,
   renderFinditEmailText,
 } from "./auth-email.ts";
@@ -93,7 +94,7 @@ Deno.serve(async (req) => {
   const { error } = await resend.emails.send({
     from: FROM,
     to: [to],
-    subject: displayCode ? `${copy.subject}: ${displayCode}` : copy.subject,
+    subject: authEmailSubjectWithCode(copy.subject, displayCode),
     html: renderFinditEmailHtml({
       heading: copy.heading,
       body: copy.body,

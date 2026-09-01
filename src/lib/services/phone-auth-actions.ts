@@ -8,6 +8,7 @@ import { consumeRateLimit } from "@/lib/security/rate-limit";
 import {
   authEmailCopy,
   authEmailOtpCode,
+  authEmailSubjectWithCode,
   customerNeedsFirstName,
   loginAudienceForAccount,
   mapEmailOtpError,
@@ -382,7 +383,7 @@ async function sendAuthEmailOtp(input: {
     body: JSON.stringify({
       from,
       to: [input.email],
-      subject: `${copy.subject}: ${code}`,
+      subject: authEmailSubjectWithCode(copy.subject, code),
       html: renderFinditEmailHtml({
         heading: copy.heading,
         body: copy.body,

@@ -41,6 +41,15 @@ export function authEmailOtpCode(
   return null;
 }
 
+/** Subject like Supabase OTP mail: "123456 is your FINDIT sign-in code". */
+export function authEmailSubjectWithCode(
+  subject: string,
+  code?: string | null
+): string {
+  const digits = authEmailOtpCode(code);
+  return digits ? `${digits} is your FINDIT sign-in code` : subject;
+}
+
 export function otpTypeForAuthEmail(action: AuthEmailAction): string {
   if (action === "email_change_new" || action === "email_change_current") {
     return "email_change";
@@ -159,7 +168,8 @@ export function renderFinditEmailHtml(input: {
         <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#6E6E78;word-break:break-all;">Or paste this link into your browser:<br>${escapeHtml(input.buttonUrl)}</p>`
       : "";
   const code = input.code
-    ? `<p style="margin:24px 0;font-size:32px;letter-spacing:0.18em;font-weight:700;color:#0B0B0C;text-align:center;">${escapeHtml(input.code)}</p>`
+    ? `<p style="margin:24px 0 6px;font-size:13px;line-height:1.4;color:#6E6E78;text-align:center;">Your code</p>
+        <p style="margin:0 0 8px;font-size:36px;line-height:1.2;font-weight:700;color:#0B0B0C;text-align:center;font-family:Menlo,Consolas,'Courier New',monospace;">${escapeHtml(input.code)}</p>`
     : "";
 
   return `<!DOCTYPE html>

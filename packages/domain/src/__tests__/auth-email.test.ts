@@ -3,6 +3,7 @@ import {
   authEmailConfirmationUrl,
   authEmailCopy,
   authEmailOtpCode,
+  authEmailSubjectWithCode,
   escapeHtml,
   otpTypeForAuthEmail,
   renderFinditEmailHtml,
@@ -60,6 +61,12 @@ describe("auth email", () => {
     expect(authEmailOtpCode("  847291  ", "abc")).toBe("847291");
     expect(authEmailOtpCode("7d5b7b1964cf5d388340a7f04f1dbb5eeb6c7b52ef8270e1737a58d0")).toBeNull();
     expect(authEmailOtpCode("", undefined, "12")).toBeNull();
+    expect(authEmailSubjectWithCode("Your FINDIT sign-in code", "123456")).toBe(
+      "123456 is your FINDIT sign-in code"
+    );
+    expect(authEmailSubjectWithCode("Your FINDIT sign-in code", null)).toBe(
+      "Your FINDIT sign-in code"
+    );
   });
 
   it("renders the digits in HTML and text", () => {
