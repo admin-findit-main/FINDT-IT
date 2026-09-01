@@ -34,6 +34,8 @@ import {
   isAgeRestrictedFind,
   isSoloAdmin,
   MAX_CUSTOMER_RADIUS_MILES,
+  RADIUS_OPTIONS,
+  normalizeStoreLocation,
 } from "@findit/domain";
 import { selectEligibleStores } from "@/lib/services/routing";
 import {
@@ -976,6 +978,40 @@ export function demoCreateRequest(input: {
   return { request, storesTargeted };
 }
 
+export function demoExpandRequestRadius(input: {
+  requestId: string;
+  customerId: string;
+  radiusMiles: number;
+}): { ok: true; radiusMiles: number; storesTargeted: number } {
+  const state = getDemoState();
+  const request = state.requests.find((r) => r.id === input.requestId);
+  if (!request || request.customer_id !== input.customerId) {
+    throw new Error("Request not found");
+  }
+  if (!["active", "partially_answered", "answered"].includes(request.status)) {
+    throw new Error("This Find isn't waiting on stores anymore.");
+  }
+  if (new Date(request.expires_at).getTime() <= Date.now()) {
+    throw new Error("This Find has expired.");
+  }
+  if (
+    !Number.isInteger(input.radiusMiles) ||
+    !RADIUS_OPTIONS.some((option) => option.miles === input.radiusMiles)
+  ) {
+    throw new Error("Pick a farther distance.");
+  }
+  if (input.radiusMiles > MAX_CUSTOMER_RADIUS_MILES) {
+    throw new Error(`FINDIT searches up to ${MAX_CUSTOMER_RADIUS_MILES} miles.`);
+  }
+  if (input.radiusMiles <= request.radius_miles) {
+    throw new Error("Pick a farther distance than this Find already uses.");
+  }
+  request.radius_miles = input.radiusMiles;
+  request.updated_at = now();
+  const storesTargeted = demoRouteRequestToStores(request.id);
+  return { ok: true, radiusMiles: input.radiusMiles, storesTargeted };
+}
+
 export function demoRespondToRequest(input: {
   requestId: string;
   storeId: string;
@@ -1384,6 +1420,12 @@ export function demoCreateStore(input: {
   ageRestricted?: boolean;
 }): Store {
   const state = getDemoState();
+  const location = normalizeStoreLocation({
+    streetAddress: input.streetAddress,
+    city: input.city,
+    state: input.state,
+    postalCode: input.postalCode,
+  });
   let slug = slugify(input.name);
   if (state.stores.some((s) => s.slug === slug)) slug = `${slug}-${Date.now().toString(36)}`;
 
@@ -1395,10 +1437,10 @@ export function demoCreateStore(input: {
     description: null,
     phone: input.phone || null,
     website: input.website || null,
-    street_address: input.streetAddress,
-    city: input.city,
-    state: input.state,
-    postal_code: input.postalCode,
+    street_address: location.street,
+    city: location.city,
+    state: location.state,
+    postal_code: location.postalCode,
     country: "US",
     latitude: null,
     longitude: null,
@@ -1485,14 +1527,20 @@ export function demoSubmitStoreApplication(input: {
   applicantUserId?: string | null;
 }): StoreApplication {
   const state = getDemoState();
+  const location = normalizeStoreLocation({
+    streetAddress: input.streetAddress,
+    city: input.city,
+    state: input.state,
+    postalCode: input.postalCode,
+  });
   const application: StoreApplication = {
     id: randomUUID(),
     business_name: input.businessName.trim(),
     business_type: input.businessType,
-    street_address: input.streetAddress.trim(),
-    city: input.city.trim(),
-    state: input.state,
-    postal_code: input.postalCode,
+    street_address: location.street,
+    city: location.city,
+    state: location.state,
+    postal_code: location.postalCode,
     phone: input.phone.trim(),
     website: input.website?.trim() || null,
     owner_name: input.ownerName.trim(),

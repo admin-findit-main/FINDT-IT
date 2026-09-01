@@ -31,6 +31,7 @@ import {
   defaultCategoryIdsForType,
 } from "@findit/domain";
 import { IosSwitch } from "@/components/ui/ios-switch";
+import { StoreAddressFields } from "@/components/store/store-address-fields";
 import { cn } from "@/lib/utils";
 import type { Store } from "@/types/database";
 
@@ -402,47 +403,19 @@ export default function StoreSettingsPage() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <Label htmlFor="store-street">Street</Label>
-                <Input
-                  id="store-street"
-                  name="store-street"
-                  autoComplete="off"
-                  value={street}
+                <StoreAddressFields
+                  idPrefix="store"
+                  street={street}
+                  city={city}
+                  state={region}
+                  postalCode={postal}
                   disabled={!canManage}
-                  onChange={(e) => setStreet(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="store-city">City</Label>
-                <Input
-                  id="store-city"
-                  name="store-city"
-                  autoComplete="off"
-                  value={city}
-                  disabled={!canManage}
-                  onChange={(e) => setCity(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="store-state">State</Label>
-                <Input
-                  id="store-state"
-                  name="store-state"
-                  autoComplete="off"
-                  value={region}
-                  disabled={!canManage}
-                  onChange={(e) => setRegion(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="store-zip">ZIP</Label>
-                <Input
-                  id="store-zip"
-                  name="store-zip"
-                  autoComplete="off"
-                  value={postal}
-                  disabled={!canManage}
-                  onChange={(e) => setPostal(e.target.value)}
+                  onChange={(next) => {
+                    setStreet(next.street);
+                    setCity(next.city);
+                    setRegion(next.state);
+                    setPostal(next.postalCode);
+                  }}
                 />
               </div>
             </div>

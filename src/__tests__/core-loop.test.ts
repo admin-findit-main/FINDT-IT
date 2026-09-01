@@ -271,6 +271,30 @@ describe("store join applications", () => {
     expect(pending[0].business_name).toBeTruthy();
   });
 
+  it("saves only the street line when a full mailing address is pasted", () => {
+    const application = demoSubmitStoreApplication({
+      businessName: "Street Line Mart",
+      businessType: "Convenience",
+      streetAddress: "123 Main St, Falls Church, VA 22046",
+      city: "",
+      state: "",
+      postalCode: "",
+      phone: "703-555-0199",
+      ownerName: "Alex Owner",
+      ownerEmail: "alex@streetline.example",
+      whyLegit: "Independent convenience store with a long lease on Main Street.",
+      legalName: "Street Line Mart LLC",
+      ein: "111223333",
+      entityType: "LLC",
+      confirmedLegitimate: true,
+      requestCategories: ["Convenience"],
+    });
+    expect(application.street_address).toBe("123 Main St");
+    expect(application.city).toBe("Falls Church");
+    expect(application.state).toBe("VA");
+    expect(application.postal_code).toBe("22046");
+  });
+
   it("submits and approves an application into a trial store", () => {
     const admin = demoLogin(SOLO_ADMIN_EMAIL, "demo1234")!;
     const application = demoSubmitStoreApplication({

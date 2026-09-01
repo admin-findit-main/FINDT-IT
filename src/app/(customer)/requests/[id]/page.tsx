@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, MapPin } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { GlassNotice, VerifiedStoreBadge } from "@/components/ui/glass";
@@ -19,8 +19,9 @@ import {
   type PendingFind,
 } from "@/lib/customer/pending-find";
 import { BackLink } from "@/components/shared/app-header";
-import { ResponseAccent, StatusBadge } from "@/components/shared/status";
+import { StatusBadge } from "@/components/shared/status";
 import { NotificationPrompt } from "@/components/customer/notification-prompt";
+import { ExpandRadiusControls } from "@/components/customer/expand-radius";
 import { armAlertSoundUnlock, playCustomerAlert } from "@/lib/alert-sound";
 import {
   cancelRequestAction,
@@ -121,6 +122,7 @@ export default function RequestDetailPage() {
   const [loading, setLoading] = useState(true);
   const [foundStep, setFoundStep] = useState<"idle" | "ask" | "done">("idle");
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [expandedReplyId, setExpandedReplyId] = useState<string | null>(null);
   const [feedbackDone, setFeedbackDone] = useState(false);
   const [visibleStoreCount, setVisibleStoreCount] = useState(STORES_PAGE_SIZE);
   const searchingRef = useRef(false);
@@ -379,7 +381,8 @@ export default function RequestDetailPage() {
             We don&apos;t have enough participating stores in this area yet.
           </h2>
           <p className="mt-2">
-            We saved this location demand. You can try a nearby ZIP or check back soon.
+            We saved this location demand. You can try a nearby ZIP, look farther,
+            or check back soon.
           </p>
         </GlassNotice>
       ) : null}
@@ -428,11 +431,10 @@ export default function RequestDetailPage() {
               />
             </div>
           ) : (
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 space-y-2">
               {visibleResponses.map((response) => {
                 const store = response.store;
                 if (!store) return null;
-                const muted = response.response_type === "out_of_stock";
                 const responseSecs = Math.round(
                   (new Date(response.created_at).getTime() -
                     new Date(data.created_at).getTime()) /
@@ -451,91 +453,99 @@ export default function RequestDetailPage() {
                 const canVisit = response.response_type !== "out_of_stock";
                 const canMarkFound =
                   data.status !== "fulfilled" && response.response_type !== "out_of_stock";
+                const expanded = expandedReplyId === response.id;
+                const toneClass =
+                  response.response_type === "in_stock"
+                    ? "bg-stock"
+                    : response.response_type === "can_order"
+                      ? "bg-order"
+                      : "bg-oos";
+                const statusLabel =
+                  response.response_type === "in_stock"
+                    ? "IN STOCK"
+                    : response.response_type === "can_order"
+                      ? "CAN ORDER"
+                      : "OUT OF STOCK";
                 return (
-                  <Card
-                    key={response.id}
-                    className={`relative overflow-hidden p-5 pl-6 ${muted ? "opacity-75" : ""}`}
-                  >
-                    <ResponseAccent type={response.response_type} />
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-ink">{store.name}</p>
-                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
-                          <span className="inline-flex items-center gap-1 font-medium text-ink">
-                            <MapPin className="h-3 w-3" aria-hidden />
-                            {formatEstimatedDistanceMiles(miles)}
-                          </span>
-                          <span>· {store.postal_code}</span>
+                  <div key={response.id} className="overflow-hidden rounded-xl">
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      className={`flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left text-ink-inverse ${toneClass}`}
+                      onClick={() =>
+                        setExpandedReplyId((cur) =>
+                          cur === response.id ? null : response.id
+                        )
+                      }
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold uppercase tracking-[0.08em]">
+                          {statusLabel}
                         </p>
-                        <div className="mt-2">
-                          <StatusBadge type={response.response_type} />
+                        <p className="truncate text-sm font-semibold">{store.name}</p>
+                      </div>
+                      <p className="shrink-0 text-sm font-medium tabular-nums">
+                        {formatEstimatedDistanceMiles(miles)}
+                      </p>
+                    </button>
+                    {expanded ? (
+                      <div className="border border-t-0 border-hairline-strong bg-white p-4">
+                        {store.is_verified ? (
+                          <VerifiedStoreBadge className="mb-2" />
+                        ) : null}
+                        {formatPrice(response.price) ? (
+                          <p className="text-base font-semibold text-ink">
+                            {formatPrice(response.price)}
+                          </p>
+                        ) : null}
+                        {response.note ? (
+                          <p className="mt-1 text-sm italic text-ink-muted">
+                            “{response.note}”
+                          </p>
+                        ) : null}
+                        <p className="mt-1 text-xs text-ink-muted">
+                          Responded {formatRelativeTime(response.updated_at)} ·{" "}
+                          {formatDurationSeconds(responseSecs)}
+                        </p>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="lg"
+                            className={canVisit ? "w-full" : "col-span-2 w-full"}
+                          >
+                            <Link href={`/shops/${store.slug}?from=${data.id}`}>
+                              View store
+                            </Link>
+                          </Button>
+                          {canVisit ? (
+                            <Button asChild size="lg" variant="secondary" className="w-full">
+                              <a
+                                href={mapsDirectionsUrl(store)}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={() =>
+                                  trackDirectionsClickAction(data.id, store.id)
+                                }
+                              >
+                                Directions
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            </Button>
+                          ) : null}
+                          {canMarkFound ? (
+                            <Button
+                              size="lg"
+                              className="col-span-2 w-full"
+                              onClick={() => markFound(store.id)}
+                            >
+                              I found it here
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
-                      {store.is_verified ? (
-                        <VerifiedStoreBadge className="shrink-0" />
-                      ) : null}
-                    </div>
-                    {formatPrice(response.price) ? (
-                      <p className="mt-3 text-lg font-semibold text-ink">
-                        {formatPrice(response.price)}
-                      </p>
                     ) : null}
-                    {response.availability_amount ? (
-                      <p className="mt-1 text-sm capitalize text-ink-muted">
-                        {response.availability_amount.replace("_", " ")}
-                      </p>
-                    ) : null}
-                    {response.estimated_availability_label ? (
-                      <p className="mt-1 text-sm text-ink-muted">
-                        Available {response.estimated_availability_label.toLowerCase()}
-                      </p>
-                    ) : null}
-                    {response.note ? (
-                      <p className="mt-2 text-sm italic text-ink-muted">
-                        “{response.note}”
-                      </p>
-                    ) : null}
-                    <p className="mt-2 text-xs text-ink-muted">
-                      Responded {formatRelativeTime(response.updated_at)} ·{" "}
-                      {formatDurationSeconds(responseSecs)}
-                    </p>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="lg"
-                        className={canVisit ? "w-full" : "col-span-2 w-full"}
-                      >
-                        <Link href={`/shops/${store.slug}?from=${data.id}`}>
-                          View store
-                        </Link>
-                      </Button>
-                      {canVisit ? (
-                        <Button asChild size="lg" variant="secondary" className="w-full">
-                          <a
-                            href={mapsDirectionsUrl(store)}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={() =>
-                              trackDirectionsClickAction(data.id, store.id)
-                            }
-                          >
-                            Directions
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </Button>
-                      ) : null}
-                      {canMarkFound ? (
-                        <Button
-                          size="lg"
-                          className="col-span-2 w-full"
-                          onClick={() => markFound(store.id)}
-                        >
-                          I found it here
-                        </Button>
-                      ) : null}
-                    </div>
-                  </Card>
+                  </div>
                 );
               })}
               {hiddenStoreCount > 0 ? (
@@ -555,6 +565,14 @@ export default function RequestDetailPage() {
           )}
         </div>
       )}
+
+      {openRequest ? (
+        <ExpandRadiusControls
+          requestId={data.id}
+          currentMiles={data.radius_miles}
+          onExpanded={() => void load()}
+        />
+      ) : null}
 
       {foundStep === "ask" ? (
         <Card level="strong" className="mt-6 p-5">

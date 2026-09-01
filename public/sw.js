@@ -42,6 +42,7 @@ async function showPushNotification(event) {
     badge: "/icons/icon-192.png",
     data: { url: payload.url },
     tag: payload.tag,
+    requireInteraction: true,
     renotify: true,
     silent: false,
     vibrate: [200, 80, 200, 80, 320],

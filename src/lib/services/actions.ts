@@ -32,6 +32,7 @@ import {
   demoRouteRequestToStores,
   demoSignupWithSession,
   demoStillLooking,
+  demoExpandRequestRadius,
   demoSubmitStoreApplication,
   demoUpdateStoreSettings,
   getDemoState,
@@ -76,6 +77,8 @@ import {
   monthlyFindWindowStart,
   planLimitReachedMessage,
   MAX_CUSTOMER_RADIUS_MILES,
+  RADIUS_OPTIONS,
+  normalizeStoreLocation,
   boundUuid,
   boundSlug,
   signupSchema,
@@ -1823,16 +1826,22 @@ export async function createStoreAction(raw: unknown) {
   }
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Unauthorized" };
+  const location = normalizeStoreLocation({
+    streetAddress: parsed.data.streetAddress,
+    city: parsed.data.city,
+    state: parsed.data.state,
+    postalCode: parsed.data.postalCode,
+  });
 
   if (isDemoMode()) {
     const store = demoCreateStore({
       ownerId: profile.id,
       name: parsed.data.name,
       categories: parsed.data.categories,
-      streetAddress: parsed.data.streetAddress,
-      city: parsed.data.city,
-      state: parsed.data.state,
-      postalCode: parsed.data.postalCode,
+      streetAddress: location.street,
+      city: location.city,
+      state: location.state,
+      postalCode: location.postalCode,
       phone: parsed.data.phone,
       website: parsed.data.website,
       serviceZips: parsed.data.serviceZips,
@@ -1857,10 +1866,10 @@ export async function createStoreAction(raw: unknown) {
       owner_id: user.id,
       name: parsed.data.name,
       slug,
-      street_address: parsed.data.streetAddress,
-      city: parsed.data.city,
-      state: parsed.data.state,
-      postal_code: parsed.data.postalCode,
+      street_address: location.street,
+      city: location.city,
+      state: location.state,
+      postal_code: location.postalCode,
       phone: parsed.data.phone || null,
       website: parsed.data.website || null,
       age_restricted: parsed.data.ageRestricted,
@@ -2629,6 +2638,12 @@ export async function submitStoreApplicationAction(raw: unknown) {
   const ownerName = parsed.data.ownerName.trim();
   const firstName = ownerName.split(" ")[0] || ownerName;
   const lastName = ownerName.split(" ").slice(1).join(" ");
+  const location = normalizeStoreLocation({
+    streetAddress: parsed.data.streetAddress,
+    city: parsed.data.city,
+    state: parsed.data.state,
+    postalCode: parsed.data.postalCode,
+  });
   const { data: created, error: createError } = await admin.auth.admin.createUser({
     email: ownerEmail,
     password: parsed.data.password,
@@ -2637,9 +2652,9 @@ export async function submitStoreApplicationAction(raw: unknown) {
       first_name: firstName,
       last_name: lastName,
       account_type: "business",
-      default_city: parsed.data.city,
-      default_state: parsed.data.state,
-      default_postal_code: parsed.data.postalCode,
+      default_city: location.city,
+      default_state: location.state,
+      default_postal_code: location.postalCode,
     },
   });
   if (createError || !created.user) {
@@ -2657,10 +2672,10 @@ export async function submitStoreApplicationAction(raw: unknown) {
       legal_name: parsed.data.legalName,
       ein: parsed.data.ein,
       entity_type: parsed.data.entityType,
-      street_address: parsed.data.streetAddress,
-      city: parsed.data.city,
-      state: parsed.data.state,
-      postal_code: parsed.data.postalCode,
+      street_address: location.street,
+      city: location.city,
+      state: location.state,
+      postal_code: location.postalCode,
       phone: parsed.data.phone,
       website: parsed.data.website || null,
       owner_name: parsed.data.ownerName,
@@ -3022,6 +3037,85 @@ export async function stillLookingAction(requestId: string) {
   });
 
   return { storesTargeted: unanswered.length };
+}
+
+const EXPANDABLE_REQUEST_STATUSES = new Set([
+  "active",
+  "partially_answered",
+  "answered",
+]);
+
+export async function expandCustomerRequestRadiusAction(
+  requestId: string,
+  radiusMiles: number
+) {
+  const id = boundUuid(requestId);
+  if (!id) return { error: "Request not found" };
+  const miles = Number(radiusMiles);
+  if (
+    !Number.isInteger(miles) ||
+    !RADIUS_OPTIONS.some((option) => option.miles === miles)
+  ) {
+    return { error: "Pick a farther distance." };
+  }
+  if (miles > MAX_CUSTOMER_RADIUS_MILES) {
+    return { error: `FINDIT searches up to ${MAX_CUSTOMER_RADIUS_MILES} miles.` };
+  }
+
+  const profile = await getCurrentProfile();
+  if (!profile) return { error: "Please sign in", needsAuth: true };
+
+  const expandLimit = await consumeRateLimit({
+    bucket: "expand-radius",
+    limit: 8,
+    windowMs: 60 * 60_000,
+    key: profile.id,
+  });
+  if (!expandLimit.ok) return { error: expandLimit.error };
+
+  if (isDemoMode()) {
+    try {
+      return demoExpandRequestRadius({
+        requestId: id,
+        customerId: profile.id,
+        radiusMiles: miles,
+      });
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Couldn't look farther." };
+    }
+  }
+
+  const { supabase, user } = await getSupabaseUser();
+  if (!user) return { error: "Please sign in", needsAuth: true };
+
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data: request } = await admin
+    .from("customer_requests")
+    .select("id, customer_id, status, expires_at, radius_miles")
+    .eq("id", id)
+    .eq("customer_id", user.id)
+    .maybeSingle();
+  if (!request) return { error: "Request not found" };
+  if (!EXPANDABLE_REQUEST_STATUSES.has(request.status)) {
+    return { error: "This Find isn't waiting on stores anymore." };
+  }
+  if (new Date(request.expires_at).getTime() <= Date.now()) {
+    return { error: "This Find has expired." };
+  }
+  if (miles <= Number(request.radius_miles)) {
+    return { error: "Pick a farther distance than this Find already uses." };
+  }
+
+  const { error: updateError } = await admin
+    .from("customer_requests")
+    .update({ radius_miles: miles, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("customer_id", user.id);
+  if (updateError) return { error: "Couldn't look farther." };
+
+  const storesTargeted = await routeRequestToStoresAction(id);
+  return { ok: true as const, radiusMiles: miles, storesTargeted };
 }
 
 export async function markStoreRequestOpenedAction(storeId: string, requestId: string) {
@@ -3478,10 +3572,23 @@ export async function updateStoreProfileAction(
   if (input.description !== undefined) patch.description = input.description;
   if (input.phone !== undefined) patch.phone = input.phone;
   if (input.website !== undefined) patch.website = input.website;
-  if (input.streetAddress != null) patch.street_address = input.streetAddress.trim();
-  if (input.city != null) patch.city = input.city.trim();
-  if (input.state != null) patch.state = input.state.trim();
-  if (input.postalCode != null) patch.postal_code = input.postalCode.trim();
+  if (
+    input.streetAddress != null ||
+    input.city != null ||
+    input.state != null ||
+    input.postalCode != null
+  ) {
+    const location = normalizeStoreLocation({
+      streetAddress: input.streetAddress ?? "",
+      city: input.city ?? "",
+      state: input.state ?? "",
+      postalCode: input.postalCode ?? "",
+    });
+    if (input.streetAddress != null) patch.street_address = location.street;
+    if (input.city != null) patch.city = location.city;
+    if (input.state != null) patch.state = location.state;
+    if (input.postalCode != null) patch.postal_code = location.postalCode;
+  }
   if (input.ageRestricted != null) patch.age_restricted = input.ageRestricted;
   const { error } = await supabase.from("stores").update(patch).eq("id", id);
   if (error) return { error: "Couldn't save store profile." };

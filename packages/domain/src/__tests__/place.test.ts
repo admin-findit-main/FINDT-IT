@@ -5,9 +5,13 @@ import {
   formatShortPlace,
   isCompleteShortPlace,
   normalizeStateCode,
+  normalizeStoreLocation,
   parseCityLookup,
+  parsePhotonStreetFeatures,
   parseReverseGeocode,
   parseZipLookup,
+  splitUsMailingAddress,
+  streetLineOnly,
 } from "../place";
 
 describe("normalizeStateCode", () => {
@@ -106,6 +110,83 @@ describe("zip lookup parsers", () => {
 
   it("strips ZIP to five digits", () => {
     expect(digitsPostalCode("22044-8910")).toBe("22044");
+  });
+});
+
+describe("streetLineOnly", () => {
+  it("keeps the street and drops city, state, ZIP", () => {
+    expect(
+      streetLineOnly("123 Main St, Falls Church, VA 22046", {
+        city: "Falls Church",
+        state: "VA",
+        postalCode: "22046",
+      })
+    ).toBe("123 Main St");
+    expect(
+      streetLineOnly("123 Main St", {
+        city: "Falls Church",
+        state: "VA",
+        postalCode: "22046",
+      })
+    ).toBe("123 Main St");
+  });
+});
+
+describe("splitUsMailingAddress", () => {
+  it("splits a pasted US mailing line", () => {
+    expect(splitUsMailingAddress("123 Main St, Falls Church, VA 22046")).toEqual({
+      street: "123 Main St",
+      city: "Falls Church",
+      state: "VA",
+      postalCode: "22046",
+    });
+    expect(splitUsMailingAddress("123 Main St")).toBeNull();
+  });
+});
+
+describe("normalizeStoreLocation", () => {
+  it("never persists the full formatted address as the street", () => {
+    expect(
+      normalizeStoreLocation({
+        streetAddress: "123 Main St, Falls Church, VA 22046",
+        city: "",
+        state: "",
+        postalCode: "",
+      })
+    ).toEqual({
+      street: "123 Main St",
+      city: "Falls Church",
+      state: "VA",
+      postalCode: "22046",
+    });
+  });
+});
+
+describe("parsePhotonStreetFeatures", () => {
+  it("returns street separately from city/state/ZIP", () => {
+    const rows = parsePhotonStreetFeatures({
+      features: [
+        {
+          properties: {
+            housenumber: "123",
+            street: "Main St",
+            city: "Falls Church",
+            state: "Virginia",
+            postcode: "22046",
+            countrycode: "US",
+          },
+        },
+      ],
+    });
+    expect(rows).toEqual([
+      {
+        street: "123 Main St",
+        city: "Falls Church",
+        state: "VA",
+        postalCode: "22046",
+        label: "123 Main St · Falls Church, VA 22046",
+      },
+    ]);
   });
 });
 

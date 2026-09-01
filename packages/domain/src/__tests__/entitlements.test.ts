@@ -16,6 +16,7 @@ import {
   isMonthlyFindCapError,
   planLimitReachedMessage,
   radiusOptionsForPlan,
+  widerRadiusOptions,
 } from "../entitlements";
 
 describe("product architecture config", () => {
@@ -75,6 +76,12 @@ describe("getConsumerEntitlements", () => {
     );
     expect(free.map((o) => o.miles)).toEqual([2, 5, 10]);
     expect(plus.map((o) => o.miles)).toEqual([2, 5, 10, 15, 25, 40]);
+  });
+
+  it("offers farther chips while a Find is already waiting", () => {
+    expect(widerRadiusOptions(2, 10).map((o) => o.miles)).toEqual([5, 10]);
+    expect(widerRadiusOptions(10, 10)).toEqual([]);
+    expect(widerRadiusOptions(5, 40).map((o) => o.miles)).toEqual([10, 15, 25, 40]);
   });
 
   it("does not refund a Find when the request is later cancelled", () => {

@@ -66,17 +66,19 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Toaster
           position="top-center"
           closeButton
+          visibleToasts={4}
           toastOptions={{
+            duration: 8000,
             classNames: {
               toast:
-                "glass-strong !rounded-glass-xl !border-hairline-strong !text-ink",
+                "findit-toast !rounded-glass-xl !border-hairline-strong !bg-white !text-ink",
               description: "!text-ink-muted",
               actionButton: "!bg-accent !text-ink-inverse",
-              cancelButton: "!bg-glass-2 !text-ink-muted",
+              cancelButton: "!bg-[#f2f2f7] !text-ink-muted",
               error:
                 "!border-[var(--accent)] !bg-[var(--fd-red-50)] !text-[var(--fd-red-700)]",
               success:
-                "!border-[var(--stock-border)] !bg-[var(--stock-tint)] !text-[var(--stock-ink)]",
+                "!border-[var(--stock)] !bg-white !text-[var(--stock-ink)]",
             },
           }}
         />

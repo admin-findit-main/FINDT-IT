@@ -24,6 +24,8 @@ export {
   getConsumerEntitlements,
   consumerPlanId,
   radiusOptionsForPlan,
+  widerRadiusOptions,
+  MAX_CUSTOMER_RADIUS_MILES,
   MAX_ACTIVE_REQUESTS_PER_HOUR,
   MAX_APPLICATIONS_PER_DAY,
   MIN_PRODUCT_NAME_LENGTH,

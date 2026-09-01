@@ -35,6 +35,7 @@ export async function showBrowserNotification(input: {
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
     data: { url: input.url || "/notifications" },
+    requireInteraction: true,
     renotify: true,
     silent: false,
     vibrate: [200, 80, 200],

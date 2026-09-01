@@ -280,6 +280,176 @@ export async function reverseGeocodeUs(
   }
 }
 
+export type StreetAddressSuggestion = {
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  label: string;
+};
+
+export type ParsedMailingAddress = {
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+};
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Street line only: "123 Main St", never the city/state/ZIP suffix. */
+export function streetLineOnly(
+  street: string,
+  place?: { city?: string | null; state?: string | null; postalCode?: string | null }
+): string {
+  const split = splitUsMailingAddress(street);
+  if (split?.street) return split.street;
+  let s = street.replace(/\s+/g, " ").trim();
+  const zip = digitsPostalCode(place?.postalCode || "");
+  if (zip) {
+    s = s.replace(new RegExp(`[,\\s]+${zip}(?:-\\d{4})?$`), "");
+  }
+  const state = normalizeStateCode(place?.state);
+  if (state) {
+    s = s.replace(new RegExp(`[,\\s]+${state}$`, "i"), "");
+  }
+  const city = (place?.city || "").trim();
+  if (city.length >= 2) {
+    s = s.replace(new RegExp(`[,\\s]+${escapeRegExp(city)}$`, "i"), "");
+  }
+  s = s.replace(/[,\s]+$/, "").trim();
+  return s || street.replace(/\s+/g, " ").trim();
+}
+
+/** Persist street / city / state / ZIP separately. Never the full mailing line. */
+export function normalizeStoreLocation(input: {
+  streetAddress: string;
+  city: string;
+  state: string;
+  postalCode: string;
+}): ParsedMailingAddress {
+  const split = splitUsMailingAddress(input.streetAddress);
+  const city = (input.city.trim() || split?.city || "").trim();
+  const state = normalizeStateCode(input.state || split?.state || "");
+  const postalCode = digitsPostalCode(input.postalCode || split?.postalCode || "");
+  return {
+    street: streetLineOnly(input.streetAddress, { city, state, postalCode }),
+    city,
+    state,
+    postalCode,
+  };
+}
+
+/**
+ * Split a pasted US mailing line into street / city / state / ZIP.
+ * Returns null when it does not look like a full address.
+ */
+export function splitUsMailingAddress(raw: string): ParsedMailingAddress | null {
+  const line = raw.replace(/\s+/g, " ").trim();
+  if (!line.includes(",") && !/\d{5}(?:-\d{4})?/.test(line)) return null;
+
+  const withComma = line.match(
+    /^(.*?),\s*([^,]+),\s*([A-Za-z]{2}|[A-Za-z][A-Za-z .'-]+?)\s+(\d{5})(?:-\d{4})?$/
+  );
+  if (withComma) {
+    const state = normalizeStateCode(withComma[3]);
+    const street = withComma[1].trim();
+    const city = withComma[2].trim();
+    if (state && street.length >= 3 && city.length >= 2) {
+      return { street, city, state, postalCode: withComma[4] };
+    }
+  }
+
+  const cityStateZip = line.match(
+    /^(.*?),\s*([^,]+?)\s+([A-Za-z]{2})\s+(\d{5})(?:-\d{4})?$/
+  );
+  if (cityStateZip) {
+    const state = normalizeStateCode(cityStateZip[3]);
+    const street = cityStateZip[1].trim();
+    const city = cityStateZip[2].trim();
+    if (state && street.length >= 3 && city.length >= 2) {
+      return { street, city, state, postalCode: cityStateZip[4] };
+    }
+  }
+
+  return null;
+}
+
+function photonStreetLine(props: {
+  housenumber?: string;
+  street?: string;
+  name?: string;
+}): string {
+  const number = (props.housenumber || "").trim();
+  const street = (props.street || "").trim();
+  if (number && street) return `${number} ${street}`;
+  if (street) return street;
+  const name = (props.name || "").trim();
+  if (/^\d/.test(name)) return streetLineOnly(name);
+  return "";
+}
+
+export function parsePhotonStreetFeatures(
+  payload: unknown
+): StreetAddressSuggestion[] {
+  if (!payload || typeof payload !== "object") return [];
+  const features = (payload as { features?: unknown[] }).features;
+  if (!Array.isArray(features)) return [];
+  const seen = new Set<string>();
+  const out: StreetAddressSuggestion[] = [];
+  for (const feature of features) {
+    if (!feature || typeof feature !== "object") continue;
+    const props = (feature as { properties?: Record<string, unknown> }).properties;
+    if (!props) continue;
+    const country = String(props.countrycode || props.country || "").toUpperCase();
+    if (country && country !== "US" && country !== "USA" && country !== "UNITED STATES") {
+      continue;
+    }
+    const street = photonStreetLine({
+      housenumber: typeof props.housenumber === "string" ? props.housenumber : "",
+      street: typeof props.street === "string" ? props.street : "",
+      name: typeof props.name === "string" ? props.name : "",
+    });
+    const city = String(props.city || props.town || props.village || props.district || "").trim();
+    const state = normalizeStateCode(String(props.state || props.county || ""));
+    const postalCode = digitsPostalCode(String(props.postcode || ""));
+    if (street.length < 3 || !city || !state || !postalCode) continue;
+    const key = `${street.toLowerCase()}|${postalCode}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      street,
+      city,
+      state,
+      postalCode,
+      label: `${street} · ${formatShortPlace({ city, state, postalCode })}`,
+    });
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
+const PHOTON = "https://photon.komoot.io/api/";
+
+/** Street suggestions. City / state / ZIP come back separately so we never save the full line. */
+export async function lookupUsStreetAddress(
+  query: string
+): Promise<StreetAddressSuggestion[]> {
+  const q = query.replace(/\s+/g, " ").trim().slice(0, 80);
+  if (q.length < 4) return [];
+  try {
+    const res = await fetch(
+      `${PHOTON}?q=${encodeURIComponent(q)}&limit=8&lang=en`
+    );
+    if (!res.ok) return [];
+    return parsePhotonStreetFeatures(await res.json());
+  } catch {
+    return [];
+  }
+}
+
 /** Resolve a US city to matching ZIPs in that state. */
 export async function lookupUsCity(
   state: string,

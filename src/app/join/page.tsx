@@ -17,9 +17,9 @@ import {
   OTP_RESEND_SECONDS,
   formatEin,
   normalizeEin,
+  normalizeStoreLocation,
   passwordRejectReason,
   storeSelectionSuggestsCustomerId,
-  US_STATES,
 } from "@findit/domain";
 import {
   sendStoreJoinEmailCodeAction,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/services/actions";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
 import { AuthAudienceSwitch } from "@/components/auth/auth-audience";
+import { StoreAddressFields } from "@/components/store/store-address-fields";
 import {
   useMarketingHomeHref,
   useSurfaceHref,
@@ -87,6 +88,12 @@ export default function JoinAsStorePage() {
   }, [resendSeconds]);
 
   function applicationPayload() {
+    const location = normalizeStoreLocation({
+      streetAddress,
+      city,
+      state,
+      postalCode,
+    });
     return {
       ownerName,
       ownerEmail,
@@ -98,10 +105,10 @@ export default function JoinAsStorePage() {
       entityType,
       businessName,
       businessType,
-      streetAddress,
-      city,
-      state,
-      postalCode,
+      streetAddress: location.street,
+      city: location.city,
+      state: location.state,
+      postalCode: location.postalCode,
       phone,
       website,
       whyLegit,
@@ -181,16 +188,30 @@ export default function JoinAsStorePage() {
       }
     }
     if (index === 2) {
-      if (streetAddress.trim().length < 3) {
-        toast.error("Enter the street address");
+      const location = normalizeStoreLocation({
+        streetAddress,
+        city,
+        state,
+        postalCode,
+      });
+      setStreetAddress(location.street);
+      setCity(location.city);
+      setState(location.state);
+      setPostalCode(location.postalCode);
+      if (location.street.length < 3) {
+        toast.error("Enter the street, not the full mailing line");
         return false;
       }
-      if (city.trim().length < 2) {
+      if (location.city.length < 2) {
         toast.error("Enter the city");
         return false;
       }
-      if (!/^\d{5}(-\d{4})?$/.test(postalCode.trim())) {
+      if (!/^\d{5}$/.test(location.postalCode)) {
         toast.error("Enter a valid ZIP code");
+        return false;
+      }
+      if (!location.state) {
+        toast.error("Pick a state");
         return false;
       }
       if (phone.trim().length < 7) {
@@ -638,50 +659,18 @@ export default function JoinAsStorePage() {
             {step === 2 ? (
               <>
                 <p className="text-sm font-semibold text-ink">Store location</p>
-                <div>
-                  <Label htmlFor="streetAddress">Street address</Label>
-                  <Input
-                    id="streetAddress"
-                    value={streetAddress}
-                    onChange={(e) => setStreetAddress(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="col-span-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="postalCode">ZIP</Label>
-                    <Input
-                      id="postalCode"
-                      value={postalCode}
-                      onChange={(e) => setPostalCode(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="state">State</Label>
-                  <select
-                    id="state"
-                    className="mt-1.5 h-12 w-full rounded-2xl border border-hairline-strong bg-white px-4 text-sm text-ink"
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                  >
-                    {US_STATES.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <StoreAddressFields
+                  street={streetAddress}
+                  city={city}
+                  state={state}
+                  postalCode={postalCode}
+                  onChange={(next) => {
+                    setStreetAddress(next.street);
+                    setCity(next.city);
+                    setState(next.state);
+                    setPostalCode(next.postalCode);
+                  }}
+                />
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="phone">Business phone</Label>

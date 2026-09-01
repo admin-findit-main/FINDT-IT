@@ -58,6 +58,16 @@ export function radiusOptionsForPlan(maxSearchRadiusMiles: number) {
   return RADIUS_OPTIONS.filter((o) => o.miles <= maxSearchRadiusMiles);
 }
 
+/** Wider chips a shopper can pick after a Find is already out. */
+export function widerRadiusOptions(
+  currentMiles: number,
+  maxSearchRadiusMiles: number
+) {
+  return RADIUS_OPTIONS.filter(
+    (o) => o.miles > currentMiles && o.miles <= maxSearchRadiusMiles
+  );
+}
+
 /**
  * A Find is spent when it is created. Cancel, expire, or fulfill does not
  * give it back — that was the loop around the free monthly cap.

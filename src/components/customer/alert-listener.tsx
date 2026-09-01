@@ -53,7 +53,7 @@ export function CustomerAlertListener({ userId }: { userId: string }) {
               const url = row.related_request_id
                 ? `/requests/${row.related_request_id}`
                 : "/notifications";
-              toast.success(title, { description: body });
+              toast.success(title, { description: body, duration: 12000 });
               playCustomerAlert();
               void showBrowserNotification({
                 title,

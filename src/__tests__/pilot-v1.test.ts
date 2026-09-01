@@ -6,6 +6,7 @@ import {
   demoRespondToRequest,
   demoRouteRequestToStores,
   demoStillLooking,
+  demoExpandRequestRadius,
   getDemoState,
   resetDemoState,
 } from "@/lib/demo/store";
@@ -127,6 +128,41 @@ describe("routing engine", () => {
     const first = storesTargeted;
     const second = demoRouteRequestToStores(request.id);
     expect(second).toBe(first);
+  });
+
+  it("lets a waiting shopper look farther without spending another Find", () => {
+    const customer = demoLogin("customer@demo.findit.local", "demo1234")!;
+    const { request } = demoCreateRequest({
+      customerId: customer.id,
+      productName: "Farther Radius Widget",
+      city: "Falls Church",
+      state: "VA",
+      postalCode: "22044",
+      radiusMiles: 2,
+      expirationHours: 24,
+    });
+    const before = getDemoState().requests.filter(
+      (row) => row.customer_id === customer.id
+    ).length;
+    const expanded = demoExpandRequestRadius({
+      requestId: request.id,
+      customerId: customer.id,
+      radiusMiles: 10,
+    });
+    expect(expanded.ok).toBe(true);
+    expect(expanded.radiusMiles).toBe(10);
+    const updated = getDemoState().requests.find((row) => row.id === request.id);
+    expect(updated?.radius_miles).toBe(10);
+    expect(
+      getDemoState().requests.filter((row) => row.customer_id === customer.id).length
+    ).toBe(before);
+    expect(() =>
+      demoExpandRequestRadius({
+        requestId: request.id,
+        customerId: customer.id,
+        radiusMiles: 5,
+      })
+    ).toThrow(/farther/);
   });
 });
 
