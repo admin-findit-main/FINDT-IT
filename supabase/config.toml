@@ -311,10 +311,11 @@ max_frequency = "5s"
 # enabled = true
 # uri = "pg-functions://postgres/auth/before-user-created-hook"
 
-# Hosted: Auth → Hooks → Send Email → HTTPS
-# https://xxvwermagplfcdfbkxez.supabase.co/functions/v1/send-email
+# Hosted dashboard email templates are used only when this hook is OFF.
+# Authentication → Hooks → Send Email → Disabled
+# https://supabase.com/dashboard/project/xxvwermagplfcdfbkxez/auth/hooks
 # [auth.hook.send_email]
-# enabled = true
+# enabled = false
 # uri = "https://xxvwermagplfcdfbkxez.supabase.co/functions/v1/send-email"
 # secret = "env(SEND_EMAIL_HOOK_SECRET)"
 

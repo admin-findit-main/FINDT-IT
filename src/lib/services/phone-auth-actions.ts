@@ -2,13 +2,9 @@
 
 import { isDemoMode } from "@/lib/config/env";
 import { coerceSoloAdminProfile, isSoloAdminEmail } from "@/lib/auth/admin";
-import { authEmailErrorMessage } from "@/lib/auth/email-error";
 import { resolvePostAuthDestination, type AppHomePath } from "@/lib/auth/home-path";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import {
-  authEmailCopy,
-  authEmailOtpCode,
-  authEmailSubjectWithCode,
   customerNeedsFirstName,
   loginAudienceForAccount,
   mapEmailOtpError,
@@ -19,8 +15,6 @@ import {
   normalizePhoneToE164,
   PHONE_OTP_DISABLED_MESSAGE,
   PHONE_OTP_ENABLED,
-  renderFinditEmailHtml,
-  renderFinditEmailText,
   wrongLoginSideMessage,
   type LoginAudience,
 } from "@findit/domain";
@@ -310,101 +304,6 @@ export async function verifyPhoneOtpAction(input: {
   }
 }
 
-function authUserMissing(message: string) {
-  const text = message.toLowerCase();
-  return (
-    text.includes("user not found") ||
-    text.includes("unable to find") ||
-    text.includes("no user")
-  );
-}
-
-function alreadyRegistered(message: string) {
-  const text = message.toLowerCase();
-  return (
-    text.includes("already registered") ||
-    text.includes("already been registered") ||
-    text.includes("user already exists") ||
-    text.includes("email address is already")
-  );
-}
-
-/** Mint a 6-digit Auth OTP and send it with Resend. Skips the Send Email Hook
- * (PKCE magiclink payloads often have no digits, and the hook can 504). */
-async function sendAuthEmailOtp(input: {
-  admin: ReturnType<typeof import("@/lib/supabase/admin").createServiceClient>;
-  email: string;
-  createIfMissing: boolean;
-  userMetadata?: { account_type: string };
-}): Promise<{ error?: string }> {
-  let generated = await input.admin.auth.admin.generateLink({
-    type: "magiclink",
-    email: input.email,
-  });
-  if (
-    generated.error &&
-    input.createIfMissing &&
-    authUserMissing(generated.error.message)
-  ) {
-    const created = await input.admin.auth.admin.createUser({
-      email: input.email,
-      email_confirm: true,
-      user_metadata: input.userMetadata,
-    });
-    if (created.error && !alreadyRegistered(created.error.message)) {
-      return { error: mapEmailOtpError(created.error.message, "send") };
-    }
-    generated = await input.admin.auth.admin.generateLink({
-      type: "magiclink",
-      email: input.email,
-    });
-  }
-  if (generated.error) {
-    return { error: mapEmailOtpError(generated.error.message, "send") };
-  }
-  const code = authEmailOtpCode(generated.data.properties?.email_otp);
-  if (!code) {
-    return { error: "Could not create a sign-in code. Try again." };
-  }
-
-  const copy = authEmailCopy("email_otp");
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM || "FINDIT <hello@askfindit.com>";
-  if (!apiKey) {
-    return { error: "Email sending is not configured. Try again later." };
-  }
-
-  const sent = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: [input.email],
-      subject: authEmailSubjectWithCode(copy.subject, code),
-      html: renderFinditEmailHtml({
-        heading: copy.heading,
-        body: copy.body,
-        footnote: copy.footnote,
-        code,
-      }),
-      text: renderFinditEmailText({
-        heading: copy.heading,
-        body: copy.body,
-        footnote: copy.footnote,
-        code,
-      }),
-    }),
-  });
-  if (!sent.ok) {
-    const detail = await sent.text();
-    return { error: authEmailErrorMessage(detail || "Could not send the code.") };
-  }
-  return {};
-}
-
 export async function sendEmailOtpAction(input: {
   email: string;
   createIfMissing: boolean;
@@ -474,15 +373,19 @@ export async function sendEmailOtpAction(input: {
       if (audience && belongs !== audience) return wrongSideResult(belongs);
     }
 
-    const sent = await sendAuthEmailOtp({
-      admin,
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithOtp({
       email: parsed.email,
-      createIfMissing,
-      userMetadata:
-        audience === "shopper" ? { account_type: "customer" } : undefined,
+      options: {
+        shouldCreateUser: createIfMissing,
+        data: audience === "shopper" ? { account_type: "customer" } : undefined,
+      },
     });
-    if (sent.error) return { error: sent.error };
-    return { email: parsed.email, masked: maskEmail(parsed.email) };
+    if (!error) {
+      return { email: parsed.email, masked: maskEmail(parsed.email) };
+    }
+    return { error: mapEmailOtpError(error.message, "send") };
   } catch (e) {
     const message = e instanceof Error ? e.message : "";
     return { error: mapEmailOtpError(message, "send") };
