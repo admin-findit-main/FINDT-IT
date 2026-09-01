@@ -111,7 +111,8 @@ export function decideHostRouting(
       publicPath.startsWith("/home") ||
       publicPath.startsWith("/requests") ||
       publicPath.startsWith("/login") ||
-      publicPath.startsWith("/signup")
+      publicPath.startsWith("/signup") ||
+      publicPath.startsWith("/start")
     ) {
       return {
         kind: "redirect",
@@ -123,6 +124,9 @@ export function decideHostRouting(
 
   if (surface === "www") {
     if (publicPath === "/signup" || publicPath.startsWith("/signup/")) {
+      return { kind: "redirect", url: absolute(request, "dashboard", publicPath) };
+    }
+    if (publicPath === "/start" || publicPath.startsWith("/start/")) {
       return { kind: "redirect", url: absolute(request, "dashboard", publicPath) };
     }
     if (publicPath === "/login/business" || publicPath.startsWith("/login/business/")) {
@@ -195,7 +199,7 @@ export function decideHostRouting(
         kind: "continue",
         surface,
         publicPath,
-        internalPath: "/login",
+        internalPath: "/start",
         rewrite: true,
       };
     }
@@ -226,7 +230,9 @@ export function decideHostRouting(
       publicPath.startsWith("/welcome") ||
       publicPath.startsWith("/shops") ||
       publicPath === "/signup" ||
-      publicPath.startsWith("/signup/")
+      publicPath.startsWith("/signup/") ||
+      publicPath === "/start" ||
+      publicPath.startsWith("/start/")
     ) {
       return { kind: "redirect", url: absolute(request, "dashboard", publicPath) };
     }

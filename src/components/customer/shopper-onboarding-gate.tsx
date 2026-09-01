@@ -70,7 +70,7 @@ export function ShopperOnboardingGate({
   }
 
   if (show) {
-    return <ShopperOnboarding onComplete={() => setShow(false)} />;
+    return <ShopperOnboarding signedIn onComplete={() => setShow(false)} />;
   }
 
   return children;

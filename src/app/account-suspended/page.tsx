@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
+import { SUPPORT_EMAIL } from "@/lib/auth/admin";
 import { signOutAction } from "@/lib/services/actions";
 
 export default function AccountSuspendedPage() {
@@ -10,8 +11,8 @@ export default function AccountSuspendedPage() {
         <h1 className="text-2xl font-bold tracking-tight">This account is suspended</h1>
         <p className="text-sm leading-relaxed text-ink-muted">
           FINDIT has turned off this login. If that is a mistake, email{" "}
-          <a className="underline" href="mailto:hello@askfindit.com">
-            hello@askfindit.com
+          <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>
+            {SUPPORT_EMAIL}
           </a>
           .
         </p>

@@ -5,6 +5,7 @@ import {
   isSoloAdmin,
   isSoloAdminEmail,
   SOLO_ADMIN_EMAIL,
+  SUPPORT_EMAIL,
 } from "@/lib/auth/admin";
 
 describe("solo admin lock", () => {
@@ -13,6 +14,8 @@ describe("solo admin lock", () => {
     expect(isSoloAdminEmail(" ceo@askfindit.com ")).toBe(true);
     expect(isSoloAdminEmail("stirux.invest@gmail.com")).toBe(false);
     expect(isSoloAdminEmail(null)).toBe(false);
+    expect(SUPPORT_EMAIL).toBe("support@askfindit.com");
+    expect(SUPPORT_EMAIL).not.toBe(SOLO_ADMIN_EMAIL);
   });
 
   it("requires both admin role and the designated email", () => {

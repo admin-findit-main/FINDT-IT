@@ -22,9 +22,9 @@ export default function ContactPage() {
         .
       </p>
       <p>
-        Shoppers create an account at{" "}
-        <a className="font-semibold text-ink underline" href="https://dashboard.askfindit.com/signup">
-          dashboard.askfindit.com/signup
+        Shoppers start at{" "}
+        <a className="font-semibold text-ink underline" href="https://dashboard.askfindit.com/start">
+          dashboard.askfindit.com/start
         </a>
         . Stores apply at{" "}
         <a className="font-semibold text-ink underline" href="/join">

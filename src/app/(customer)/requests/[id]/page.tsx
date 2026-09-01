@@ -32,6 +32,7 @@ import {
   submitPilotFeedbackAction,
   trackDirectionsClickAction,
 } from "@/lib/services/actions";
+import { SupportReportForm } from "@/components/shared/support-report-form";
 import {
   LIVE_POLL_MS,
   SEARCHING_POLL_MS,
@@ -718,6 +719,12 @@ export default function RequestDetailPage() {
             {saving ? "Saving…" : "Save"}
           </Button>
         )}
+      </div>
+      <div className="mt-8 text-center">
+        <SupportReportForm
+          requestId={data.id}
+          storeId={selectedStoreId || data.fulfilled_store_id || undefined}
+        />
       </div>
     </div>
   );

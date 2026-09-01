@@ -84,6 +84,7 @@ import {
   boundUuid,
   boundSlug,
   signupSchema,
+  reportSchema,
   loginAudienceForAccount,
   wrongLoginSideMessage,
   type LoginAudience,
@@ -112,6 +113,7 @@ import {
 import { isStoreOpenAt } from "@/lib/services/store-hours";
 import { trackEvent } from "@/lib/services/analytics";
 import { getHubDeviceSession } from "@/lib/hub/session";
+import { notifySupportInbox } from "@/lib/services/support-inbox";
 
 async function getDemoSessionId(): Promise<string | null> {
   try {
@@ -2895,6 +2897,19 @@ export async function fulfillRequestAction(input: {
         storeId: input.storeId,
         foundWithFindit: input.foundWithFindit,
       });
+      const foundLabel =
+        input.foundWithFindit === true
+          ? "Found with FINDIT"
+          : input.foundWithFindit === false
+            ? "Found without FINDIT"
+            : "Marked found";
+      void notifySupportInbox({
+        kind: "found",
+        subject: `${foundLabel}: ${request.product_name}`,
+        heading: foundLabel,
+        body: `Demo customer ${profile.email || profile.id} marked this Find.`,
+        replyTo: profile.email,
+      });
       return { request };
     } catch (e) {
       return { error: e instanceof Error ? e.message : "Failed" };
@@ -2946,6 +2961,25 @@ export async function fulfillRequestAction(input: {
     requestId: input.requestId,
     storeId: input.storeId,
     metadata: { foundWithFindit: input.foundWithFindit },
+  });
+
+  const foundLabel =
+    input.foundWithFindit === true
+      ? "Found with FINDIT"
+      : input.foundWithFindit === false
+        ? "Found without FINDIT"
+        : "Marked found";
+  void notifySupportInbox({
+    kind: "found",
+    subject: `${foundLabel}: ${data.product_name}`,
+    heading: foundLabel,
+    body: [
+      `Product: ${data.product_name}`,
+      `Request: ${input.requestId}`,
+      input.storeId ? `Store: ${input.storeId}` : "Store: none picked",
+      `Customer: ${profile.email || user.email || user.id}`,
+    ].join("\n"),
+    replyTo: profile.email || user.email,
   });
 
   return { request: data as CustomerRequest };
@@ -3191,6 +3225,15 @@ export async function submitPilotFeedbackAction(input: {
       request_id: input.requestId,
       created_at: new Date().toISOString(),
     });
+    const liked =
+      input.helpful === true ? "Liked" : input.helpful === false ? "Disliked" : "Feedback";
+    void notifySupportInbox({
+      kind: "feedback",
+      subject: `${liked} a Find`,
+      heading: liked,
+      body: `Demo ${input.role} ${profile.email || profile.id}`,
+      replyTo: profile.email,
+    });
     return { ok: true };
   }
 
@@ -3210,6 +3253,29 @@ export async function submitPilotFeedbackAction(input: {
     userId: user.id,
     requestId: input.requestId,
     storeId: input.storeId,
+  });
+  const liked =
+    input.helpful === true ? "Liked" : input.helpful === false ? "Disliked" : "Feedback";
+  void notifySupportInbox({
+    kind: "feedback",
+    subject: `${liked} a Find`,
+    heading: liked,
+    body: [
+      `Role: ${input.role}`,
+      input.helpful === true
+        ? "Helpful: yes"
+        : input.helpful === false
+          ? "Helpful: no"
+          : "Helpful: not said",
+      input.relevance ? `Relevance: ${input.relevance}` : null,
+      input.note ? `Note: ${input.note}` : null,
+      input.requestId ? `Request: ${input.requestId}` : null,
+      input.storeId ? `Store: ${input.storeId}` : null,
+      `Customer: ${profile.email || user.email || user.id}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    replyTo: profile.email || user.email,
   });
   return { ok: true };
 }
@@ -3678,6 +3744,69 @@ export async function setStoreSuspendedAction(storeId: string, suspended: boolea
     .eq("id", storeId);
   if (error) return { error: "Couldn't update store status." };
   return { ok: true };
+}
+
+export async function submitReportAction(raw: unknown) {
+  const parsed = reportSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message || "Tell us what happened." };
+  }
+  const profile = await getCurrentProfile();
+  if (!profile) return { error: "Please sign in" };
+
+  const limited = await consumeRateLimit({
+    bucket: "report",
+    limit: 8,
+    windowMs: 60 * 60_000,
+    key: profile.id,
+  });
+  if (!limited.ok) return { error: limited.error };
+
+  if (isDemoMode()) {
+    void notifySupportInbox({
+      kind: "report",
+      subject: `Report: ${parsed.data.reason}`,
+      heading: "New report",
+      body: [
+        `Reason: ${parsed.data.reason}`,
+        parsed.data.description ? `Details: ${parsed.data.description}` : null,
+        parsed.data.requestId ? `Request: ${parsed.data.requestId}` : null,
+        parsed.data.storeId ? `Store: ${parsed.data.storeId}` : null,
+        `From: ${profile.email || profile.id}`,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      replyTo: profile.email,
+    });
+    return { ok: true as const };
+  }
+
+  const { supabase, user } = await getSupabaseUser();
+  if (!user) return { error: "Please sign in" };
+  const { error } = await supabase.from("reports").insert({
+    reported_by: user.id,
+    reason: parsed.data.reason,
+    description: parsed.data.description || null,
+    request_id: parsed.data.requestId || null,
+    store_id: parsed.data.storeId || null,
+  });
+  if (error) return { error: "Couldn't send that report." };
+  void notifySupportInbox({
+    kind: "report",
+    subject: `Report: ${parsed.data.reason}`,
+    heading: "New report",
+    body: [
+      `Reason: ${parsed.data.reason}`,
+      parsed.data.description ? `Details: ${parsed.data.description}` : null,
+      parsed.data.requestId ? `Request: ${parsed.data.requestId}` : null,
+      parsed.data.storeId ? `Store: ${parsed.data.storeId}` : null,
+      `From: ${profile.email || user.email || user.id}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    replyTo: profile.email || user.email,
+  });
+  return { ok: true as const };
 }
 
 export async function getAdminReportsAction() {

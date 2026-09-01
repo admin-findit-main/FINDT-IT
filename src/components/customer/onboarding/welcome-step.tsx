@@ -1,7 +1,16 @@
 import { BrandLogo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
-export function WelcomeStep({ onNext }: { onNext: () => void }) {
+export function WelcomeStep({
+  onNext,
+  loginHref,
+  onLogin,
+}: {
+  onNext: () => void;
+  loginHref?: string;
+  onLogin?: () => void;
+}) {
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex flex-1 flex-col items-center justify-center text-center">
@@ -13,9 +22,22 @@ export function WelcomeStep({ onNext }: { onNext: () => void }) {
           Looking for something? Ask once and let nearby stores tell you who has it.
         </p>
       </div>
-      <Button type="button" size="xl" className="mt-8 w-full" onClick={onNext}>
-        Get Started
-      </Button>
+      <div className="mt-8 space-y-3">
+        <Button type="button" size="xl" className="w-full" onClick={onNext}>
+          Get Started
+        </Button>
+        {loginHref ? (
+          <p className="text-center text-sm text-ink-muted">
+            <Link
+              href={loginHref}
+              onClick={() => onLogin?.()}
+              className="font-semibold text-ink underline-offset-2 hover:underline"
+            >
+              Already have an account
+            </Link>
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }

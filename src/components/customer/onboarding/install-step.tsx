@@ -53,16 +53,27 @@ const IOS_STEPS = [
 
 export function InstallStep({
   surface,
+  holdForHomeScreen,
   onContinue,
   onSkip,
 }: {
   surface: InstallSurface;
+  holdForHomeScreen?: boolean;
   onContinue: () => void;
   onSkip: () => void;
 }) {
   const { canInstall, promptInstall } = usePwaInstall();
   const [busy, setBusy] = useState(false);
   const [promptGone, setPromptGone] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+
+  function added() {
+    if (holdForHomeScreen) {
+      setWaiting(true);
+      return;
+    }
+    onContinue();
+  }
 
   async function install() {
     setBusy(true);
@@ -71,7 +82,7 @@ export function InstallStep({
     setBusy(false);
     if (result === "accepted") {
       void trackShopperOnboardingEventAction("pwa_installed");
-      onContinue();
+      added();
       return;
     }
     if (result === "dismissed") {
@@ -80,6 +91,22 @@ export function InstallStep({
       return;
     }
     setPromptGone(true);
+  }
+
+  if (waiting) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col justify-center">
+          <h1 className="text-[2rem] font-bold leading-[1.12] tracking-tight text-ink sm:text-4xl">
+            Open FINDIT from your Home Screen
+          </h1>
+          <p className="mt-4 text-base leading-relaxed text-ink-muted">
+            Tap the FINDIT icon you just added. That&apos;s where we&apos;ll
+            show you how it works and sign you in.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (surface === "ios-safari") {
@@ -121,18 +148,20 @@ export function InstallStep({
           </ol>
         </div>
         <div className="mt-8 space-y-2">
-          <Button type="button" size="xl" className="w-full" onClick={onContinue}>
+          <Button type="button" size="xl" className="w-full" onClick={added}>
             I&apos;ve Added FINDIT
           </Button>
-          <Button
-            type="button"
-            size="lg"
-            variant="ghost"
-            className="h-12 w-full"
-            onClick={onSkip}
-          >
-            Do this later
-          </Button>
+          {holdForHomeScreen ? null : (
+            <Button
+              type="button"
+              size="lg"
+              variant="ghost"
+              className="h-12 w-full"
+              onClick={onSkip}
+            >
+              Do this later
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -153,7 +182,9 @@ export function InstallStep({
           </p>
           {promptGone ? (
             <p className="mt-6 text-sm leading-relaxed text-ink-muted">
-              You can install FINDIT later from your browser menu, or skip for now.
+              {holdForHomeScreen
+                ? "Add FINDIT from your browser menu, then open it from your Home Screen."
+                : "You can install FINDIT later from your browser menu, or skip for now."}
             </p>
           ) : null}
         </div>
@@ -169,19 +200,21 @@ export function InstallStep({
               {busy ? "Installing…" : "Install FINDIT"}
             </Button>
           ) : (
-            <Button type="button" size="xl" className="w-full" onClick={onContinue}>
+            <Button type="button" size="xl" className="w-full" onClick={added}>
               Continue
             </Button>
           )}
-          <Button
-            type="button"
-            size="lg"
-            variant="ghost"
-            className="h-12 w-full"
-            onClick={onSkip}
-          >
-            Do this later
-          </Button>
+          {holdForHomeScreen ? null : (
+            <Button
+              type="button"
+              size="lg"
+              variant="ghost"
+              className="h-12 w-full"
+              onClick={onSkip}
+            >
+              Do this later
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -202,18 +235,20 @@ export function InstallStep({
           </p>
         </div>
         <div className="mt-8 space-y-2">
-          <Button type="button" size="xl" className="w-full" onClick={onContinue}>
-            Continue
+          <Button type="button" size="xl" className="w-full" onClick={added}>
+            I&apos;ve Added FINDIT
           </Button>
-          <Button
-            type="button"
-            size="lg"
-            variant="ghost"
-            className="h-12 w-full"
-            onClick={onSkip}
-          >
-            Do this later
-          </Button>
+          {holdForHomeScreen ? null : (
+            <Button
+              type="button"
+              size="lg"
+              variant="ghost"
+              className="h-12 w-full"
+              onClick={onSkip}
+            >
+              Do this later
+            </Button>
+          )}
         </div>
       </div>
     );

@@ -12,6 +12,7 @@ import { LocateMeButton } from "@/components/customer/locate-me-button";
 import { geolocateUsPlace } from "@/lib/customer/geolocate";
 import { SUPPORT_EMAIL } from "@/lib/auth/admin";
 import { DeleteAccountCard } from "@/components/account/delete-account-card";
+import { SupportReportForm } from "@/components/shared/support-report-form";
 import {
   getCurrentProfile,
   signOutAction,
@@ -178,8 +179,11 @@ export default function ProfilePage() {
           <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>
             {SUPPORT_EMAIL}
           </a>
-          . We don&apos;t offer text support during the pilot.
+          .
         </p>
+        <div className="pt-1">
+          <SupportReportForm />
+        </div>
       </Card>
 
       <div className="mt-4">

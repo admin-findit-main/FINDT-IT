@@ -9,7 +9,7 @@ export function MarketingStartCard({
 }: {
   compact?: boolean;
 }) {
-  const shopperSignup = useSurfaceHref("dashboard", "/signup");
+  const shopperStart = useSurfaceHref("dashboard", "/start");
   const shopperLogin = useSurfaceHref("dashboard", "/login");
   const storeLogin = useSurfaceHref("store", "/login/business");
   const joinHref = useSurfaceHref("www", "/join");
@@ -18,7 +18,7 @@ export function MarketingStartCard({
     <div className={compact ? "mt-0" : "mt-8"}>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         <Button asChild size="lg">
-          <Link href={shopperSignup}>{compact ? "Start using FINDIT" : "Find something"}</Link>
+          <Link href={shopperStart}>{compact ? "Start using FINDIT" : "Find something"}</Link>
         </Button>
         <Button asChild variant="outline" size="lg">
           <Link href={joinHref}>For stores</Link>

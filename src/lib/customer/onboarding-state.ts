@@ -22,15 +22,18 @@ export type ShopperOnboardingState = {
   installEducationSeen: boolean;
   /** User tapped “Do this later” on the install step. Not the same as installed. */
   installSkipped: boolean;
+  /** Welcome + how-it-works already shown on this device. */
+  introSeen: boolean;
   notificationEducationSeen: boolean;
   locationEducationSeen: boolean;
   installHintDismissedAt: number | null;
 };
 
 export type ShopperOnboardingStepId =
+  | "install"
   | "welcome"
   | "how"
-  | "install"
+  | "account"
   | "location"
   | "notify"
   | "ready";
@@ -40,6 +43,7 @@ const DEFAULT_STATE: ShopperOnboardingState = {
   completedAt: null,
   installEducationSeen: false,
   installSkipped: false,
+  introSeen: false,
   notificationEducationSeen: false,
   locationEducationSeen: false,
   installHintDismissedAt: null,
@@ -68,6 +72,7 @@ function parseState(raw: string | null): ShopperOnboardingState {
       completedAt: typeof parsed.completedAt === "number" ? parsed.completedAt : null,
       installEducationSeen: Boolean(parsed.installEducationSeen),
       installSkipped: Boolean(parsed.installSkipped),
+      introSeen: Boolean(parsed.introSeen),
       notificationEducationSeen: Boolean(parsed.notificationEducationSeen),
       locationEducationSeen: Boolean(parsed.locationEducationSeen),
       installHintDismissedAt:
@@ -176,13 +181,23 @@ export function shopperOnboardingSteps(input: {
   standalone: boolean;
   notification: "granted" | "denied" | "default" | "unsupported";
   needsLocation: boolean;
+  introSeen?: boolean;
+  signedIn?: boolean;
 }): ShopperOnboardingStepId[] {
-  const steps: ShopperOnboardingStepId[] = ["welcome", "how"];
-  if (!input.standalone) steps.push("install");
-  if (input.needsLocation) steps.push("location");
-  if (input.notification === "default" || input.notification === "denied") {
-    steps.push("notify");
+  const introSeen = Boolean(input.introSeen);
+  const signedIn = Boolean(input.signedIn);
+  const steps: ShopperOnboardingStepId[] = [];
+  if (!introSeen) {
+    if (!input.standalone) steps.push("install");
+    steps.push("welcome", "how");
+    if (!signedIn) steps.push("account");
   }
-  steps.push("ready");
+  if (signedIn) {
+    if (input.needsLocation) steps.push("location");
+    if (input.notification === "default" || input.notification === "denied") {
+      steps.push("notify");
+    }
+    steps.push("ready");
+  }
   return steps;
 }

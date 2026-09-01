@@ -8,17 +8,19 @@ import {
 import {
   WEB_NOTIFY_PROMPT_DISMISS_KEY,
   markShopperOnboardingComplete,
+  readShopperOnboardingState,
   shopperOnboardingSteps,
   writeShopperOnboardingState,
-  type ShopperOnboardingStepId,
 } from "@/lib/customer/onboarding-state";
 import {
   getInstallSurface,
   isIosDevice,
   isStandaloneDisplay,
+  shouldHoldForHomeScreen,
 } from "@/lib/pwa";
 import { usePwaInstall } from "@/lib/pwa-install";
 import { trackShopperOnboardingEventAction } from "@/lib/services/onboarding-actions";
+import { AccountStep } from "./account-step";
 import { HowItWorksStep } from "./how-it-works-step";
 import { InstallStep } from "./install-step";
 import { LocationStep } from "./location-step";
@@ -29,6 +31,7 @@ import { WelcomeStep } from "./welcome-step";
 import { useCustomerProfile } from "@/components/customer/session";
 import { getConsumerEntitlements } from "@/lib/config/constants";
 import { isCompleteShortPlace, shortPlaceFromProfile } from "@findit/domain";
+import { useSurfaceHref } from "@/components/host/host-surface";
 
 function markNotifyPromptDismissed() {
   try {
@@ -38,12 +41,21 @@ function markNotifyPromptDismissed() {
   }
 }
 
-export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
+export function ShopperOnboarding({
+  signedIn = true,
+  onComplete,
+}: {
+  signedIn?: boolean;
+  onComplete: () => void;
+}) {
   const profile = useCustomerProfile();
+  const loginHref = useSurfaceHref("dashboard", "/login");
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
   const { canInstall } = usePwaInstall();
   const [permission, setPermission] = useState<BrowserNotifyPermission>("default");
   const [standalone, setStandalone] = useState(false);
+  const [holdForHomeScreen, setHoldForHomeScreen] = useState(false);
+  const [introSeen, setIntroSeen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [index, setIndex] = useState(0);
   const started = useRef(false);
@@ -51,6 +63,8 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     setPermission(browserNotifyPermission());
     setStandalone(isStandaloneDisplay());
+    setHoldForHomeScreen(shouldHoldForHomeScreen());
+    setIntroSeen(readShopperOnboardingState().introSeen);
     setHydrated(true);
   }, []);
 
@@ -70,14 +84,16 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
         standalone,
         notification: permission,
         needsLocation,
+        introSeen,
+        signedIn,
       }),
-    [standalone, permission, needsLocation]
+    [standalone, permission, needsLocation, introSeen, signedIn]
   );
 
   const step = steps[Math.min(index, steps.length - 1)] ?? "welcome";
   const dotsTotal = Math.max(steps.length - 1, 1);
   const dotsIndex = Math.min(index, dotsTotal - 1);
-  const showDots = step !== "ready";
+  const showDots = step !== "ready" && step !== "install";
   const iosNeedsHomeScreen = isIosDevice() && !standalone;
   const surface = getInstallSurface(canInstall);
 
@@ -85,11 +101,20 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
     setIndex((current) => Math.min(current + 1, steps.length - 1));
   }
 
+  function markIntroSeen() {
+    writeShopperOnboardingState({ introSeen: true });
+    setIntroSeen(true);
+  }
+
   function finishInstall(skipped: boolean) {
     writeShopperOnboardingState({
       installEducationSeen: true,
       installSkipped: skipped,
     });
+    goNext();
+  }
+
+  function finishHow() {
     goNext();
   }
 
@@ -104,9 +129,17 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
     goNext();
   }
 
+  function finishAccount() {
+    markIntroSeen();
+    onComplete();
+  }
+
   function finish() {
     markShopperOnboardingComplete();
-    writeShopperOnboardingState({ notificationEducationSeen: true });
+    writeShopperOnboardingState({
+      notificationEducationSeen: true,
+      introSeen: true,
+    });
     void trackShopperOnboardingEventAction("onboarding_completed");
     onComplete();
   }
@@ -122,14 +155,29 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
           {showDots ? <OnboardingProgress index={dotsIndex} total={dotsTotal} /> : null}
         </div>
         <OnboardingEnter stepKey={step}>
-          {step === "welcome" ? <WelcomeStep onNext={goNext} /> : null}
-          {step === "how" ? <HowItWorksStep onNext={goNext} /> : null}
           {step === "install" ? (
             <InstallStep
               surface={surface}
+              holdForHomeScreen={holdForHomeScreen}
               onContinue={() => finishInstall(false)}
               onSkip={() => finishInstall(true)}
             />
+          ) : null}
+          {step === "welcome" ? (
+            <WelcomeStep
+              onNext={goNext}
+              loginHref={loginHref}
+              onLogin={() => {
+                writeShopperOnboardingState({
+                  introSeen: true,
+                  installEducationSeen: true,
+                });
+              }}
+            />
+          ) : null}
+          {step === "how" ? <HowItWorksStep onNext={finishHow} /> : null}
+          {step === "account" ? (
+            <AccountStep loginHref={loginHref} onFinished={finishAccount} />
           ) : null}
           {step === "location" ? (
             <LocationStep onContinue={finishLocation} />
@@ -154,5 +202,3 @@ export function ShopperOnboarding({ onComplete }: { onComplete: () => void }) {
     </OnboardingShell>
   );
 }
-
-export type { ShopperOnboardingStepId };

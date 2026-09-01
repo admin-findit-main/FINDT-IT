@@ -49,7 +49,7 @@ describe("decideHostRouting", () => {
     }
   });
 
-  it("rewrites dashboard / to /home for customers and /login when signed out", () => {
+  it("rewrites dashboard / to /home for customers and /start when signed out", () => {
     const inApp = decideHostRouting(req("dashboard.askfindit.com", "/"), "customer");
     expect(inApp.kind).toBe("continue");
     if (inApp.kind === "continue") {
@@ -59,7 +59,16 @@ describe("decideHostRouting", () => {
     const signedOut = decideHostRouting(req("dashboard.askfindit.com", "/"), "anonymous");
     expect(signedOut.kind).toBe("continue");
     if (signedOut.kind === "continue") {
-      expect(signedOut.internalPath).toBe("/login");
+      expect(signedOut.internalPath).toBe("/start");
+    }
+  });
+
+  it("sends www /start to the shopper app", () => {
+    const start = decideHostRouting(req("www.askfindit.com", "/start"), "anonymous");
+    expect(start.kind).toBe("redirect");
+    if (start.kind === "redirect") {
+      expect(start.url.hostname).toBe("dashboard.askfindit.com");
+      expect(start.url.pathname).toBe("/start");
     }
   });
 

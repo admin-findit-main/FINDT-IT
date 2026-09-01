@@ -6,6 +6,7 @@ import {
   isIosDevice,
   isStandaloneDisplay,
   notificationCapability,
+  shouldHoldForHomeScreen,
   supportsNotifications,
 } from "@/lib/pwa";
 import {
@@ -159,28 +160,54 @@ describe("shopper onboarding persistence", () => {
     expect(isStandaloneDisplay({})).toBe(false);
   });
 
-  it("skips install when already standalone and notify when already granted", () => {
+  it("holds phone browsers on Home Screen before the rest of onboarding", () => {
+    expect(
+      shouldHoldForHomeScreen({
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+      })
+    ).toBe(true);
+    expect(
+      shouldHoldForHomeScreen({
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+        iosStandalone: true,
+      })
+    ).toBe(false);
+    expect(shouldHoldForHomeScreen({ userAgent: "Mozilla/5.0 (Macintosh)" })).toBe(false);
+  });
+
+  it("asks new phones to install first, then explain, then sign in", () => {
+    expect(
+      shopperOnboardingSteps({
+        standalone: false,
+        notification: "granted",
+        needsLocation: false,
+      })
+    ).toEqual(["install", "welcome", "how", "account"]);
     expect(
       shopperOnboardingSteps({
         standalone: true,
         notification: "granted",
         needsLocation: false,
       })
-    ).toEqual(["welcome", "how", "ready"]);
+    ).toEqual(["welcome", "how", "account"]);
     expect(
       shopperOnboardingSteps({
-        standalone: false,
-        notification: "granted",
-        needsLocation: false,
-      })
-    ).toEqual(["welcome", "how", "install", "ready"]);
-    expect(
-      shopperOnboardingSteps({
-        standalone: false,
+        standalone: true,
         notification: "default",
         needsLocation: true,
+        signedIn: true,
+        introSeen: true,
       })
-    ).toEqual(["welcome", "how", "install", "location", "notify", "ready"]);
+    ).toEqual(["location", "notify", "ready"]);
+    expect(
+      shopperOnboardingSteps({
+        standalone: true,
+        notification: "granted",
+        needsLocation: false,
+        signedIn: true,
+        introSeen: false,
+      })
+    ).toEqual(["welcome", "how", "ready"]);
   });
 
   it("does not show the later install hint on every visit", () => {

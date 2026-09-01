@@ -97,6 +97,7 @@ const PASS_THROUGH_PREFIXES = [
   "/admin",
   "/login",
   "/signup",
+  "/start",
   "/forgot-password",
   "/join",
   "/privacy",
@@ -175,6 +176,7 @@ export function surfaceForAppPath(pathname: string): Exclude<ProductSurface, "lo
     path.startsWith("/welcome") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
+    path.startsWith("/start") ||
     path.startsWith("/forgot-password") ||
     path.startsWith("/auth")
   ) {
@@ -305,6 +307,7 @@ export function resolveBrandHomeHref(input: {
   if (
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
+    path.startsWith("/start") ||
     path.startsWith("/forgot-password") ||
     path.startsWith("/auth") ||
     path.startsWith("/invite") ||

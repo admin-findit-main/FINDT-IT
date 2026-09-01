@@ -83,6 +83,12 @@ export type InstallSurface =
   | "android-manual"
   | "desktop";
 
+/** Phone browser tab — add to Home Screen before explaining the app. */
+export function shouldHoldForHomeScreen(env: PwaEnv = liveEnv()): boolean {
+  if (isStandaloneDisplay(env)) return false;
+  return isIosDevice(env) || isAndroid(env);
+}
+
 export function getInstallSurface(
   canNativePrompt: boolean,
   env: PwaEnv = liveEnv()

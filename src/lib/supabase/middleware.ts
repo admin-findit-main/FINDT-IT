@@ -93,6 +93,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/forgot-password") ||
+    path.startsWith("/start") ||
     path.startsWith("/auth/update-password");
   if (
     !path.startsWith("/auth/callback") &&
@@ -272,13 +273,27 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
+    const shopperApp =
+      internalPath.startsWith("/home") ||
+      internalPath.startsWith("/requests") ||
+      internalPath.startsWith("/shops") ||
+      internalPath.startsWith("/notifications") ||
+      internalPath.startsWith("/profile") ||
+      internalPath.startsWith("/plan") ||
+      isWelcome;
     url.pathname =
       isStoreAppPath(internalPath) || isAdminAppPath(internalPath)
         ? surface === "store"
           ? "/login"
           : "/login/business"
-        : "/login";
-    url.searchParams.set("next", internalPath);
+        : shopperApp
+          ? "/start"
+          : "/login";
+    if (!shopperApp) {
+      url.searchParams.set("next", internalPath);
+    } else {
+      url.search = "";
+    }
     return copyCookies(supabaseResponse, NextResponse.redirect(url));
   }
 

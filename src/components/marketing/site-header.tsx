@@ -14,7 +14,7 @@ const LINKS = [
 
 export function MarketingHeader() {
   const [open, setOpen] = useState(false);
-  const shopperSignup = useSurfaceHref("dashboard", "/signup");
+  const shopperStart = useSurfaceHref("dashboard", "/start");
   const shopperLogin = useSurfaceHref("dashboard", "/login");
 
   return (
@@ -40,7 +40,7 @@ export function MarketingHeader() {
             <Link href={shopperLogin}>Sign in</Link>
           </Button>
           <Button asChild size="sm">
-            <Link href={shopperSignup}>Get started</Link>
+            <Link href={shopperStart}>Get started</Link>
           </Button>
           <button
             type="button"
@@ -96,7 +96,7 @@ export function MarketingHeader() {
             </li>
             <li>
               <Link
-                href={shopperSignup}
+                href={shopperStart}
                 className="block rounded-glass-md px-2 py-2.5 text-sm font-medium text-ink"
                 onClick={() => setOpen(false)}
               >
