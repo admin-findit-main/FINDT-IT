@@ -66,7 +66,10 @@ export async function notifyCustomerDevices(input: {
     .select("token")
     .eq("user_id", input.customerId)
     .in("app_surface", ["customer", "web"]);
-  if (!tokens?.length) return;
+  if (!tokens?.length) {
+    console.warn("[FINDIT] no customer push tokens", input.customerId.slice(0, 8));
+    return;
+  }
 
   const expoTokens = tokens
     .map((row) => row.token)

@@ -75,6 +75,17 @@ describe("decideHostRouting", () => {
     }
   });
 
+  it("keeps the store inbox on the store host", () => {
+    const decision = decideHostRouting(
+      req("store.askfindit.com", "/requests"),
+      "manager"
+    );
+    expect(decision.kind).toBe("continue");
+    if (decision.kind === "continue") {
+      expect(decision.internalPath).toBe("/store/requests");
+    }
+  });
+
   it("pretty-redirects team and notifications on the store host", () => {
     const team = decideHostRouting(req("store.askfindit.com", "/store/team"), "manager");
     expect(team.kind).toBe("redirect");
@@ -140,6 +151,29 @@ describe("decideHostRouting", () => {
     if (decision.kind === "continue") {
       expect(decision.internalPath).toBe("/store");
       expect(decision.rewrite).toBe(false);
+    }
+  });
+
+  it("sends dashboard public store links into the in-app shop profile", () => {
+    const decision = decideHostRouting(
+      req("dashboard.askfindit.com", "/stores/acme"),
+      "customer"
+    );
+    expect(decision.kind).toBe("redirect");
+    if (decision.kind === "redirect") {
+      expect(decision.url.hostname).toBe("dashboard.askfindit.com");
+      expect(decision.url.pathname).toBe("/shops/acme");
+    }
+  });
+
+  it("keeps in-app shop profiles on the dashboard", () => {
+    const decision = decideHostRouting(
+      req("dashboard.askfindit.com", "/shops/acme"),
+      "customer"
+    );
+    expect(decision.kind).toBe("continue");
+    if (decision.kind === "continue") {
+      expect(decision.internalPath).toBe("/shops/acme");
     }
   });
 

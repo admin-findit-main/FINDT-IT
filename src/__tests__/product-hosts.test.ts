@@ -57,7 +57,8 @@ describe("pretty store and dashboard paths", () => {
     expect(toInternalPath("store", "/login")).toBe("/login/business");
   });
 
-  it("keeps public /stores pages on the marketing site", () => {
+  it("keeps shopper store profiles on the dashboard app", () => {
+    expect(surfaceForAppPath("/shops/acme")).toBe("dashboard");
     expect(surfaceForAppPath("/stores/acme")).toBe("www");
     expect(surfaceForAppPath("/store")).toBe("store");
     expect(surfaceForAppPath("/store/requests")).toBe("store");

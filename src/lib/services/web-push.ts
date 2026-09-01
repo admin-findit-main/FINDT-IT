@@ -58,7 +58,11 @@ export async function sendWebPush(input: {
   data: Record<string, string>;
   onGoneToken?: (token: string) => Promise<void>;
 }): Promise<void> {
-  if (!input.tokens.length || !vapidConfigured() || !applyVapid()) return;
+  if (!input.tokens.length) return;
+  if (!vapidConfigured() || !applyVapid()) {
+    console.error("[FINDIT] Web push skipped: VAPID keys are not configured");
+    return;
+  }
 
   const payload = JSON.stringify({
     title: input.title,

@@ -182,6 +182,7 @@ describe("isCustomerSurfacePath", () => {
   it("flags shopper routes", () => {
     expect(isCustomerSurfacePath("/home")).toBe(true);
     expect(isCustomerSurfacePath("/requests/1")).toBe(true);
+    expect(isCustomerSurfacePath("/shops/acme")).toBe(true);
     expect(isCustomerSurfacePath("/admin")).toBe(false);
     expect(isCustomerSurfacePath("/store")).toBe(false);
   });

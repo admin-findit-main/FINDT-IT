@@ -124,9 +124,9 @@ export async function notifyCustomerPush(input: {
           column: string,
           value: string
         ) => {
-          eq: (
+          in: (
             column: string,
-            value: string
+            values: string[]
           ) => Promise<{ data: { token: string }[] | null }>;
         };
       };
@@ -149,7 +149,7 @@ export async function notifyCustomerPush(input: {
     .from("device_push_tokens")
     .select("token")
     .eq("user_id", input.customerId)
-    .eq("app_surface", "customer");
+    .in("app_surface", ["customer", "web"]);
   if (!tokens?.length) return;
   await sendExpoPush(
     tokens

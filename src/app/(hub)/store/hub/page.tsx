@@ -18,6 +18,7 @@ import {
   HUB_DEVICE_HEARTBEAT_MS,
   HUB_INBOX_POLL_MS,
 } from "@/lib/hub/constants";
+import { armAlertSoundUnlock, playHubAlert } from "@/lib/alert-sound";
 import { readCached, writeCached } from "@/lib/data/client-cache";
 import { BrandLogo } from "@/components/brand/logo";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
@@ -51,32 +52,6 @@ function formatMiles(miles: number): string {
   if (miles <= 0) return "Nearby";
   if (miles < 10) return `${miles.toFixed(1)} mi away`;
   return `${Math.round(miles)} mi away`;
-}
-
-function playHubAlert() {
-  try {
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(880, now);
-    osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.3);
-    osc.onended = () => void ctx.close();
-  } catch (err) {
-    console.error("[FINDIT Hub] alert sound failed", err);
-  }
 }
 
 export default function FinditHubPage() {
@@ -193,6 +168,10 @@ export default function FinditHubPage() {
       if (!silent) setLoading(false);
     }
   }, [store?.id, loadRuntime, loadQueue]);
+
+  useEffect(() => {
+    armAlertSoundUnlock();
+  }, []);
 
   useEffect(() => {
     const cached = storeId ? readCached<HubRequest[]>(`hub-queue:${storeId}`, 180_000) : null;

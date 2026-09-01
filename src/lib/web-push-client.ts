@@ -32,6 +32,16 @@ export function isStandaloneDisplay(): boolean {
   return Boolean(standalone);
 }
 
+async function getPushRegistration(): Promise<ServiceWorkerRegistration | null> {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  try {
+    await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  } catch {
+    // ready() still resolves if an earlier registration succeeded.
+  }
+  return navigator.serviceWorker.ready;
+}
+
 export async function subscribeWebPush(): Promise<{ ok: boolean; error?: string }> {
   if (typeof window === "undefined") return { ok: false, error: "unsupported" };
   if (!vapidPublicKey()) return { ok: false, error: "missing-vapid" };
@@ -46,12 +56,14 @@ export async function subscribeWebPush(): Promise<{ ok: boolean; error?: string 
   }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await getPushRegistration();
+    if (!registration) return { ok: false, error: "unsupported" };
+    const key = urlBase64ToUint8Array(vapidPublicKey());
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey()),
+        applicationServerKey: key,
       });
     }
 
@@ -61,12 +73,21 @@ export async function subscribeWebPush(): Promise<{ ok: boolean; error?: string 
       platform: "web",
       appSurface: "web",
     });
-    if ("error" in result) return { ok: false, error: result.error };
+    if ("error" in result) {
+      console.error("[FINDIT] push token save failed", result.error);
+      return { ok: false, error: result.error };
+    }
     return { ok: true };
   } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "subscribe-failed",
-    };
+    const message = err instanceof Error ? err.message : "subscribe-failed";
+    console.error("[FINDIT] web push subscribe failed", message);
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+      await existing?.unsubscribe();
+    } catch {
+      // Ignore cleanup failures and report the original error.
+    }
+    return { ok: false, error: message };
   }
 }

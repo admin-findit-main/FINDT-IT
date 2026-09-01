@@ -62,7 +62,7 @@ export default function StoreNotificationsPage() {
       );
       return;
     }
-    toast.success("Alerts are on for this device.");
+    toast.message("Couldn’t turn on lock-screen alerts. You can still see replies here.");
   }
 
   return (

@@ -87,7 +87,7 @@ export function NotificationPrompt({
       } else if (subscribed.error === "ios-homescreen") {
         toast.message("Add FINDIT to your Home Screen to get alerts after you close it.");
       } else {
-        toast.success("Alerts are on for this device.");
+        toast.message("Couldn’t turn on lock-screen alerts. We’ll still update this screen.");
       }
     } else {
       toast.message("You can still see replies here and on Alerts.");

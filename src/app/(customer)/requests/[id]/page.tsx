@@ -21,6 +21,7 @@ import {
 import { BackLink } from "@/components/shared/app-header";
 import { ResponseAccent, StatusBadge } from "@/components/shared/status";
 import { NotificationPrompt } from "@/components/customer/notification-prompt";
+import { armAlertSoundUnlock, playCustomerAlert } from "@/lib/alert-sound";
 import {
   cancelRequestAction,
   fulfillRequestAction,
@@ -123,6 +124,8 @@ export default function RequestDetailPage() {
   const [feedbackDone, setFeedbackDone] = useState(false);
   const [visibleStoreCount, setVisibleStoreCount] = useState(STORES_PAGE_SIZE);
   const searchingRef = useRef(false);
+  const primedResponses = useRef(false);
+  const seenResponseIds = useRef<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     const result = await getCustomerRequestAction(params.id);
@@ -156,6 +159,30 @@ export default function RequestDetailPage() {
   useEffect(() => {
     setVisibleStoreCount(STORES_PAGE_SIZE);
   }, [params.id]);
+
+  useEffect(() => {
+    armAlertSoundUnlock();
+  }, []);
+
+  useEffect(() => {
+    primedResponses.current = false;
+    seenResponseIds.current = new Set();
+  }, [params.id]);
+
+  useEffect(() => {
+    if (!data || data.id !== params.id) return;
+    const incoming = (data.responses || []).filter(
+      (row) => row.response_type === "in_stock" || row.response_type === "can_order"
+    );
+    if (!primedResponses.current) {
+      incoming.forEach((row) => seenResponseIds.current.add(row.id));
+      primedResponses.current = true;
+      return;
+    }
+    const arrived = incoming.filter((row) => !seenResponseIds.current.has(row.id));
+    if (arrived.length > 0) playCustomerAlert();
+    incoming.forEach((row) => seenResponseIds.current.add(row.id));
+  }, [data, params.id]);
 
   const sync = useRequestRealtime(params.id, { onChange: load });
   const climb = useClimbingPercent(
@@ -479,7 +506,9 @@ export default function RequestDetailPage() {
                         size="lg"
                         className={canVisit ? "w-full" : "col-span-2 w-full"}
                       >
-                        <Link href={`/stores/${store.slug}`}>View store</Link>
+                        <Link href={`/shops/${store.slug}?from=${data.id}`}>
+                          View store
+                        </Link>
                       </Button>
                       {canVisit ? (
                         <Button asChild size="lg" variant="secondary" className="w-full">

@@ -249,6 +249,7 @@ export async function updateSession(request: NextRequest) {
   const isProtected =
     internalPath.startsWith("/home") ||
     internalPath.startsWith("/requests") ||
+    internalPath.startsWith("/shops") ||
     internalPath.startsWith("/notifications") ||
     internalPath.startsWith("/profile") ||
     internalPath.startsWith("/plan") ||

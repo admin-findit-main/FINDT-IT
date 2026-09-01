@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { armAlertSoundUnlock, playCustomerAlert } from "@/lib/alert-sound";
 import { showBrowserNotification } from "@/lib/browser-notify";
 import { createClient } from "@/lib/supabase/client";
 
@@ -9,6 +10,10 @@ import { createClient } from "@/lib/supabase/client";
  * Live in-app toast (and optional browser notification) when a store answers.
  */
 export function CustomerAlertListener({ userId }: { userId: string }) {
+  useEffect(() => {
+    armAlertSoundUnlock();
+  }, []);
+
   useEffect(() => {
     if (!userId) return;
     if (process.env.NEXT_PUBLIC_FINDIT_DEMO_MODE === "true") return;
@@ -49,6 +54,7 @@ export function CustomerAlertListener({ userId }: { userId: string }) {
                 ? `/requests/${row.related_request_id}`
                 : "/notifications";
               toast.success(title, { description: body });
+              playCustomerAlert();
               void showBrowserNotification({
                 title,
                 body,
