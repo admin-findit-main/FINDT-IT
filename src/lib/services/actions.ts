@@ -2170,6 +2170,62 @@ export async function getAdminStoreDetailAction(storeId: string) {
   };
 }
 
+export type AdminHubRow = {
+  id: string;
+  name: string;
+  storeId: string;
+  storeName: string;
+  lastSeenAt: string | null;
+  revokedAt: string | null;
+  pairedAt: string;
+};
+
+export async function getAdminHubsAction(): Promise<AdminHubRow[] | null> {
+  const profile = await getCurrentProfile();
+  if (!isSoloAdmin(profile)) return null;
+
+  if (isDemoMode()) {
+    const state = getDemoState();
+    return (state.storeDevices || []).map((d) => ({
+      id: d.id,
+      name: d.device_name,
+      storeId: d.store_id,
+      storeName: state.stores.find((s) => s.id === d.store_id)?.name || "Store",
+      lastSeenAt: d.last_seen_at,
+      revokedAt: d.revoked_at,
+      pairedAt: d.paired_at,
+    }));
+  }
+
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data } = await admin
+    .from("store_devices")
+    .select("id, device_name, paired_at, last_seen_at, revoked_at, store_id, store:stores(id, name)")
+    .order("paired_at", { ascending: false });
+
+  return ((data || []) as Array<{
+    id: string;
+    device_name: string;
+    paired_at: string;
+    last_seen_at: string | null;
+    revoked_at: string | null;
+    store_id: string;
+    store?: { id?: string; name?: string } | { id?: string; name?: string }[] | null;
+  }>).map((d) => {
+    const store = Array.isArray(d.store) ? d.store[0] : d.store;
+    return {
+      id: d.id,
+      name: d.device_name,
+      storeId: store?.id || d.store_id,
+      storeName: store?.name || "Store",
+      lastSeenAt: d.last_seen_at,
+      revokedAt: d.revoked_at,
+      pairedAt: d.paired_at,
+    };
+  });
+}
+
 export async function updateProfileAction(input: {
   firstName?: string;
   lastName?: string;
