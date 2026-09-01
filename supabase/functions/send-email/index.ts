@@ -3,6 +3,7 @@ import { Resend } from "npm:resend@4.0.1";
 import {
   authEmailConfirmationUrl,
   authEmailCopy,
+  authEmailOtpCode,
   renderFinditEmailHtml,
   renderFinditEmailText,
 } from "./auth-email.ts";
@@ -58,7 +59,17 @@ Deno.serve(async (req) => {
   if (!to) return jsonError(400, "Missing user email");
 
   const rawAction = event.email_data.email_action_type || "signup";
-  const action = rawAction === "magiclink" ? "email_otp" : rawAction;
+  const code = authEmailOtpCode(
+    event.email_data.token,
+    event.email_data.token_new
+  );
+  // signInWithOtp arrives as magiclink. Only use OTP copy when Auth gave us digits.
+  const action =
+    rawAction === "magiclink" && code
+      ? "email_otp"
+      : rawAction === "magiclink"
+        ? "magiclink"
+        : rawAction;
   const firstName =
     event.user.user_metadata?.first_name ||
     event.user.user_metadata?.display_name ||
@@ -75,16 +86,14 @@ Deno.serve(async (req) => {
           action: rawAction,
         })
       : null;
-  const code =
-    action === "email_otp" || action === "reauthentication"
-      ? event.email_data.token || null
-      : null;
+  const displayCode =
+    action === "email_otp" || action === "reauthentication" ? code : null;
 
   const resend = new Resend(apiKey);
   const { error } = await resend.emails.send({
     from: FROM,
     to: [to],
-    subject: copy.subject,
+    subject: displayCode ? `${copy.subject}: ${displayCode}` : copy.subject,
     html: renderFinditEmailHtml({
       heading: copy.heading,
       body: copy.body,
@@ -92,7 +101,7 @@ Deno.serve(async (req) => {
       buttonUrl,
       footnote: copy.footnote,
       firstName,
-      code,
+      code: displayCode,
     }),
     text: renderFinditEmailText({
       heading: copy.heading,
@@ -100,7 +109,7 @@ Deno.serve(async (req) => {
       buttonUrl,
       footnote: copy.footnote,
       firstName,
-      code,
+      code: displayCode,
     }),
   });
 

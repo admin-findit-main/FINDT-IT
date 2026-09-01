@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   authEmailConfirmationUrl,
   authEmailCopy,
+  authEmailOtpCode,
   escapeHtml,
   otpTypeForAuthEmail,
   renderFinditEmailHtml,
+  renderFinditEmailText,
 } from "../auth-email";
 
 describe("auth email", () => {
@@ -51,5 +53,23 @@ describe("auth email", () => {
 
   it("escapes markup in copy", () => {
     expect(escapeHtml('<b>x</b>')).toBe("&lt;b&gt;x&lt;/b&gt;");
+  });
+
+  it("picks a 6-digit OTP and ignores hashes", () => {
+    expect(authEmailOtpCode("123456")).toBe("123456");
+    expect(authEmailOtpCode("  847291  ", "abc")).toBe("847291");
+    expect(authEmailOtpCode("7d5b7b1964cf5d388340a7f04f1dbb5eeb6c7b52ef8270e1737a58d0")).toBeNull();
+    expect(authEmailOtpCode("", undefined, "12")).toBeNull();
+  });
+
+  it("renders the digits in HTML and text", () => {
+    const input = {
+      heading: "Your sign-in code",
+      body: "Enter this 6-digit code in FINDIT.",
+      footnote: "Ignore if unexpected",
+      code: "123456",
+    };
+    expect(renderFinditEmailHtml(input)).toContain("123456");
+    expect(renderFinditEmailText(input)).toContain("Code: 123456");
   });
 });

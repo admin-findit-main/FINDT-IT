@@ -30,6 +30,17 @@ export function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+/** First 4–8 digit Auth OTP in the payload. Hashes and magic-link tokens are ignored. */
+export function authEmailOtpCode(
+  ...candidates: Array<string | null | undefined>
+): string | null {
+  for (const raw of candidates) {
+    const value = (raw || "").trim();
+    if (/^\d{4,8}$/.test(value)) return value;
+  }
+  return null;
+}
+
 export function otpTypeForAuthEmail(action: AuthEmailAction): string {
   if (action === "email_change_new" || action === "email_change_current") {
     return "email_change";
