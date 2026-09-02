@@ -221,6 +221,18 @@ export interface StoreResponse {
   updated_at: string;
 }
 
+export interface AdminPushBroadcast {
+  id: string;
+  sent_by: string;
+  audience: "all" | "shoppers" | "store_owners" | "employees";
+  title: string;
+  body: string;
+  destination_url: string;
+  recipient_count: number;
+  pruned_count: number;
+  created_at: string;
+}
+
 export interface Notification {
   id: string;
   user_id: string;

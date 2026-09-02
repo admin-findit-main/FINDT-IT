@@ -11,7 +11,8 @@ import {
 describe("solo admin lock", () => {
   it("accepts only the designated operator email", () => {
     expect(isSoloAdminEmail(SOLO_ADMIN_EMAIL)).toBe(true);
-    expect(isSoloAdminEmail(" ceo@askfindit.com ")).toBe(true);
+    expect(isSoloAdminEmail(" ali@askfindit.com ")).toBe(true);
+    expect(isSoloAdminEmail("ceo@askfindit.com")).toBe(false);
     expect(isSoloAdminEmail("stirux.invest@gmail.com")).toBe(false);
     expect(isSoloAdminEmail(null)).toBe(false);
     expect(SUPPORT_EMAIL).toBe("support@askfindit.com");

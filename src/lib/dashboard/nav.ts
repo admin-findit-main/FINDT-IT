@@ -39,6 +39,7 @@ export const employeeDashItems: DashItem[] = [
 
 export const adminDashItems: DashItem[] = [
   { href: "/admin", label: "Overview", icon: "overview" },
+  { href: "/admin/notifications", label: "Notifications", icon: "alerts" },
   { href: "/admin/applications", label: "Applications", icon: "applications" },
   { href: "/admin/stores", label: "Stores", icon: "stores" },
   { href: "/admin/shoppers", label: "Shoppers", icon: "users" },
@@ -65,6 +66,10 @@ export function dashTitle(pathname: string): { title: string; subtitle: string }
     "/store/notifications": { title: "Notifications", subtitle: "New asks and team updates" },
     "/store/account": { title: "Account", subtitle: "Your login" },
     "/admin": { title: "Overview", subtitle: "FINDIT network" },
+    "/admin/notifications": {
+      title: "Notifications",
+      subtitle: "Send a push to shoppers, owners, or employees",
+    },
     "/admin/applications": { title: "Applications", subtitle: "Businesses waiting to join" },
     "/admin/stores": { title: "Stores", subtitle: "Open a location for its people and settings" },
     "/admin/shoppers": { title: "Shoppers", subtitle: "Customer accounts" },

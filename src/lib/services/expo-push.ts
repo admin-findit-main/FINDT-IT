@@ -28,7 +28,10 @@ function asTokenTable(admin: {
   return admin.from("device_push_tokens") as TokenQuery;
 }
 
-export async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
+export async function sendExpoPush(
+  messages: ExpoPushMessage[],
+  options?: { onGoneToken?: (token: string) => Promise<void> }
+): Promise<void> {
   if (!messages.length) return;
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -39,18 +42,39 @@ export async function sendExpoPush(messages: ExpoPushMessage[]): Promise<void> {
     process.env.EXPO_ACCESS_TOKEN || process.env.EXPO_PUSH_ACCESS_TOKEN;
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  try {
-    const res = await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(messages),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      console.error("[FINDIT] Expo push failed", res.status, text.slice(0, 400));
+  const chunkSize = 100;
+  for (let i = 0; i < messages.length; i += chunkSize) {
+    const chunk = messages.slice(i, i + chunkSize);
+    try {
+      const res = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(chunk),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        console.error("[FINDIT] Expo push failed", res.status, text.slice(0, 400));
+        continue;
+      }
+      if (!options?.onGoneToken) continue;
+      const json = (await res.json().catch(() => null)) as {
+        data?: Array<{ status?: string; details?: { error?: string } }>;
+      } | null;
+      const tickets = json?.data || [];
+      await Promise.all(
+        tickets.map(async (ticket, index) => {
+          if (
+            ticket.status === "error" &&
+            ticket.details?.error === "DeviceNotRegistered"
+          ) {
+            const token = chunk[index]?.to;
+            if (token) await options.onGoneToken?.(token);
+          }
+        })
+      );
+    } catch (err) {
+      console.error("[FINDIT] Expo push send failed", err);
     }
-  } catch (err) {
-    console.error("[FINDIT] Expo push send failed", err);
   }
 }
 

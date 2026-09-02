@@ -1,5 +1,5 @@
 /** The only email allowed to hold `account_type = admin` (Google Workspace). */
-export const SOLO_ADMIN_EMAIL = "ceo@askfindit.com";
+export const SOLO_ADMIN_EMAIL = "ali@askfindit.com";
 
 /** Public inbox for reports, Find outcomes, and in-app like/dislike. */
 export const SUPPORT_EMAIL = "support@askfindit.com";
