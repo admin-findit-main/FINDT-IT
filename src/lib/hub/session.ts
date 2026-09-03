@@ -4,12 +4,15 @@ import {
   HUB_DEVICE_COOKIE,
   HUB_DEVICE_COOKIE_MAX_AGE,
   HUB_PAIRING_COOKIE,
+  HUB_SHIFT_COOKIE,
 } from "@/lib/hub/constants";
 import {
   parseDeviceCookie,
   parsePairingCookie,
+  parseShiftCookie,
   serializeDeviceCookie,
   serializePairingCookie,
+  serializeShiftCookie,
   sha256Hex,
 } from "@/lib/hub/crypto";
 import type { Store, StoreDevice } from "@/types/database";
@@ -63,6 +66,7 @@ export async function setHubDeviceCookie(deviceId: string, token: string) {
 export async function clearHubDeviceCookie() {
   const jar = await cookieJar();
   jar.delete(HUB_DEVICE_COOKIE);
+  jar.delete(HUB_SHIFT_COOKIE);
 }
 
 export async function setHubPairingCookie(pairingId: string, secret: string) {
@@ -79,6 +83,31 @@ export async function setHubPairingCookie(pairingId: string, secret: string) {
 export async function clearHubPairingCookie() {
   const jar = await cookieJar();
   jar.delete(HUB_PAIRING_COOKIE);
+}
+
+export async function readHubShiftCookie(): Promise<{ punchId: string } | null> {
+  try {
+    const jar = await cookieJar();
+    return parseShiftCookie(jar.get(HUB_SHIFT_COOKIE)?.value);
+  } catch {
+    return null;
+  }
+}
+
+export async function setHubShiftCookie(punchId: string) {
+  const jar = await cookieJar();
+  jar.set(HUB_SHIFT_COOKIE, serializeShiftCookie(punchId), {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: HUB_DEVICE_COOKIE_MAX_AGE,
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
+export async function clearHubShiftCookie() {
+  const jar = await cookieJar();
+  jar.delete(HUB_SHIFT_COOKIE);
 }
 
 export async function inspectHubDeviceCookie(): Promise<HubDeviceInspect> {

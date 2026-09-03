@@ -13,6 +13,11 @@ import {
   resolveHubTerminalAction,
   touchHubDeviceAction,
 } from "@/lib/services/hub-devices";
+import {
+  clockOutHubAction,
+  getHubClockStateAction,
+} from "@/lib/services/shifts";
+import { HubClockGate } from "@/components/hub/clock-gate";
 import { hubConnectHref } from "@/lib/hub/relink";
 import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
 import {
@@ -25,7 +30,7 @@ import {
   readHubSeenIds,
   writeHubSeenIds,
 } from "@/lib/hub/arrivals";
-import { readCached, writeCached } from "@/lib/data/client-cache";
+import { writeCached } from "@/lib/data/client-cache";
 import { BrandLogo } from "@/components/brand/logo";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
 
@@ -81,6 +86,8 @@ export default function FinditHubPage() {
   const [source, setSource] = useState<"device" | "member" | null>(null);
   const [canManage, setCanManage] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
+  const [shiftLocked, setShiftLocked] = useState<boolean | null>(null);
+  const [shiftName, setShiftName] = useState<string | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
   const primed = useRef(false);
   const queueSeq = useRef(0);
@@ -91,6 +98,9 @@ export default function FinditHubPage() {
     (reason?: Parameters<typeof hubConnectHref>[0]) => {
       setStore(null);
       setQueue([]);
+      queueSignature.current = "";
+      setShiftLocked(null);
+      setShiftName(null);
       router.replace(hubConnectHref(reason));
     },
     [router]
@@ -186,7 +196,18 @@ export default function FinditHubPage() {
     if (!silent) setLoading(true);
     try {
       const id = store?.id || (await loadRuntime());
-      if (id) await loadQueue(id, { silent });
+      if (!id) return;
+      const clockState = await getHubClockStateAction();
+      if (clockState.required && !clockState.clockedIn) {
+        setShiftLocked(true);
+        setShiftName(null);
+        return;
+      }
+      setShiftLocked(false);
+      setShiftName(
+        clockState.required && clockState.clockedIn ? clockState.clockedIn.name : null
+      );
+      await loadQueue(id, { silent });
     } finally {
       if (!silent) setLoading(false);
     }
@@ -197,16 +218,9 @@ export default function FinditHubPage() {
   }, []);
 
   useEffect(() => {
-    const cached = storeId ? readCached<HubRequest[]>(`hub-queue:${storeId}`, 180_000) : null;
     if (storeId) {
       const remembered = readHubSeenIds(storeId, sessionStorage);
       remembered.forEach((rowId) => seenIds.current.add(rowId));
-    }
-    if (cached?.length) {
-      queueSignature.current = cached.map((row) => row.id).join(",");
-      cached.forEach((row) => seenIds.current.add(row.id));
-      setQueue(cached);
-      setLoading(false);
     }
     void load({ silent: Boolean(storeId) });
   }, [load, storeId]);
@@ -232,12 +246,12 @@ export default function FinditHubPage() {
   }, [load]);
 
   const onRealtime = useCallback(() => {
-    if (storeId) void loadQueue(storeId, { silent: true });
-  }, [storeId, loadQueue]);
+    if (storeId && shiftLocked === false) void loadQueue(storeId, { silent: true });
+  }, [storeId, loadQueue, shiftLocked]);
   useStoreInboxRealtime(storeId, { onChange: onRealtime });
 
   useEffect(() => {
-    if (!storeId) return;
+    if (!storeId || shiftLocked !== false) return;
     const tick = () => {
       if (document.visibilityState !== "visible") return;
       void loadQueue(storeId, { silent: true });
@@ -245,7 +259,7 @@ export default function FinditHubPage() {
     tick();
     const id = window.setInterval(tick, HUB_INBOX_POLL_MS);
     return () => window.clearInterval(id);
-  }, [storeId, loadQueue]);
+  }, [storeId, loadQueue, shiftLocked]);
 
   useEffect(() => {
     if (source !== "device") return;
@@ -265,6 +279,17 @@ export default function FinditHubPage() {
       });
       if (beat && "ok" in beat && beat.ok === false) {
         goToLinking(beat.reason);
+        return;
+      }
+      const clockState = await getHubClockStateAction().catch((err) => {
+        console.error("[FINDIT Hub] clock check failed", err);
+        return null;
+      });
+      if (clockState?.required && !clockState.clockedIn) {
+        setQueue([]);
+        queueSignature.current = "";
+        setShiftName(null);
+        setShiftLocked(true);
       }
     };
     void checkLink();
@@ -297,11 +322,11 @@ export default function FinditHubPage() {
   const active = queue[index] ?? null;
 
   useEffect(() => {
-    if (!storeId || !active || !isValidId(active.id)) return;
+    if (!storeId || !active || !isValidId(active.id) || shiftLocked !== false) return;
     void markStoreRequestOpenedAction(storeId, active.id).catch((err) => {
       console.error("[FINDIT Hub] mark opened failed", err);
     });
-  }, [storeId, active]);
+  }, [storeId, active, shiftLocked]);
 
   const distanceLabel = useMemo(() => {
     if (!store || !active) return null;
@@ -363,6 +388,28 @@ export default function FinditHubPage() {
     void load({ silent: true });
   }
 
+  if (shiftLocked !== false) {
+    if (store && shiftLocked === true) {
+      return (
+        <HubClockGate
+          storeName={store.name}
+          onClockedIn={(name) => {
+            setShiftName(name);
+            setShiftLocked(false);
+            setLoading(false);
+            void loadQueue(store.id, { silent: false });
+          }}
+        />
+      );
+    }
+    return (
+      <div className="flex h-dvh flex-col items-center justify-center bg-black text-center text-white">
+        <BrandLogo kind="business" tone="dark" className="h-7 w-auto" />
+        <p className="mt-4 text-2xl font-semibold text-white/80">Preparing Hub…</p>
+      </div>
+    );
+  }
+
   const parsedPrice = price.trim() ? Number(price) : null;
   const priceInvalid = price.trim() !== "" && (!Number.isFinite(parsedPrice) || Number(parsedPrice) < 0);
 
@@ -380,6 +427,11 @@ export default function FinditHubPage() {
           <BrandLogo kind="business" tone="dark" className="h-6" />
           <span className="hidden text-white/25 sm:inline">·</span>
           <p className="max-w-[40vw] truncate text-sm text-white/70">{store?.name || "Store"}</p>
+          {shiftName ? (
+            <span className="hidden max-w-[20vw] truncate text-sm text-white/50 sm:inline">
+              {shiftName}
+            </span>
+          ) : null}
           {queue.length > 0 ? (
             <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
               {queue.length} waiting
@@ -674,11 +726,31 @@ export default function FinditHubPage() {
             {deviceName ? (
               <p className="mt-1 text-sm text-white/60">{deviceName}</p>
             ) : null}
+            {shiftName ? (
+              <p className="mt-1 text-sm text-white/70">Clocked in as {shiftName}</p>
+            ) : null}
             <p className="mt-2 text-sm text-white/50">
               {source === "device"
                 ? "This terminal is connected to the store. The owner can disconnect it from Devices in FINDIT Business."
                 : "Countertop terminal for this store. Exit returns to FINDIT Business — this screen does not sign you out of FINDIT."}
             </p>
+            {source === "device" && shiftName ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await clockOutHubAction();
+                  setSettingsOpen(false);
+                  setQueue([]);
+                  queueSignature.current = "";
+                  setIndex(0);
+                  setShiftName(null);
+                  setShiftLocked(true);
+                }}
+                className="mt-6 min-h-14 w-full rounded-2xl bg-[#E5231B] text-lg font-semibold"
+              >
+                Clock out
+              </button>
+            ) : null}
             {source === "member" && canManage ? (
               <button
                 type="button"

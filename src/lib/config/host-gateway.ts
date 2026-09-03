@@ -206,6 +206,11 @@ export function decideHostRouting(
   }
 
   if (surface === "store") {
+    if (publicPath === "/team" || publicPath === "/store/team") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/shifts";
+      return { kind: "redirect", url };
+    }
     if (publicPath.startsWith("/join") || isWwwPublicPath(publicPath) && publicPath !== "/") {
       if (publicPath !== "/") {
         return { kind: "redirect", url: absolute(request, "www", publicPath) };

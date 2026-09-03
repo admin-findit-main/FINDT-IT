@@ -38,7 +38,7 @@ function ownerStoreItems(): StoreNavItem[] {
     { href: "/store/demand", label: "Demand", icon: ChartNoAxesCombined },
     { href: "/store/notifications", label: "Alerts", icon: Bell },
     { href: "/store/settings", label: "Store", icon: Store },
-    { href: "/store/team", label: "Team", icon: Users },
+    { href: "/store/shifts", label: "Shifts", icon: Users },
     { href: "/store/account", label: "Account", icon: Settings },
   ];
 }
@@ -57,7 +57,7 @@ function ownerMobileItems(): StoreNavItem[] {
   return [
     { href: "/store/hub", label: "Hub", icon: Tablet },
     { href: "/store", label: "Requests", icon: PackageSearch },
-    { href: "/store/team", label: "Team", icon: Users },
+    { href: "/store/shifts", label: "Shifts", icon: Users },
     { href: "/store/account", label: "Account", icon: User },
   ];
 }

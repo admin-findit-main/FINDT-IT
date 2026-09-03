@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { IosSwitch } from "@/components/ui/ios-switch";
 import { formatRelativeTime } from "@/lib/utils";
 import {
+  deleteStoreDeviceAction,
   setStoreDeviceEnabledAction,
   type StoreDeviceView,
 } from "@/lib/services/hub-devices";
@@ -45,6 +46,26 @@ export function StoreDeviceEnableList({
     onChanged?.();
   }
 
+  async function removeDevice(device: StoreDeviceView) {
+    if (!canManage || busyId) return;
+    if (
+      !window.confirm(
+        `Remove ${device.device_name}? That tablet leaves this store and will show a new pairing code.`
+      )
+    ) {
+      return;
+    }
+    setBusyId(device.id);
+    const result = await deleteStoreDeviceAction(device.id);
+    setBusyId(null);
+    if ("error" in result && result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`${device.device_name} was removed.`);
+    onChanged?.();
+  }
+
   return (
     <ul className="space-y-3">
       {devices.map((device) => {
@@ -70,16 +91,28 @@ export function StoreDeviceEnableList({
                   : "Never seen"}
               </p>
             </div>
-            <IosSwitch
-              label={
-                enabled
-                  ? `Disable ${device.device_name}`
-                  : `Enable ${device.device_name}`
-              }
-              checked={enabled}
-              disabled={!canManage || busyId === device.id}
-              onCheckedChange={(next) => void setEnabled(device, next)}
-            />
+            <div className="flex shrink-0 items-center gap-2">
+              <IosSwitch
+                label={
+                  enabled
+                    ? `Disable ${device.device_name}`
+                    : `Enable ${device.device_name}`
+                }
+                checked={enabled}
+                disabled={!canManage || busyId === device.id}
+                onCheckedChange={(next) => void setEnabled(device, next)}
+              />
+              {canManage ? (
+                <button
+                  type="button"
+                  disabled={busyId === device.id}
+                  onClick={() => void removeDevice(device)}
+                  className="min-h-11 rounded-full px-3 text-sm font-semibold text-accent-ink disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
           </li>
         );
       })}

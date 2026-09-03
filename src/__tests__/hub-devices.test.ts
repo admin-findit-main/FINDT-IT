@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   demoClaimHubPairing,
   demoCreateHubPairing,
+  demoDeleteStoreDevice,
   demoGetStoreDeviceBySession,
   demoListStoreDevices,
   demoLogin,
@@ -137,6 +138,31 @@ describe("FINDIT Hub device pairing", () => {
     expect(demoGetStoreDeviceBySession(redeemed.deviceId, redeemed.token)?.id).toBe(
       redeemed.deviceId
     );
+  });
+
+  it("lets the owner delete a paired tablet so it is gone from the list", () => {
+    const owner = demoLogin("owner@demo.findit.local", "demo1234")!;
+    const store = getDemoState().stores.find((s) => s.owner_id === owner.id)!;
+    const pairing = demoCreateHubPairing();
+    const claimed = demoClaimHubPairing({
+      code: pairing.code,
+      storeId: store.id,
+      deviceName: "Spare iPad",
+      pairedBy: owner.id,
+    });
+    if ("error" in claimed) throw new Error(claimed.error);
+    const redeemed = demoRedeemHubPairing({
+      pairingId: pairing.pairingId,
+      secret: pairing.secret,
+    });
+    if ("error" in redeemed) throw new Error(redeemed.error);
+
+    const removed = demoDeleteStoreDevice(store.id, redeemed.deviceId);
+    expect(removed).toEqual({ ok: true });
+    expect(demoListStoreDevices(store.id).some((d) => d.id === redeemed.deviceId)).toBe(
+      false
+    );
+    expect(demoGetStoreDeviceBySession(redeemed.deviceId, redeemed.token)).toBeNull();
   });
 
   it("serializes a device cookie without storing the raw token in the listing", () => {

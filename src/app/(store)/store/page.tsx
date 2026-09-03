@@ -118,10 +118,10 @@ function OwnerOverview() {
               Connect FINDIT Hub
             </Link>
             <Link
-              href="/store/team"
+              href="/store/shifts"
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
             >
-              Invite staff
+              Employee shifts
             </Link>
             <Link
               href="/store/settings"

@@ -82,7 +82,7 @@ export function dashTitle(pathname: string): { title: string; subtitle: string }
     "/store/requests": { title: "Requests", subtitle: "Answer nearby asks" },
     "/store/responses": { title: "Responses", subtitle: "What your team already answered" },
     "/store/demand": { title: "Demand", subtitle: "What people nearby keep asking for" },
-    "/store/team": { title: "Team", subtitle: "Who can answer on FINDIT" },
+    "/store/shifts": { title: "Shifts", subtitle: "Who can clock in on the Hub" },
     "/store/devices": { title: "Devices", subtitle: "Counter tablets connected to this store" },
     "/store/settings": { title: "Store profile", subtitle: "How this location appears" },
     "/store/subscription": { title: "Billing", subtitle: "FINDIT Business" },
@@ -124,6 +124,6 @@ export const STORE_PROFILE_MENU = [
   { href: "/store/settings#hours", label: "Business Hours" },
   { href: "/store/settings#area", label: "Service Area" },
   { href: "/store/settings#categories", label: "Request Categories" },
-  { href: "/store/team", label: "Team" },
+  { href: "/store/shifts", label: "Shifts" },
   { href: "/store/notifications", label: "Notifications" },
 ] as const;

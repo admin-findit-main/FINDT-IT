@@ -14,6 +14,10 @@ export function hashPairingCode(code: string, pepper = pairingPepper()): string 
   return createHmac("sha256", pepper).update(code).digest("hex");
 }
 
+export function generateHubPin(): string {
+  return String(randomInt(0, 10_000)).padStart(4, "0");
+}
+
 export function generatePairingCode(): string {
   return String(randomInt(0, 1_000_000)).padStart(6, "0");
 }
@@ -44,6 +48,21 @@ export function parseDeviceCookie(
     return null;
   }
   return { deviceId, token };
+}
+
+export function serializeShiftCookie(punchId: string): string {
+  return `v1.${punchId}`;
+}
+
+export function parseShiftCookie(
+  value: string | undefined | null
+): { punchId: string } | null {
+  if (!value) return null;
+  const parts = value.split(".");
+  if (parts.length !== 2 || parts[0] !== "v1") return null;
+  const punchId = parts[1];
+  if (!/^[0-9a-f-]{36}$/i.test(punchId)) return null;
+  return { punchId };
 }
 
 export function serializePairingCookie(pairingId: string, secret: string): string {

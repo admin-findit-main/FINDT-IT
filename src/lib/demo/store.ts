@@ -14,6 +14,8 @@ import type {
   Store,
   StoreApplication,
   StoreDevice,
+  StoreShiftEmployee,
+  StoreShiftPunch,
   StoreMetrics,
   StoreResponse,
   StoreMember,
@@ -50,6 +52,7 @@ import {
 } from "@/lib/services/request-lifecycle";
 import { isStoreOpenAt } from "@/lib/services/store-hours";
 import {
+  generateHubPin,
   generatePairingCode,
   generateSecret,
   hashPairingCode,
@@ -101,6 +104,8 @@ interface DemoState {
   storeApplications: StoreApplication[];
   storeDevices: StoreDevice[];
   devicePairings: DevicePairingCode[];
+  shiftEmployees: StoreShiftEmployee[];
+  shiftPunches: StoreShiftPunch[];
   sessions: Record<string, SessionUser>;
   currentSessionId: string | null;
   phoneOtps: Record<string, { sentAt: number }>;
@@ -453,6 +458,8 @@ function seedState(): DemoState {
     ],
     storeDevices: [],
     devicePairings: [],
+    shiftEmployees: [],
+    shiftPunches: [],
     sessions: {},
     currentSessionId: null,
     phoneOtps: {},
@@ -2104,6 +2111,25 @@ export function demoRevokeStoreDevice(
   return demoSetStoreDeviceEnabled(storeId, deviceId, false);
 }
 
+export function demoDeleteStoreDevice(
+  storeId: string,
+  deviceId: string
+): { ok: true } | { error: string } {
+  const state = getDemoState();
+  const index = state.storeDevices.findIndex(
+    (d) => d.id === deviceId && d.store_id === storeId
+  );
+  if (index < 0) return { error: "Device not found." };
+  state.storeDevices.splice(index, 1);
+  for (const pairing of state.devicePairings) {
+    if (pairing.device_id === deviceId) {
+      pairing.device_id = null;
+      pairing.issued_token = null;
+    }
+  }
+  return { ok: true };
+}
+
 export function demoSetStoreDeviceEnabled(
   storeId: string,
   deviceId: string,
@@ -2123,4 +2149,154 @@ export function demoTouchStoreDevice(deviceId: string): void {
   if (!device || device.revoked_at) return;
   device.last_seen_at = now();
   device.updated_at = now();
+}
+
+function unusedHubPin(storeId: string): string {
+  const taken = new Set(
+    getDemoState()
+      .shiftEmployees.filter((row) => row.store_id === storeId && row.pin)
+      .map((row) => row.pin as string)
+  );
+  for (let i = 0; i < 40; i += 1) {
+    const pin = generateHubPin();
+    if (!taken.has(pin)) return pin;
+  }
+  throw new Error("Could not pick a free PIN.");
+}
+
+export function demoListShiftEmployees(storeId: string): StoreShiftEmployee[] {
+  return getDemoState()
+    .shiftEmployees.filter((row) => row.store_id === storeId)
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+}
+
+export function demoAddShiftEmployee(
+  storeId: string,
+  displayName: string
+): StoreShiftEmployee | { error: string } {
+  const name = displayName.trim().slice(0, 80);
+  if (!name) return { error: "Name this person." };
+  const employee: StoreShiftEmployee = {
+    id: randomUUID(),
+    store_id: storeId,
+    display_name: name,
+    pin: unusedHubPin(storeId),
+    active: true,
+    created_at: now(),
+    updated_at: now(),
+  };
+  getDemoState().shiftEmployees.push(employee);
+  return employee;
+}
+
+export function demoSetShiftEmployeePin(
+  storeId: string,
+  employeeId: string,
+  pin: string | null
+): StoreShiftEmployee | { error: string } {
+  const employee = getDemoState().shiftEmployees.find(
+    (row) => row.id === employeeId && row.store_id === storeId
+  );
+  if (!employee) return { error: "Person not found." };
+  if (pin) {
+    const clash = getDemoState().shiftEmployees.find(
+      (row) => row.store_id === storeId && row.pin === pin && row.id !== employeeId
+    );
+    if (clash) return { error: "That PIN is already used at this store." };
+  }
+  employee.pin = pin;
+  employee.updated_at = now();
+  if (!pin) {
+    const stamp = now();
+    for (const punch of getDemoState().shiftPunches) {
+      if (punch.employee_id === employeeId && !punch.clocked_out_at) {
+        punch.clocked_out_at = stamp;
+      }
+    }
+  }
+  return employee;
+}
+
+export function demoDeleteShiftEmployee(
+  storeId: string,
+  employeeId: string
+): { ok: true } | { error: string } {
+  const state = getDemoState();
+  const index = state.shiftEmployees.findIndex(
+    (row) => row.id === employeeId && row.store_id === storeId
+  );
+  if (index < 0) return { error: "Person not found." };
+  const id = state.shiftEmployees[index].id;
+  state.shiftEmployees.splice(index, 1);
+  state.shiftPunches = state.shiftPunches.filter((row) => row.employee_id !== id);
+  return { ok: true };
+}
+
+export function demoOpenPunch(employeeId: string): StoreShiftPunch | undefined {
+  return getDemoState().shiftPunches.find(
+    (row) => row.employee_id === employeeId && !row.clocked_out_at
+  );
+}
+
+export function demoClockInHub(input: {
+  storeId: string;
+  pin: string;
+  deviceId: string | null;
+}):
+  | { punch: StoreShiftPunch; employee: StoreShiftEmployee }
+  | { error: string } {
+  const employee = getDemoState().shiftEmployees.find(
+    (row) =>
+      row.store_id === input.storeId &&
+      row.active &&
+      row.pin === input.pin
+  );
+  if (!employee) return { error: "That PIN is not on this store." };
+  const existing = demoOpenPunch(employee.id);
+  if (existing) {
+    if (input.deviceId) existing.device_id = input.deviceId;
+    return { punch: existing, employee };
+  }
+  const punch: StoreShiftPunch = {
+    id: randomUUID(),
+    store_id: input.storeId,
+    employee_id: employee.id,
+    device_id: input.deviceId,
+    clocked_in_at: now(),
+    clocked_out_at: null,
+    created_at: now(),
+  };
+  getDemoState().shiftPunches.push(punch);
+  return { punch, employee };
+}
+
+export function demoClockOutHub(
+  punchId: string,
+  storeId: string
+): StoreShiftPunch | { error: string } {
+  const punch = getDemoState().shiftPunches.find(
+    (row) => row.id === punchId && row.store_id === storeId && !row.clocked_out_at
+  );
+  if (!punch) return { error: "Already clocked out." };
+  punch.clocked_out_at = now();
+  return punch;
+}
+
+export function demoGetOpenPunch(
+  punchId: string,
+  storeId: string
+): { punch: StoreShiftPunch; employee: StoreShiftEmployee } | null {
+  const punch = getDemoState().shiftPunches.find(
+    (row) => row.id === punchId && row.store_id === storeId && !row.clocked_out_at
+  );
+  if (!punch) return null;
+  const employee = getDemoState().shiftEmployees.find((row) => row.id === punch.employee_id);
+  if (!employee || !employee.active) return null;
+  return { punch, employee };
+}
+
+export function demoCountClockableEmployees(storeId: string): number {
+  return getDemoState().shiftEmployees.filter(
+    (row) => row.store_id === storeId && row.active && row.pin
+  ).length;
 }

@@ -706,7 +706,7 @@ export default function StoreSettingsPage() {
 
         <SectionCard
           title="Hub devices"
-          body="Turn counter tablets on or off without unpairing them"
+          body="Turn a counter tablet off, or remove it so it needs a new code"
           open={openSection === "devices"}
           onToggle={() => toggleSection("devices")}
         >
@@ -729,9 +729,9 @@ export default function StoreSettingsPage() {
 
         {canManage ? (
           <MenuLink
-            href="/store/team"
-            title="Team"
-            body="Invite employees and managers"
+            href="/store/shifts"
+            title="Shifts"
+            body="Employee PINs and who is clocked in"
           />
         ) : null}
 

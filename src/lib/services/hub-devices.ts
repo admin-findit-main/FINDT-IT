@@ -437,6 +437,36 @@ export async function revokeStoreDeviceAction(deviceId: string) {
   return setStoreDeviceEnabledAction(deviceId, false);
 }
 
+export async function deleteStoreDeviceAction(deviceId: string) {
+  const id = boundUuid(deviceId);
+  if (!id) return { error: "Device not found." };
+  const manager = await requireStoreManager();
+  if (manager.error || !manager.storeId) return { error: manager.error || "Unauthorized" };
+
+  if (isDemoMode()) {
+    const { demoDeleteStoreDevice } = await import("@/lib/demo/store");
+    return demoDeleteStoreDevice(manager.storeId, id);
+  }
+
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data, error } = await admin
+    .from("store_devices")
+    .delete()
+    .eq("id", id)
+    .eq("store_id", manager.storeId)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) return { error: "Couldn't remove that device." };
+  void logSecurityEvent({
+    actorId: manager.profile?.id,
+    action: "hub_device_removed",
+    resource: id,
+    metadata: { storeId: manager.storeId },
+  });
+  return { ok: true as const };
+}
+
 export async function touchHubDeviceAction(): Promise<
   { ok: true } | { ok: false; reason: HubRelinkReason }
 > {

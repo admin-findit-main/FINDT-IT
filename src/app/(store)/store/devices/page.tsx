@@ -11,6 +11,7 @@ import { IosSwitch } from "@/components/ui/ios-switch";
 import { formatRelativeTime } from "@/lib/utils";
 import {
   claimHubPairingAction,
+  deleteStoreDeviceAction,
   listStoreDevicesAction,
   previewHubPairingAction,
   renameStoreDeviceAction,
@@ -244,6 +245,35 @@ function StoreDevicesClient() {
                         await load();
                       }}
                     />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="min-h-11 border-[var(--accent-ring)] text-accent-ink"
+                      disabled={busyId === device.id}
+                      onClick={async () => {
+                        if (
+                          !window.confirm(
+                            `Remove ${device.device_name}? That tablet leaves this store and will show a new pairing code.`
+                          )
+                        ) {
+                          return;
+                        }
+                        setBusyId(device.id);
+                        const result = await deleteStoreDeviceAction(device.id);
+                        setBusyId(null);
+                        if ("error" in result && result.error) {
+                          toast.error(result.error);
+                          return;
+                        }
+                        toast.success("Device removed");
+                        setRenaming((current) =>
+                          current === device.id ? null : current
+                        );
+                        await load();
+                      }}
+                    >
+                      Remove
+                    </Button>
                   </div>
                 </div>
               </Card>

@@ -51,7 +51,7 @@ describe("pretty store and dashboard paths", () => {
   it("maps store request and settings paths without a /store prefix in the URL", () => {
     expect(toInternalPath("store", "/requests")).toBe("/store/requests");
     expect(toInternalPath("store", "/requests/abc")).toBe("/store/requests/abc");
-    expect(toInternalPath("store", "/team")).toBe("/store/team");
+    expect(toInternalPath("store", "/shifts")).toBe("/store/shifts");
     expect(toPublicPath("store", "/store/requests/abc")).toBe("/requests/abc");
     expect(toPublicPath("store", "/login/business")).toBe("/login");
     expect(toInternalPath("store", "/login")).toBe("/login/business");

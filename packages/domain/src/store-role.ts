@@ -23,6 +23,7 @@ export function isOwnerOnlyStorePath(pathname: string): boolean {
   return (
     pathname.startsWith("/store/demand") ||
     pathname.startsWith("/store/team") ||
+    pathname.startsWith("/store/shifts") ||
     pathname.startsWith("/store/settings") ||
     pathname.startsWith("/store/subscription") ||
     pathname.startsWith("/store/devices") ||

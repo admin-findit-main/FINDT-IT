@@ -332,6 +332,27 @@ export interface DevicePushToken {
   created_at: string;
 }
 
+/** Floor staff who clock into FINDIT Hub with a 4-digit PIN. */
+export interface StoreShiftEmployee {
+  id: string;
+  store_id: string;
+  display_name: string;
+  pin: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoreShiftPunch {
+  id: string;
+  store_id: string;
+  employee_id: string;
+  device_id: string | null;
+  clocked_in_at: string;
+  clocked_out_at: string | null;
+  created_at: string;
+}
+
 /** Paired FINDIT Hub terminal (counter tablet / POS browser). */
 export interface StoreDevice {
   id: string;

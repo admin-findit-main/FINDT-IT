@@ -95,11 +95,11 @@ describe("decideHostRouting", () => {
     }
   });
 
-  it("pretty-redirects team and notifications on the store host", () => {
-    const team = decideHostRouting(req("store.askfindit.com", "/store/team"), "manager");
-    expect(team.kind).toBe("redirect");
-    if (team.kind === "redirect") {
-      expect(team.url.pathname).toBe("/team");
+  it("pretty-redirects shifts and notifications on the store host", () => {
+    const shifts = decideHostRouting(req("store.askfindit.com", "/store/shifts"), "manager");
+    expect(shifts.kind).toBe("redirect");
+    if (shifts.kind === "redirect") {
+      expect(shifts.url.pathname).toBe("/shifts");
     }
     const notes = decideHostRouting(
       req("store.askfindit.com", "/store/notifications"),
@@ -109,11 +109,16 @@ describe("decideHostRouting", () => {
     if (notes.kind === "redirect") {
       expect(notes.url.pathname).toBe("/notifications");
     }
-    const prettyTeam = decideHostRouting(req("store.askfindit.com", "/team"), "manager");
-    expect(prettyTeam.kind).toBe("continue");
-    if (prettyTeam.kind === "continue") {
-      expect(prettyTeam.internalPath).toBe("/store/team");
-      expect(prettyTeam.rewrite).toBe(true);
+    const prettyShifts = decideHostRouting(req("store.askfindit.com", "/shifts"), "manager");
+    expect(prettyShifts.kind).toBe("continue");
+    if (prettyShifts.kind === "continue") {
+      expect(prettyShifts.internalPath).toBe("/store/shifts");
+      expect(prettyShifts.rewrite).toBe(true);
+    }
+    const oldTeam = decideHostRouting(req("store.askfindit.com", "/team"), "manager");
+    expect(oldTeam.kind).toBe("redirect");
+    if (oldTeam.kind === "redirect") {
+      expect(oldTeam.url.pathname).toBe("/shifts");
     }
   });
 

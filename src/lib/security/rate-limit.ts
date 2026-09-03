@@ -10,6 +10,7 @@ const FAIL_CLOSED_BUCKETS = new Set([
   "phone-otp",
   "hub-pairing",
   "hub-claim",
+  "hub-clock",
   "create-request",
   "account-delete",
 ]);

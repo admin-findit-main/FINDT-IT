@@ -159,6 +159,16 @@ export const inviteEmployeeSchema = z.object({
   role: z.enum(["manager", "employee"]),
 });
 
+export function normalizeHubPin(value: string): string | null {
+  const digits = value.replace(/\D/g, "");
+  return /^\d{4}$/.test(digits) ? digits : null;
+}
+
+export const shiftEmployeeNameSchema = z
+  .string()
+  .transform((value) => sanitizeText(value, 80))
+  .pipe(z.string().min(1, "Name this person.").max(80));
+
 export const reportSchema = z.object({
   reason: z.string().min(3).max(120),
   description: z.string().max(500).optional().or(z.literal("")),
