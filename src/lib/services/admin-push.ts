@@ -7,11 +7,7 @@ import { isExpoPushToken, sendWebPush } from "@/lib/services/web-push";
 import { sendExpoPush } from "@/lib/services/expo-push";
 
 type ServiceAdmin = {
-  from: (table: string) => {
-    select: (columns: string) => any;
-    insert: (rows: any) => any;
-    delete: () => any;
-  };
+  from: (table: string) => any;
 };
 
 type TokenRow = { token: string; user_id: string };

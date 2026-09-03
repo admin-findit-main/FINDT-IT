@@ -42,7 +42,7 @@ export async function getAdminPushPageDataAction(): Promise<{
   }
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
-  const admin = createServiceClient();
+  const admin = createServiceClient() as Parameters<typeof countPushAudience>[0];
   const [all, shoppers, store_owners, employees, recentRes] = await Promise.all([
     countPushAudience(admin, "all"),
     countPushAudience(admin, "shoppers"),
@@ -91,7 +91,7 @@ export async function sendAdminPushBroadcastAction(input: {
 
   try {
     const { createServiceClient } = await import("@/lib/supabase/admin");
-    const admin = createServiceClient();
+    const admin = createServiceClient() as Parameters<typeof deliverAdminPush>[0]["admin"];
     const result = await deliverAdminPush({
       admin,
       audience: input.audience,
