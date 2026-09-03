@@ -104,28 +104,28 @@ function OwnerOverview() {
       </div>
 
       {!hubConnected ? (
-        <div className="rounded-2xl border border-hairline-strong bg-white px-5 py-4">
+        <div className="rounded-2xl border border-hairline-strong bg-white px-4 py-4 sm:px-5">
           <p className="text-sm font-semibold text-ink">Open your store</p>
           <p className="mt-1 text-sm text-ink-muted">
             FINDIT accepted you. Connect a counter tablet, invite staff, and
             confirm hours so you can answer Asks.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             <Link
               href="/store/hub"
-              className="rounded-full bg-[#E5231B] px-4 py-2 text-sm font-semibold text-white"
+              className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#E5231B] px-4 py-2 text-center text-sm font-semibold text-white"
             >
               Connect FINDIT Hub
             </Link>
             <Link
               href="/store/team"
-              className="rounded-full border border-hairline-strong px-4 py-2 text-sm font-semibold text-ink"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
             >
               Invite staff
             </Link>
             <Link
               href="/store/settings"
-              className="rounded-full border border-hairline-strong px-4 py-2 text-sm font-semibold text-ink"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
             >
               Store profile
             </Link>
@@ -157,7 +157,7 @@ function OwnerOverview() {
       </div>
 
       {waiting.length ? (
-        <div className="flex items-center justify-between rounded-2xl border border-[#E5231B]/20 bg-[#FFF1F0] px-5 py-4">
+        <div className="flex flex-col items-stretch gap-3 rounded-2xl border border-[#E5231B]/20 bg-[#FFF1F0] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
             <p className="text-sm font-semibold text-[#C81109]">
               {waiting.length} request{waiting.length === 1 ? "" : "s"} waiting
@@ -166,7 +166,7 @@ function OwnerOverview() {
           </div>
           <Link
             href="/store/requests"
-            className="rounded-full bg-[#E5231B] px-4 py-2 text-sm font-semibold text-white"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#E5231B] px-4 py-2 text-center text-sm font-semibold text-white"
           >
             View requests
           </Link>

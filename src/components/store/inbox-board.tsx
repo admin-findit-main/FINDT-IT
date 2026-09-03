@@ -194,7 +194,7 @@ export function StoreInboxBoard() {
 
   if (!loading && stores.length === 0) {
     return (
-      <div className="px-5 pt-10 md:px-8">
+      <div className="px-1 py-4">
           <EmptyState
             title="No store assigned yet"
             description="Owners apply on FINDIT. Staff join with an invite from their owner."

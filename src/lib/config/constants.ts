@@ -43,6 +43,7 @@ export {
   PAYMENTS_COMING_SOON_TITLE,
   PAYMENTS_COMING_SOON_BODY,
   PAYMENTS_COMING_SOON_NOTE,
+  WAITING_FOR_REPLY_HINT,
   planLimitReachedMessage,
   radiusLimitMessage,
   isMonthlyFindCapError,

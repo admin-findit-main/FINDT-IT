@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import { GlassSelect, Overline } from "@/components/ui/glass";
-import { BackLink } from "@/components/shared/app-header";
 import {
   getStoreDemandAction,
   getStoreMetricsAction,
@@ -47,8 +46,7 @@ export default function DemandPage() {
   );
 
   return (
-    <div className="px-5 pt-6 md:px-8 md:pt-8">
-      <BackLink href="/store" label="Store home" className="mb-2 md:hidden" />
+    <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-ink">

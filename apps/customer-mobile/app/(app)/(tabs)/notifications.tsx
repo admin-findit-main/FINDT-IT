@@ -2,7 +2,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { formatRelativeTime } from "@findit/domain";
+import { formatRelativeTime, WAITING_FOR_REPLY_HINT } from "@findit/domain";
 import type { Notification } from "@findit/types";
 import { radius, spacing, typography } from "@findit/theme";
 import { GlassCard, GlassEmptyState, useAppTheme } from "@findit/theme/native";
@@ -37,7 +37,7 @@ export default function NotificationsScreen() {
         {items.length === 0 ? (
           <GlassEmptyState
             title="No alerts yet."
-            description="When a store answers, it shows up here."
+            description={WAITING_FOR_REPLY_HINT}
           />
         ) : (
           <GlassCard padded={false}>

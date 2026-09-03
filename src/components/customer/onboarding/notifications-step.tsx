@@ -78,8 +78,9 @@ export function NotificationsStep({
 
         {permission === "denied" ? (
           <p className="mt-6 text-sm leading-relaxed text-ink-muted">
-            Notifications are off. Enable them in your device or browser settings
-            to receive store responses.
+            Notifications are off. Leave FINDIT open while you wait. Enable
+            alerts in your device or browser settings if you want a ping after
+            you switch away.
           </p>
         ) : null}
       </div>

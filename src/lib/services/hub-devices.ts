@@ -16,14 +16,18 @@ import {
   sha256Hex,
 } from "@/lib/hub/crypto";
 import {
+  clearHubDeviceCookie,
   clearHubPairingCookie,
   getHubDeviceSession,
+  inspectHubDeviceCookie,
   readHubPairingCookie,
   setHubDeviceCookie,
   setHubPairingCookie,
+  type HubDeviceInspect,
 } from "@/lib/hub/session";
 import { getCurrentProfile, getStoreWorkspaceAction } from "@/lib/services/actions";
 import { boundUuid } from "@findit/domain";
+import type { HubRelinkReason } from "@/lib/hub/relink";
 
 export type HubRuntime = {
   store: Store;
@@ -58,31 +62,51 @@ async function requireStoreManager(storeId?: string) {
   return { profile, storeId: id };
 }
 
+function runtimeFromWorkspace(
+  workspace: NonNullable<Awaited<ReturnType<typeof getStoreWorkspaceAction>>>
+): HubRuntime {
+  return {
+    store: workspace.store!,
+    source: "member",
+    role: workspace.role,
+    canManage: workspace.canManageStore,
+    deviceName: null,
+    deviceId: null,
+  };
+}
+
+function runtimeFromDevice(
+  device: Extract<HubDeviceInspect, { status: "linked" }>["session"]
+): HubRuntime {
+  return {
+    store: device.store,
+    source: "device",
+    role: "employee",
+    canManage: false,
+    deviceName: device.device_name,
+    deviceId: device.id,
+  };
+}
+
 export const getHubRuntimeAction = cache(async (): Promise<HubRuntime | null> => {
+  const resolved = await resolveHubTerminalAction();
+  return resolved.ok ? resolved.runtime : null;
+});
+
+export async function resolveHubTerminalAction(): Promise<
+  { ok: true; runtime: HubRuntime } | { ok: false; reason: HubRelinkReason }
+> {
   const workspace = await getStoreWorkspaceAction();
   if (workspace?.store) {
-    return {
-      store: workspace.store,
-      source: "member",
-      role: workspace.role,
-      canManage: workspace.canManageStore,
-      deviceName: null,
-      deviceId: null,
-    };
+    return { ok: true, runtime: runtimeFromWorkspace(workspace) };
   }
-  const device = await getHubDeviceSession();
-  if (device) {
-    return {
-      store: device.store,
-      source: "device",
-      role: "employee",
-      canManage: false,
-      deviceName: device.device_name,
-      deviceId: device.id,
-    };
+  const device = await inspectHubDeviceCookie();
+  if (device.status === "linked") {
+    return { ok: true, runtime: runtimeFromDevice(device.session) };
   }
-  return null;
-});
+  if (device.status === "absent") return { ok: false, reason: "missing" };
+  return { ok: false, reason: device.status };
+}
 
 export async function createHubPairingAction(): Promise<
   { code: string; expiresAt: string; pairUrl: string } | { error: string }
@@ -413,25 +437,36 @@ export async function revokeStoreDeviceAction(deviceId: string) {
   return setStoreDeviceEnabledAction(deviceId, false);
 }
 
-export async function touchHubDeviceAction() {
-  const device = await getHubDeviceSession();
-  if (!device) return { ok: false as const };
+export async function touchHubDeviceAction(): Promise<
+  { ok: true } | { ok: false; reason: HubRelinkReason }
+> {
+  const linked = await resolveHubTerminalAction();
+  if (!linked.ok) return linked;
+  if (linked.runtime.source !== "device" || !linked.runtime.deviceId) {
+    return { ok: true };
+  }
   if (isDemoMode()) {
     const { demoTouchStoreDevice } = await import("@/lib/demo/store");
-    demoTouchStoreDevice(device.id);
-    return { ok: true as const };
+    demoTouchStoreDevice(linked.runtime.deviceId);
+    return { ok: true };
   }
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  await admin
+  const { data } = await admin
     .from("store_devices")
     .update({
       last_seen_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", device.id)
-    .is("revoked_at", null);
-  return { ok: true as const };
+    .eq("id", linked.runtime.deviceId)
+    .is("revoked_at", null)
+    .select("id")
+    .maybeSingle();
+  if (!data) {
+    await clearHubDeviceCookie();
+    return { ok: false, reason: "disconnected" };
+  }
+  return { ok: true };
 }
 
 function toView(device: StoreDevice): StoreDeviceView {

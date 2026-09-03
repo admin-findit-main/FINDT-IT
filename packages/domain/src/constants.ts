@@ -226,3 +226,7 @@ export const PAYMENTS_COMING_SOON_BODY =
   "Enjoy your free trial while we finish setting up billing.";
 export const PAYMENTS_COMING_SOON_NOTE =
   "You'll be notified before any paid subscription begins.";
+
+/** Shown while a shopper is waiting for store replies without reliable lock-screen push. */
+export const WAITING_FOR_REPLY_HINT =
+  "Leave FINDIT open until a store answers. If you close it, you can miss the reply.";

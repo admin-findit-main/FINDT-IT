@@ -8,6 +8,7 @@ import {
   formatShortPlace,
   isRequestExpired,
   mapsDirectionsUrl,
+  WAITING_FOR_REPLY_HINT,
 } from "@findit/domain";
 import { spacing, typography } from "@findit/theme";
 import {
@@ -157,7 +158,7 @@ export default function RequestDetailScreen() {
             description={
               detail.stores_targeted === 0
                 ? "We saved this ask. Try another ZIP, or check back as more stores join."
-                : `${detail.stores_targeted} store${detail.stores_targeted === 1 ? "" : "s"} asked.`
+                : WAITING_FOR_REPLY_HINT
             }
           />
         ) : (

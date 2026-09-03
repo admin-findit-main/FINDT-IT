@@ -10,9 +10,10 @@ import {
   signOutAction,
 } from "@/lib/services/actions";
 import {
-  getHubRuntimeAction,
+  resolveHubTerminalAction,
   touchHubDeviceAction,
 } from "@/lib/services/hub-devices";
+import { hubConnectHref } from "@/lib/hub/relink";
 import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
 import {
   HUB_DEVICE_HEARTBEAT_MS,
@@ -86,16 +87,23 @@ export default function FinditHubPage() {
   const queueSignature = useRef("");
   const storeId = store?.id;
 
+  const goToLinking = useCallback(
+    (reason?: Parameters<typeof hubConnectHref>[0]) => {
+      setStore(null);
+      setQueue([]);
+      router.replace(hubConnectHref(reason));
+    },
+    [router]
+  );
+
   const loadRuntime = useCallback(async () => {
     try {
-      const runtime = await getHubRuntimeAction();
-      if (!runtime?.store) {
-        setError("This Hub is not linked to an approved store.");
-        setStore(null);
-        setQueue([]);
-        router.replace("/store/hub/connect");
+      const linked = await resolveHubTerminalAction();
+      if (!linked.ok) {
+        goToLinking(linked.reason);
         return null;
       }
+      const runtime = linked.runtime;
       if (!isValidId(runtime.store.id)) {
         setError("Store session is invalid.");
         return null;
@@ -105,9 +113,14 @@ export default function FinditHubPage() {
       setDeviceName(runtime.deviceName);
       setStore(runtime.store);
       if (runtime.source === "device") {
-        void touchHubDeviceAction().catch((err) => {
+        const beat = await touchHubDeviceAction().catch((err) => {
           console.error("[FINDIT Hub] device heartbeat failed", err);
+          return { ok: false as const, reason: "disconnected" as const };
         });
+        if (beat && "ok" in beat && beat.ok === false) {
+          goToLinking(beat.reason);
+          return null;
+        }
       }
       setError(null);
       setOnline(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -116,7 +129,7 @@ export default function FinditHubPage() {
       console.error("[FINDIT Hub] runtime failed", err);
       return null;
     }
-  }, [router]);
+  }, [goToLinking]);
 
   const loadQueue = useCallback(async (id: string, opts?: { silent?: boolean }) => {
     const seq = ++queueSeq.current;
@@ -236,15 +249,28 @@ export default function FinditHubPage() {
 
   useEffect(() => {
     if (source !== "device") return;
-    const beat = () => {
+    const checkLink = async () => {
       if (document.visibilityState !== "visible") return;
-      void touchHubDeviceAction().catch((err) => {
-        console.error("[FINDIT Hub] device heartbeat failed", err);
+      const linked = await resolveHubTerminalAction().catch((err) => {
+        console.error("[FINDIT Hub] link check failed", err);
+        return null;
       });
+      if (linked && !linked.ok) {
+        goToLinking(linked.reason);
+        return;
+      }
+      const beat = await touchHubDeviceAction().catch((err) => {
+        console.error("[FINDIT Hub] device heartbeat failed", err);
+        return { ok: false as const, reason: "disconnected" as const };
+      });
+      if (beat && "ok" in beat && beat.ok === false) {
+        goToLinking(beat.reason);
+      }
     };
-    const id = window.setInterval(beat, HUB_DEVICE_HEARTBEAT_MS);
+    void checkLink();
+    const id = window.setInterval(checkLink, HUB_DEVICE_HEARTBEAT_MS);
     return () => window.clearInterval(id);
-  }, [source]);
+  }, [source, goToLinking]);
 
   useEffect(() => {
     let wake: WakeLockSentinel | null = null;

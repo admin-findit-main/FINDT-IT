@@ -19,6 +19,11 @@ import {
   serializeDeviceCookie,
   sha256Hex,
 } from "@/lib/hub/crypto";
+import {
+  hubConnectHref,
+  hubRelinkMessage,
+  parseHubRelinkReason,
+} from "@/lib/hub/relink";
 
 beforeEach(() => {
   resetDemoState();
@@ -140,5 +145,18 @@ describe("FINDIT Hub device pairing", () => {
     const cookie = serializeDeviceCookie(deviceId, token);
     expect(parseDeviceCookie(cookie)).toEqual({ deviceId, token });
     expect(sha256Hex(token)).not.toBe(token);
+  });
+});
+
+describe("Hub relink copy", () => {
+  it("sends disconnected tablets to the pairing screen with a reason", () => {
+    expect(hubConnectHref("disconnected")).toBe(
+      "/store/hub/connect?reason=disconnected"
+    );
+    expect(hubConnectHref("missing")).toBe("/store/hub/connect");
+    expect(parseHubRelinkReason("disconnected")).toBe("disconnected");
+    expect(parseHubRelinkReason("nope")).toBeNull();
+    expect(hubRelinkMessage("disconnected")).toMatch(/disconnected/i);
+    expect(hubRelinkMessage("missing")).toBeNull();
   });
 });

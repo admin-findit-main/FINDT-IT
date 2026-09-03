@@ -1,3 +1,4 @@
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
@@ -108,7 +109,7 @@ export default function PlanScreen() {
 
         {catalog.billingLive ? null : (
           <View style={{ alignItems: "center", paddingVertical: spacing.lg }}>
-            <Text style={{ fontSize: 22 }}>🔒</Text>
+            <FontAwesome name="credit-card" size={22} color={theme.inkMuted} />
             <Text style={[styles.planName, { color: theme.ink, marginTop: spacing.sm }]}>
               {PAYMENTS_COMING_SOON_TITLE}
             </Text>

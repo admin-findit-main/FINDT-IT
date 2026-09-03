@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
 import { Overline } from "@/components/ui/glass";
 import { DeleteAccountCard } from "@/components/account/delete-account-card";
-import { BackLink } from "@/components/shared/app-header";
 import { roleLabel } from "@/lib/auth/store-role";
 import {
   getCurrentProfile,
@@ -27,15 +26,14 @@ export default function StoreAccountPage() {
   }, []);
 
   if (!profile) {
-    return <div className="px-5 pt-8 text-sm text-ink-muted">Loading…</div>;
+    return <p className="text-sm text-ink-muted">Loading…</p>;
   }
 
   const role = workspace?.role || "employee";
   const storeName = workspace?.store?.name || "Your store";
 
   return (
-    <div className="px-5 pt-6 md:px-8 md:pt-8">
-      <BackLink href="/store" label="Store home" className="mb-2 md:hidden" />
+    <div>
       <h1 className="text-2xl font-bold tracking-tight text-ink">Account</h1>
       <p className="mt-1 text-sm text-ink-muted">
         Your login for this store.

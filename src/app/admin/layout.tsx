@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { isSoloAdmin } from "@/lib/auth/admin";
-import { adminDashItems } from "@/lib/dashboard/nav";
+import { adminDashItems, adminMobileDashItems } from "@/lib/dashboard/nav";
 import { getCurrentProfile } from "@/lib/services/actions";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +26,7 @@ export default async function AdminLayout({
       role="Platform operator"
       email={profile.email}
       items={adminDashItems}
+      mobileItems={adminMobileDashItems}
       accountHref="/admin"
       logoutHref="/login/business"
     >

@@ -1,3 +1,4 @@
+import { CreditCard } from "lucide-react";
 import {
   PAYMENTS_COMING_SOON_BODY,
   PAYMENTS_COMING_SOON_NOTE,
@@ -15,9 +16,11 @@ export function ComingSoonFeature({
 }) {
   return (
     <div className="py-10 text-center">
-      <p aria-hidden className="text-2xl">
-        🔒
-      </p>
+      <CreditCard
+        aria-hidden
+        className="mx-auto h-8 w-8 text-ink-muted"
+        strokeWidth={1.75}
+      />
       <h2 className="mt-3 text-lg font-semibold tracking-tight text-ink">{title}</h2>
       <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ink-muted">
         {description}

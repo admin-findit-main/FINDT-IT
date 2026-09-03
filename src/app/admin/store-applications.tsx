@@ -117,9 +117,10 @@ export function AdminStoreApplications({
                   <Button
                     size="sm"
                     disabled={pending}
+                    title="Approve — blue badge and dashboard"
                     onClick={() => review(app.id, "approved")}
                   >
-                    Approve — blue badge + dashboard
+                    Approve
                   </Button>
                   <Button
                     size="sm"

@@ -13,8 +13,13 @@ import {
   sha256Hex,
 } from "@/lib/hub/crypto";
 import type { Store, StoreDevice } from "@/types/database";
+import type { HubRelinkReason } from "@/lib/hub/relink";
 
 export type HubDeviceSession = StoreDevice & { store: Store };
+
+export type HubDeviceInspect =
+  | { status: "linked"; session: HubDeviceSession }
+  | { status: Exclude<HubRelinkReason, "missing"> | "absent" };
 
 async function cookieJar() {
   return cookies();
@@ -76,26 +81,27 @@ export async function clearHubPairingCookie() {
   jar.delete(HUB_PAIRING_COOKIE);
 }
 
-export async function getHubDeviceSession(): Promise<HubDeviceSession | null> {
+export async function inspectHubDeviceCookie(): Promise<HubDeviceInspect> {
   const parsed = await readHubDeviceCookie();
-  if (!parsed) return null;
+  if (!parsed) return { status: "absent" };
 
   if (isDemoMode()) {
-    const { getDemoState } = await import(
-      "@/lib/demo/store"
-    );
+    const { getDemoState } = await import("@/lib/demo/store");
     const device = getDemoState().storeDevices.find((d) => d.id === parsed.deviceId);
     if (!device || device.token_hash !== sha256Hex(parsed.token)) {
       await clearHubDeviceCookie();
-      return null;
+      return { status: "invalid" };
     }
-    if (device.revoked_at) return null;
+    if (device.revoked_at) {
+      await clearHubDeviceCookie();
+      return { status: "disconnected" };
+    }
     const store = getDemoState().stores.find((s) => s.id === device.store_id);
     if (!store || store.is_suspended || !store.is_active) {
       await clearHubDeviceCookie();
-      return null;
+      return { status: "store_unavailable" };
     }
-    return { ...device, store };
+    return { status: "linked", session: { ...device, store } };
   }
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
@@ -107,9 +113,12 @@ export async function getHubDeviceSession(): Promise<HubDeviceSession | null> {
     .maybeSingle();
   if (!device || device.token_hash !== sha256Hex(parsed.token)) {
     await clearHubDeviceCookie();
-    return null;
+    return { status: "invalid" };
   }
-  if (device.revoked_at) return null;
+  if (device.revoked_at) {
+    await clearHubDeviceCookie();
+    return { status: "disconnected" };
+  }
   const { data: store } = await admin
     .from("stores")
     .select("*")
@@ -117,7 +126,12 @@ export async function getHubDeviceSession(): Promise<HubDeviceSession | null> {
     .maybeSingle();
   if (!store || store.is_suspended || store.is_active === false) {
     await clearHubDeviceCookie();
-    return null;
+    return { status: "store_unavailable" };
   }
-  return { ...(device as StoreDevice), store: store as Store };
+  return { status: "linked", session: { ...(device as StoreDevice), store: store as Store } };
+}
+
+export async function getHubDeviceSession(): Promise<HubDeviceSession | null> {
+  const result = await inspectHubDeviceCookie();
+  return result.status === "linked" ? result.session : null;
 }

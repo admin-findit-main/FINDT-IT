@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BrandLogo } from "@/components/brand/logo";
 import { PairingQr } from "@/components/store/pairing-qr";
 import { formatPairingCode } from "@/lib/hub/format";
+import { hubRelinkMessage, parseHubRelinkReason } from "@/lib/hub/relink";
 import {
   createHubPairingAction,
   getHubRuntimeAction,
@@ -12,7 +13,17 @@ import {
 } from "@/lib/services/hub-devices";
 
 export default function HubConnectPage() {
+  return (
+    <Suspense>
+      <HubConnectClient />
+    </Suspense>
+  );
+}
+
+function HubConnectClient() {
   const router = useRouter();
+  const params = useSearchParams();
+  const notice = hubRelinkMessage(parseHubRelinkReason(params.get("reason")));
   const [code, setCode] = useState<string | null>(null);
   const [pairUrl, setPairUrl] = useState("");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
@@ -74,8 +85,14 @@ export default function HubConnectPage() {
           Connect this device to FINDIT
         </h1>
         <p className="mt-3 max-w-md text-base leading-relaxed text-white/65">
-          Ask the store owner to connect this device from their FINDIT Hub.
+          Ask the store owner to enter this code under Devices.
         </p>
+
+        {notice ? (
+          <p className="mt-6 max-w-md rounded-2xl border border-[#E5231B]/40 bg-[#E5231B]/15 px-4 py-3 text-sm leading-relaxed text-white/90">
+            {notice}
+          </p>
+        ) : null}
 
         {code ? (
           <>

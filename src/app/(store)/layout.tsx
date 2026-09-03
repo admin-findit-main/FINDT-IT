@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
-import { employeeDashItems, ownerDashItems } from "@/lib/dashboard/nav";
+import { employeeDashItems, employeeMobileDashItems, ownerDashItems, ownerMobileDashItems } from "@/lib/dashboard/nav";
 import { BrandHomeLink } from "@/components/brand/logo";
 import { roleLabel } from "@/lib/auth/store-role";
 import { STORE_TRIAL_DAYS } from "@/lib/config/constants";
@@ -41,11 +41,13 @@ export default async function StoreLayout({
   if (!access.allowed) {
     return (
       <div className="app-canvas min-h-screen bg-canvas">
-        <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong px-6 py-4">
-          <BrandHomeLink href={marketingHomeHref()} kind="business" />
+        <header className="glass-chrome sticky top-0 z-50 border-b border-hairline-strong px-4 pt-[env(safe-area-inset-top)]">
+          <div className="flex min-h-14 items-center">
+            <BrandHomeLink href={marketingHomeHref()} kind="business" />
+          </div>
         </header>
-        <main className="mx-auto max-w-lg px-6 py-16">
-          <Card sheen className="p-8 text-center">
+        <main className="mx-auto max-w-lg px-4 py-8 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-16">
+          <Card sheen className="p-5 text-center sm:p-8">
             {access.reason === "pending_application" ? (
               <>
                 <h1 className="text-2xl font-bold tracking-tight">
@@ -96,6 +98,7 @@ export default async function StoreLayout({
       role={roleLabel(role)}
       email={profile.email}
       items={canManage ? ownerDashItems : employeeDashItems}
+      mobileItems={canManage ? ownerMobileDashItems : employeeMobileDashItems}
       accountHref="/store/account"
       storeProfileHref="/store/settings"
       logoutHref="/login/business"

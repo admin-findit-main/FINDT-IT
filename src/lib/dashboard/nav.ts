@@ -37,6 +37,29 @@ export const employeeDashItems: DashItem[] = [
   { href: "/store/notifications", label: "Notifications", icon: "alerts" },
 ];
 
+/** Phone tab bar — keep to 4–5 short labels. The full list stays in the menu. */
+export const ownerMobileDashItems: DashItem[] = [
+  { href: "/store", label: "Home", icon: "overview" },
+  { href: "/store/requests", label: "Asks", icon: "requests" },
+  { href: "/store/hub", label: "Hub", icon: "hub" },
+  { href: "/store/devices", label: "Devices", icon: "devices" },
+  { href: "/store/account", label: "Account", icon: "account" },
+];
+
+export const employeeMobileDashItems: DashItem[] = [
+  { href: "/store/hub", label: "Hub", icon: "hub" },
+  { href: "/store/requests", label: "Asks", icon: "requests" },
+  { href: "/store/notifications", label: "Alerts", icon: "alerts" },
+  { href: "/store/account", label: "Account", icon: "account" },
+];
+
+export const adminMobileDashItems: DashItem[] = [
+  { href: "/admin", label: "Home", icon: "overview" },
+  { href: "/admin/applications", label: "Join", icon: "applications" },
+  { href: "/admin/stores", label: "Stores", icon: "stores" },
+  { href: "/admin/notifications", label: "Alerts", icon: "alerts" },
+];
+
 export const adminDashItems: DashItem[] = [
   { href: "/admin", label: "Overview", icon: "overview" },
   { href: "/admin/notifications", label: "Notifications", icon: "alerts" },

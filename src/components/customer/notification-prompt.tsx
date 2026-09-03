@@ -18,6 +18,7 @@ import {
   readShopperOnboardingState,
   WEB_NOTIFY_PROMPT_DISMISS_KEY,
 } from "@/lib/customer/onboarding-state";
+import { WAITING_FOR_REPLY_HINT } from "@/lib/config/constants";
 
 export function NotificationPrompt({
   compact = false,
@@ -48,8 +49,8 @@ export function NotificationPrompt({
   }, []);
 
   if (permission === null) return null;
-  if (permission === "granted") return null;
-  if (permission === "denied") {
+  if (permission === "granted" && !waiting) return null;
+  if (permission === "denied" && !waiting) {
     const onSettings =
       audience === "store"
         ? pathname === "/store/notifications"
@@ -134,33 +135,39 @@ export function NotificationPrompt({
       >
         <p className="text-sm font-semibold text-ink">
           {waiting
-            ? "Don’t miss store responses."
+            ? "Keep FINDIT open while you wait"
             : audience === "store"
               ? "Turn on store alerts"
               : "Turn on alerts"}
         </p>
         <p className="mt-1 text-sm leading-relaxed text-ink-muted">
           {waiting
-            ? "Turn on notifications to know when a nearby store finds your item."
+            ? permission === "granted"
+              ? `${WAITING_FOR_REPLY_HINT} We’ll also ping this phone if you switch away.`
+              : permission === "denied"
+                ? `${WAITING_FOR_REPLY_HINT} Alerts are blocked, so replies only show here.`
+                : `${WAITING_FOR_REPLY_HINT} Turn on notifications if you want a ping after you switch away.`
             : audience === "store"
               ? "Allow notifications so FINDIT can ping this phone when a nearby shopper asks, including after you close the app."
               : "We’ll notify this phone when a nearby store answers a Find, including after you close the app."}
         </p>
-        {iosHomeScreen ? (
+        {iosHomeScreen && permission !== "granted" ? (
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">
             On iPhone, tap Share, then Add to Home Screen, then open FINDIT from there and allow alerts.
           </p>
         ) : null}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" size="sm" onClick={() => void enable()}>
-            Allow notifications
-          </Button>
-          {waiting ? null : (
-            <Button type="button" size="sm" variant="ghost" onClick={dismiss}>
-              Not now
+        {permission === "granted" ? null : (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={() => void enable()}>
+              Allow notifications
             </Button>
-          )}
-        </div>
+            {waiting ? null : (
+              <Button type="button" size="sm" variant="ghost" onClick={dismiss}>
+                Not now
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

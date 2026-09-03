@@ -80,19 +80,19 @@ export default function NotificationsPage() {
       {browserPermission === "granted" ? (
         <p className="mt-3 text-sm text-ink-subtle">Browser alerts are on for this device.</p>
       ) : null}
-      {browserPermission === "denied" ? (
-        <p className="mt-3 text-sm text-ink-muted">
-          Notifications are off. Enable them in your device or browser settings to
-          receive store responses.
-        </p>
-      ) : null}
+        {permission === "denied" ? (
+          <p className="mt-3 text-sm text-ink-muted">
+            Notifications are off. Leave FINDIT open while you wait for a store,
+            or enable alerts in your device or browser settings.
+          </p>
+        ) : null}
       <div className="mt-6">
         {loading ? (
           <Skeleton className="h-24 w-full" />
         ) : items.length === 0 ? (
           <EmptyState
             title="No notifications yet"
-            description="Updates about your requests will appear here."
+            description="Leave FINDIT open while you wait for a store. Replies also land here. Turn on notifications if you want a ping after you switch away."
           />
         ) : (
           <Card padded={false} className="overflow-hidden">

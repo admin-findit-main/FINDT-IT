@@ -29,14 +29,19 @@ import { cn } from "@/lib/utils";
 import { signOutAction } from "@/lib/services/actions";
 import { BrandLogo } from "@/components/brand/logo";
 import { useHostSurface } from "@/components/host/host-surface";
-import { toPublicPath, toInternalPath, matchProductSurface } from "@/lib/config/product-hosts";
+import {
+  matchProductSurface,
+  resolveBrandHomeHref,
+  toInternalPath,
+  toPublicPath,
+} from "@/lib/config/product-hosts";
 import {
   dashItemActive,
   dashTitle,
   STORE_PROFILE_MENU,
   type DashItem,
 } from "@/lib/dashboard/nav";
-import { resolveBrandHomeHref } from "@/lib/config/product-hosts";
+import { GlassTabBar } from "@/components/ui/glass";
 
 const ICONS: Record<DashItem["icon"], typeof LayoutDashboard> = {
   overview: LayoutDashboard,
@@ -64,6 +69,7 @@ export function DashboardShell({
   role,
   email,
   items,
+  mobileItems,
   accountHref,
   storeProfileHref,
   logoutHref = "/login/business",
@@ -74,6 +80,7 @@ export function DashboardShell({
   role: string;
   email: string | null;
   items: DashItem[];
+  mobileItems?: DashItem[];
   accountHref: string;
   storeProfileHref?: string;
   logoutHref?: string;
@@ -112,7 +119,7 @@ export function DashboardShell({
   }
 
   const nav = (
-    <nav className="flex flex-1 flex-col gap-0.5 px-2">
+    <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-2 py-1">
       {items.map((item) => {
         const Icon = ICONS[item.icon];
         const active = dashItemActive(internalPath, item.href);
@@ -123,7 +130,7 @@ export function DashboardShell({
             onClick={() => setDrawer(false)}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
+              "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
               active
                 ? "bg-black/[0.06] text-ink"
                 : "text-ink-muted hover:bg-black/[0.04] hover:text-ink",
@@ -139,8 +146,10 @@ export function DashboardShell({
     </nav>
   );
 
+  const hasMobileTabs = Boolean(mobileItems?.length);
+
   return (
-    <div className="app-canvas min-h-dvh bg-canvas text-ink">
+    <div className="app-canvas min-h-dvh overflow-x-clip bg-canvas text-ink">
       {drawer ? (
         <button
           type="button"
@@ -152,12 +161,12 @@ export function DashboardShell({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-hairline-strong bg-white transition-[width,transform] duration-200",
-          collapsed ? "w-[72px]" : "w-[240px]",
+          "fixed inset-y-0 left-0 z-50 flex w-[min(20rem,calc(100vw-2.75rem))] flex-col border-r border-hairline-strong bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] transition-[width,transform] duration-200 md:w-[240px]",
+          collapsed && "md:w-[72px]",
           drawer ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         )}
       >
-        <div className={cn("flex h-14 items-center gap-2 px-4", collapsed && "justify-center px-0")}>
+        <div className={cn("flex h-14 shrink-0 items-center gap-2 px-4", collapsed && "md:justify-center md:px-0")}>
           <Link
             href={resolveBrandHomeHref({
               surface,
@@ -190,7 +199,7 @@ export function DashboardShell({
           </button>
           <button
             type="button"
-            className="ml-auto grid h-8 w-8 place-items-center rounded-lg md:hidden"
+            className="ml-auto grid h-11 w-11 place-items-center rounded-lg md:hidden"
             onClick={() => setDrawer(false)}
             aria-label="Close menu"
           >
@@ -200,7 +209,7 @@ export function DashboardShell({
         {nav}
         <div
           className={cn(
-            "mt-auto border-t border-hairline-strong p-3",
+            "mt-auto overflow-y-auto border-t border-hairline-strong p-3",
           )}
         >
           {storeProfileHref ? (
@@ -293,7 +302,7 @@ export function DashboardShell({
             type="button"
             onClick={logout}
             className={cn(
-              "mt-1 w-full rounded-xl px-3 py-2 text-left text-sm text-ink-muted hover:bg-black/[0.04] hover:text-ink",
+              "mt-1 flex min-h-11 w-full items-center rounded-xl px-3 py-2 text-left text-sm text-ink-muted hover:bg-black/[0.04] hover:text-ink",
               collapsed && "text-center"
             )}
           >
@@ -303,28 +312,71 @@ export function DashboardShell({
       </aside>
 
       <div className={cn("min-h-dvh", collapsed ? "md:pl-[72px]" : "md:pl-[240px]")}>
-        <header className="glass-chrome sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-hairline-strong px-4 md:px-8">
-          <button
-            type="button"
-            className="grid h-9 w-9 place-items-center rounded-lg hover:bg-black/[0.04] md:hidden"
-            onClick={() => setDrawer(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold tracking-tight">{title}</h1>
-            {subtitle ? (
-              <p className="truncate text-[12px] text-ink-muted">{subtitle}</p>
-            ) : null}
-          </div>
-          <div className="hidden items-center gap-2 text-xs text-ink-muted sm:flex">
-            <Shield className="h-3.5 w-3.5" />
-            {identity}
+        <header className="glass-chrome sticky top-0 z-30 border-b border-hairline-strong px-3 pt-[env(safe-area-inset-top)] md:px-8">
+          <div className="flex min-h-14 items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl hover:bg-black/[0.04] md:hidden"
+              onClick={() => setDrawer(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-[15px] font-semibold tracking-tight sm:text-sm">{title}</h1>
+              {subtitle ? (
+                <p className="truncate text-[11px] text-ink-muted sm:text-[12px]">{subtitle}</p>
+              ) : null}
+            </div>
+            <div className="hidden max-w-[40%] items-center gap-2 truncate text-xs text-ink-muted sm:flex">
+              <Shield className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{identity}</span>
+            </div>
           </div>
         </header>
-        <main className="px-4 py-5 md:px-8 md:py-6">{children}</main>
+        <main
+          className={cn(
+            "px-4 pt-4 md:px-8 md:py-6",
+            hasMobileTabs
+              ? "pb-[calc(5.25rem+env(safe-area-inset-bottom))] md:pb-6"
+              : "pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:pb-6"
+          )}
+        >
+          {children}
+        </main>
       </div>
+
+      {hasMobileTabs ? (
+        <GlassTabBar className="z-30 md:hidden" aria-label={isAdmin ? "Admin" : "Store"}>
+          <ul className="mx-auto flex max-w-lg items-stretch justify-around px-1 pb-[env(safe-area-inset-bottom)]">
+            {mobileItems!.map((item) => {
+              const Icon = ICONS[item.icon];
+              const active = dashItemActive(internalPath, item.href);
+              return (
+                <li key={item.href} className="min-w-0 flex-1">
+                  <Link
+                    href={toPublicPath(surface, item.href)}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-2 text-[10px] font-semibold leading-tight sm:text-[11px]",
+                      active ? "text-accent-ink" : "text-ink-subtle"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 2} />
+                    <span className="max-w-full truncate">{item.label}</span>
+                    {active ? (
+                      <span
+                        aria-hidden
+                        className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-accent"
+                      />
+                    ) : null}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </GlassTabBar>
+      ) : null}
     </div>
   );
 }
@@ -339,7 +391,7 @@ export function MetricCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-hairline-strong bg-white px-4 py-3">
+    <div className="rounded-xl border border-hairline-strong bg-white px-3 py-3 sm:px-4">
       <p className="text-[11px] font-medium text-ink-muted">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
       {hint ? <p className="mt-0.5 text-[11px] text-ink-muted">{hint}</p> : null}
@@ -358,11 +410,11 @@ export function Panel({
 }) {
   return (
     <section className="rounded-xl border border-hairline-strong bg-white">
-      <div className="flex items-center justify-between gap-3 border-b border-hairline-strong px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline-strong px-3 py-3 sm:px-4">
         <h2 className="text-sm font-semibold">{title}</h2>
         {action}
       </div>
-      <div className="p-4">{children}</div>
+      <div className="p-3 sm:p-4">{children}</div>
     </section>
   );
 }
