@@ -114,7 +114,7 @@ export async function listShiftEmployeesAction(): Promise<ShiftEmployeeView[]> {
     return people.map((row) => toView(row, punches));
   }
 
-  const since = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
   const [{ data: people }, { data: punches }] = await Promise.all([

@@ -15,6 +15,7 @@ import {
 import {
   formatShiftHours,
   minutesInWindow,
+  windowFromLocalParts,
 } from "@/lib/shifts/hours";
 
 beforeEach(() => {
@@ -114,5 +115,21 @@ describe("Hub PINs and shifts", () => {
         now: Date.parse("2026-09-03T18:00:00.000Z"),
       })
     ).toBe(120);
+    const day = windowFromLocalParts({ date: "2026-09-03" });
+    expect(day).not.toBeNull();
+    expect(day!.end - day!.start).toBe(24 * 60 * 60 * 1000);
+    const shift = windowFromLocalParts({
+      date: "2026-09-03",
+      startTime: "09:00",
+      endTime: "17:00",
+    });
+    expect(shift!.end - shift!.start).toBe(8 * 60 * 60 * 1000);
+    const overnight = windowFromLocalParts({
+      date: "2026-09-03",
+      startTime: "22:00",
+      endTime: "02:00",
+    });
+    expect(overnight!.end - overnight!.start).toBe(4 * 60 * 60 * 1000);
+    expect(windowFromLocalParts({ date: "bad" })).toBeNull();
   });
 });
