@@ -50,15 +50,17 @@ export function HubClockGate({
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#0B0B0C] px-6 py-6 text-white sm:px-10 sm:py-8">
-      <BrandLogo kind="business" tone="dark" className="h-7 w-auto shrink-0" />
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center gap-10 lg:flex-row lg:items-center lg:justify-between lg:gap-16">
-        <div className="max-w-xl lg:flex-1">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#0B0B0C] text-white">
+      <div className="shrink-0 px-8 pt-[max(1.25rem,env(safe-area-inset-top))] md:px-12">
+        <BrandLogo kind="business" tone="dark" className="h-7 w-auto" />
+      </div>
+      <div className="flex min-h-0 flex-1 items-center gap-10 px-8 pb-[max(1.25rem,env(safe-area-inset-bottom))] pr-[max(2rem,env(safe-area-inset-right))] pl-[max(2rem,env(safe-area-inset-left))] md:gap-16 md:px-12">
+        <div className="min-w-0 flex-1">
           <p className="text-sm uppercase tracking-[0.2em] text-white/40">Clock in</p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+          <h1 className="mt-3 text-[clamp(2rem,4.5vw,4.25rem)] font-bold leading-[1.05] tracking-tight">
             {storeName}
           </h1>
-          <p className="mt-4 text-lg text-white/60 sm:text-xl">
+          <p className="mt-4 max-w-xl text-[clamp(1rem,1.6vw,1.35rem)] leading-relaxed text-white/60">
             Enter your 4-digit PIN to unlock FINDIT Hub. Your hours start when
             the PIN is accepted.
           </p>
@@ -70,8 +72,8 @@ export function HubClockGate({
             </p>
           )}
         </div>
-        <div className="w-full max-w-sm shrink-0 lg:max-w-md">
-          <div className="mb-6 flex justify-center gap-5">
+        <div className="w-[min(42vw,24rem)] shrink-0">
+          <div className="mb-5 flex justify-center gap-5">
             {[0, 1, 2, 3].map((index) => (
               <span
                 key={index}
@@ -81,7 +83,7 @@ export function HubClockGate({
               />
             ))}
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid h-[min(28rem,calc(100dvh-10rem))] grid-cols-3 grid-rows-4 gap-3">
             {KEYS.map((key, index) =>
               key === "" ? (
                 <span key={`empty-${index}`} />
@@ -91,7 +93,7 @@ export function HubClockGate({
                   type="button"
                   disabled={busy}
                   onClick={() => press(key)}
-                  className="min-h-16 rounded-2xl bg-white/10 text-2xl font-semibold disabled:opacity-50 sm:min-h-20 sm:text-3xl"
+                  className="flex h-full w-full items-center justify-center rounded-2xl bg-white/10 text-[clamp(1.5rem,4vh,2.25rem)] font-semibold disabled:opacity-50"
                 >
                   {key === "del" ? "⌫" : key}
                 </button>
