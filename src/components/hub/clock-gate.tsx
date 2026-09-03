@@ -31,7 +31,7 @@ export function HubClockGate({
       setDigits("");
       return;
     }
-    if ("name" in result) onClockedIn(result.name);
+    if ("ok" in result && result.ok) onClockedIn(result.name);
   }
 
   function press(key: (typeof KEYS)[number]) {

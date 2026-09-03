@@ -135,7 +135,9 @@ export async function listShiftEmployeesAction(): Promise<ShiftEmployeeView[]> {
   );
 }
 
-export async function addShiftEmployeeAction(displayName: string) {
+export async function addShiftEmployeeAction(displayName: string): Promise<
+  { error: string } | { ok: true; employee: ShiftEmployeeView }
+> {
   const parsed = shiftEmployeeNameSchema.safeParse(displayName);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message || "Name this person." };
@@ -332,7 +334,11 @@ export async function getHubClockStateAction(): Promise<HubClockState> {
   };
 }
 
-export async function clockInHubAction(pinValue: string) {
+export type HubClockInResult =
+  | { error: string }
+  | { ok: true; name: string; punchId: string; since: string };
+
+export async function clockInHubAction(pinValue: string): Promise<HubClockInResult> {
   const pin = normalizeHubPin(pinValue);
   if (!pin) return { error: "Enter the 4-digit PIN." };
   const limited = await consumeRateLimit({

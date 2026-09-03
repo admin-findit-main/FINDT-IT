@@ -147,7 +147,7 @@ export default function ShiftsPage() {
               toast.error(result.error);
               return;
             }
-            if ("employee" in result) {
+            if ("ok" in result && result.ok) {
               setJustAdded(result.employee);
               setShownPins((current) => ({ ...current, [result.employee.id]: true }));
               setName("");
