@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
@@ -19,7 +19,7 @@ import {
   STORE_PLANS,
   STORE_SERVICE_RADIUS_OPTIONS,
 } from "@/lib/config/constants";
-import { LoadMark } from "@/components/shared/load-progress";
+import { AppScreenLoader } from "@/components/shared/load-progress";
 import {
   getMyStoreSettingsAction,
   updateStoreCoverageAction,
@@ -33,7 +33,6 @@ import {
 import { IosSwitch } from "@/components/ui/ios-switch";
 import { StoreAddressFields } from "@/components/store/store-address-fields";
 import { StoreDeviceEnableList } from "@/components/store/store-device-enable-list";
-import { cn } from "@/lib/utils";
 import type { Store } from "@/types/database";
 import {
   listStoreDevicesAction,
@@ -46,8 +45,6 @@ type HourRow = {
   close_time: string | null;
   is_closed: boolean;
 };
-
-type OpenSection = "profile" | "hours" | "area" | "categories" | "plan" | "devices" | null;
 
 function clockLabel(hhmm: string) {
   const [hStr, mStr] = hhmm.slice(0, 5).split(":");
@@ -97,42 +94,21 @@ function timeChoices(value: string) {
 }
 
 function SectionCard({
+  id,
   title,
   body,
-  open,
-  onToggle,
   children,
 }: {
+  id?: string;
   title: string;
   body: string;
-  open: boolean;
-  onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <Card className="overflow-hidden p-0">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between gap-4 p-5 text-left"
-        aria-expanded={open}
-        onClick={onToggle}
-      >
-        <span>
-          <span className="block font-semibold text-ink">{title}</span>
-          <span className="mt-1 block text-sm text-ink-muted">{body}</span>
-        </span>
-        <ChevronDown
-          className={cn(
-            "h-5 w-5 shrink-0 text-ink-muted transition-transform",
-            open && "rotate-180"
-          )}
-        />
-      </button>
-      {open ? (
-        <div className="border-t border-hairline-strong p-5 sm:p-6">
-          {children}
-        </div>
-      ) : null}
+    <Card id={id} className="p-5 sm:p-6">
+      <h2 className="font-semibold text-ink">{title}</h2>
+      <p className="mt-1 text-sm text-ink-muted">{body}</p>
+      <div className="mt-5">{children}</div>
     </Card>
   );
 }
@@ -182,44 +158,29 @@ export default function StoreSettingsPage() {
   const [postal, setPostal] = useState("");
   const [pilotBanner, setPilotBanner] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loadPercent, setLoadPercent] = useState(8);
   const [ready, setReady] = useState(false);
   const [requiresCustomerId, setRequiresCustomerId] = useState(false);
-  const [openSection, setOpenSection] = useState<OpenSection>(null);
   const [devices, setDevices] = useState<StoreDeviceView[]>([]);
 
   const canManage = role === "owner" || role === "manager";
 
   useEffect(() => {
-    function applyHash() {
-      const id = window.location.hash.replace("#", "");
-      if (
-        id === "profile" ||
-        id === "hours" ||
-        id === "area" ||
-        id === "categories" ||
-        id === "plan" ||
-        id === "devices"
-      ) {
-        setOpenSection(id);
-      }
-    }
-    applyHash();
-    window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
-  }, []);
+    if (!ready) return;
+    const id = window.location.hash.replace("#", "");
+    if (!id) return;
+    document.getElementById(`settings-${id}`)?.scrollIntoView({
+      block: "start",
+    });
+  }, [ready]);
 
   useEffect(() => {
     let cancelled = false;
-    setLoadPercent(18);
     Promise.all([getMyStoreSettingsAction(), listStoreDevicesAction()])
       .then(([settings, hubDevices]) => {
         if (cancelled) return;
-        setLoadPercent(82);
         setDevices(hubDevices);
         if (!settings) {
           setReady(true);
-          setLoadPercent(100);
           return;
         }
         setRole(settings.role);
@@ -242,29 +203,18 @@ export default function StoreSettingsPage() {
         setPostal(settings.store.postal_code || "");
         setRequiresCustomerId(Boolean(settings.store.age_restricted));
         setStore({ ...settings.store, role: settings.role });
-        setLoadPercent(100);
         setReady(true);
       })
       .catch((err) => {
         console.error("[FINDIT] store settings load failed", err);
         if (!cancelled) {
           setReady(true);
-          setLoadPercent(100);
         }
       });
     return () => {
       cancelled = true;
     };
   }, []);
-
-  function toggleSection(id: Exclude<OpenSection, null>) {
-    setOpenSection((cur) => {
-      const next = cur === id ? null : id;
-      const path = window.location.pathname;
-      window.history.replaceState(null, "", next ? `${path}#${next}` : path);
-      return next;
-    });
-  }
 
   function patchHour(idx: number, patch: Partial<HourRow>) {
     setHours((prev) =>
@@ -332,7 +282,7 @@ export default function StoreSettingsPage() {
     STORE_PLANS[(store?.subscription_plan as keyof typeof STORE_PLANS) || "free"];
 
   if (!ready) {
-    return <LoadMark percent={loadPercent} label="Loading store profile" />;
+    return <AppScreenLoader label="Loading settings" />;
   }
 
   return (
@@ -352,10 +302,9 @@ export default function StoreSettingsPage() {
 
       <div className="mt-6 space-y-3">
         <SectionCard
+          id="settings-profile"
           title="Business Profile"
           body="Name, address, phone, website"
-          open={openSection === "profile"}
-          onToggle={() => toggleSection("profile")}
         >
           <form
             autoComplete="off"
@@ -445,10 +394,9 @@ export default function StoreSettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="settings-hours"
           title="Business Hours"
           body="Open days and open–close times"
-          open={openSection === "hours"}
-          onToggle={() => toggleSection("hours")}
         >
           <div className="space-y-3">
             {DAYS_OF_WEEK.map((day, idx) => {
@@ -543,10 +491,9 @@ export default function StoreSettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="settings-area"
           title="Service Area"
           body="ZIP codes and radius you serve"
-          open={openSection === "area"}
-          onToggle={() => toggleSection("area")}
         >
           <div>
             <Label>Service radius</Label>
@@ -588,10 +535,9 @@ export default function StoreSettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="settings-categories"
           title="Request Categories"
           body="What requests you receive"
-          open={openSection === "categories"}
-          onToggle={() => toggleSection("categories")}
         >
           <p className="text-sm text-ink-muted">
             Pick your business type, then the categories you want FINDIT requests
@@ -705,10 +651,9 @@ export default function StoreSettingsPage() {
         </SectionCard>
 
         <SectionCard
+          id="settings-devices"
           title="Hub devices"
           body="Turn a counter tablet off, or remove it so it needs a new code"
-          open={openSection === "devices"}
-          onToggle={() => toggleSection("devices")}
         >
           <StoreDeviceEnableList
             devices={devices}
@@ -731,7 +676,7 @@ export default function StoreSettingsPage() {
           <MenuLink
             href="/store/shifts"
             title="Shifts"
-            body="Employee PINs and who is clocked in"
+            body="Hours, PINs, and who is clocked in"
           />
         ) : null}
 

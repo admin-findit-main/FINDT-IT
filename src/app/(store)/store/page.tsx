@@ -127,7 +127,7 @@ function OwnerOverview() {
               href="/store/settings"
               className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
             >
-              Store profile
+              Settings
             </Link>
           </div>
         </div>

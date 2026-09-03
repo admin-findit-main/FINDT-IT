@@ -34,12 +34,12 @@ type StoreNavItem = {
 function ownerStoreItems(): StoreNavItem[] {
   return [
     { href: "/store", label: "Requests", icon: PackageSearch },
-    { href: "/store/hub", label: "Hub", icon: Tablet },
+    { href: "/store/shifts", label: "Shifts", icon: Users },
+    { href: "/store/devices", label: "Store", icon: Store },
     { href: "/store/demand", label: "Demand", icon: ChartNoAxesCombined },
     { href: "/store/notifications", label: "Alerts", icon: Bell },
-    { href: "/store/settings", label: "Store", icon: Store },
-    { href: "/store/shifts", label: "Shifts", icon: Users },
-    { href: "/store/account", label: "Account", icon: Settings },
+    { href: "/store/settings", label: "Settings", icon: Settings },
+    { href: "/store/account", label: "Account", icon: User },
   ];
 }
 
@@ -55,10 +55,10 @@ function employeeStoreItems(): StoreNavItem[] {
 /** Mobile: keep primary actions; Account always reachable for logout. */
 function ownerMobileItems(): StoreNavItem[] {
   return [
-    { href: "/store/hub", label: "Hub", icon: Tablet },
-    { href: "/store", label: "Requests", icon: PackageSearch },
+    { href: "/store/requests", label: "Asks", icon: PackageSearch },
     { href: "/store/shifts", label: "Shifts", icon: Users },
-    { href: "/store/account", label: "Account", icon: User },
+    { href: "/store/devices", label: "Devices", icon: Store },
+    { href: "/store/settings", label: "Settings", icon: Settings },
   ];
 }
 

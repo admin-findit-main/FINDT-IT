@@ -100,7 +100,6 @@ export default async function StoreLayout({
       items={canManage ? ownerDashItems : employeeDashItems}
       mobileItems={canManage ? ownerMobileDashItems : employeeMobileDashItems}
       accountHref="/store/account"
-      storeProfileHref="/store/settings"
       logoutHref="/login/business"
     >
       <StoreNotifyHost userId={profile.id} />

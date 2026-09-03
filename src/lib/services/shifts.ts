@@ -15,6 +15,12 @@ import { resolveHubTerminalAction } from "@/lib/services/hub-devices";
 import { getCurrentProfile, getStoreWorkspaceAction } from "@/lib/services/actions";
 import type { StoreShiftEmployee, StoreShiftPunch } from "@/types/database";
 
+export type ShiftPunchView = {
+  id: string;
+  clocked_in_at: string;
+  clocked_out_at: string | null;
+};
+
 export type ShiftEmployeeView = {
   id: string;
   display_name: string;
@@ -23,6 +29,7 @@ export type ShiftEmployeeView = {
   on_shift: boolean;
   clocked_in_at: string | null;
   last_clocked_out_at: string | null;
+  punches: ShiftPunchView[];
 };
 
 export type HubClockState =
@@ -70,6 +77,17 @@ function toView(
     on_shift: Boolean(open),
     clocked_in_at: open?.clocked_in_at || null,
     last_clocked_out_at: lastOut?.clocked_out_at || null,
+    punches: theirs
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(b.clocked_in_at).getTime() - new Date(a.clocked_in_at).getTime()
+      )
+      .map((row) => ({
+        id: row.id,
+        clocked_in_at: row.clocked_in_at,
+        clocked_out_at: row.clocked_out_at,
+      })),
   };
 }
 
@@ -96,6 +114,7 @@ export async function listShiftEmployeesAction(): Promise<ShiftEmployeeView[]> {
     return people.map((row) => toView(row, punches));
   }
 
+  const since = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
   const [{ data: people }, { data: punches }] = await Promise.all([
@@ -104,7 +123,12 @@ export async function listShiftEmployeesAction(): Promise<ShiftEmployeeView[]> {
       .select("*")
       .eq("store_id", manager.storeId)
       .order("display_name", { ascending: true }),
-    admin.from("store_shift_punches").select("*").eq("store_id", manager.storeId),
+    admin
+      .from("store_shift_punches")
+      .select("*")
+      .eq("store_id", manager.storeId)
+      .gte("clocked_in_at", since)
+      .order("clocked_in_at", { ascending: false }),
   ]);
   return ((people || []) as StoreShiftEmployee[]).map((row) =>
     toView(row, (punches || []) as StoreShiftPunch[])

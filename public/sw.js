@@ -1,4 +1,7 @@
-self.addEventListener("install", () => {
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open("findit-offline-v1").then((cache) => cache.add("/offline.html"))
+  );
   self.skipWaiting();
 });
 
@@ -83,7 +86,17 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("/offline.html"))
+      fetch(event.request).catch(async () => {
+        const cached = await caches.match("/offline.html");
+        if (cached) return cached;
+        return new Response(
+          "<!doctype html><title>FINDIT</title><p>FINDIT is offline.</p>",
+          {
+            status: 503,
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+          }
+        );
+      })
     );
   }
 });

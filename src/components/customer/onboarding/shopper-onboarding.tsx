@@ -29,6 +29,7 @@ import { ReadyStep } from "./ready-step";
 import { OnboardingEnter, OnboardingProgress, OnboardingShell } from "./shell";
 import { WelcomeStep } from "./welcome-step";
 import { useCustomerProfile } from "@/components/customer/session";
+import { AppScreenLoader } from "@/components/shared/load-progress";
 import { getConsumerEntitlements } from "@/lib/config/constants";
 import { isCompleteShortPlace, shortPlaceFromProfile } from "@findit/domain";
 import { useSurfaceHref } from "@/components/host/host-surface";
@@ -61,11 +62,20 @@ export function ShopperOnboarding({
   const started = useRef(false);
 
   useEffect(() => {
+    function refreshDisplay() {
+      setStandalone(isStandaloneDisplay());
+      setHoldForHomeScreen(shouldHoldForHomeScreen());
+    }
     setPermission(browserNotifyPermission());
-    setStandalone(isStandaloneDisplay());
-    setHoldForHomeScreen(shouldHoldForHomeScreen());
+    refreshDisplay();
     setIntroSeen(readShopperOnboardingState().introSeen);
     setHydrated(true);
+    window.addEventListener("pageshow", refreshDisplay);
+    document.addEventListener("visibilitychange", refreshDisplay);
+    return () => {
+      window.removeEventListener("pageshow", refreshDisplay);
+      document.removeEventListener("visibilitychange", refreshDisplay);
+    };
   }, []);
 
   useEffect(() => {
@@ -145,7 +155,7 @@ export function ShopperOnboarding({
   }
 
   if (!hydrated) {
-    return <OnboardingShell />;
+    return <AppScreenLoader />;
   }
 
   return (

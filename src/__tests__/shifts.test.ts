@@ -12,6 +12,10 @@ import {
   getDemoState,
   resetDemoState,
 } from "@/lib/demo/store";
+import {
+  formatShiftHours,
+  minutesInWindow,
+} from "@/lib/shifts/hours";
 
 beforeEach(() => {
   resetDemoState();
@@ -95,5 +99,20 @@ describe("Hub PINs and shifts", () => {
     expect(
       getDemoState().shiftEmployees.some((row) => row.id === first.id)
     ).toBe(false);
+  });
+
+  it("saves worked minutes from clock in to clock out", () => {
+    expect(formatShiftHours(0)).toBe("0m");
+    expect(formatShiftHours(45)).toBe("45m");
+    expect(formatShiftHours(90)).toBe("1h 30m");
+    expect(
+      minutesInWindow({
+        clocked_in_at: "2026-09-03T12:00:00.000Z",
+        clocked_out_at: "2026-09-03T14:00:00.000Z",
+        windowStart: Date.parse("2026-09-03T00:00:00.000Z"),
+        windowEnd: Date.parse("2026-09-04T00:00:00.000Z"),
+        now: Date.parse("2026-09-03T18:00:00.000Z"),
+      })
+    ).toBe(120);
   });
 });

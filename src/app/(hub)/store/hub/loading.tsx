@@ -1,3 +1,5 @@
+import { AppScreenLoader } from "@/components/shared/load-progress";
+
 export default function HubLoading() {
-  return <div className="min-h-dvh bg-black" aria-hidden />;
+  return <AppScreenLoader tone="dark" label="Loading Hub" />;
 }

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Plus, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePwaInstall } from "@/lib/pwa-install";
 import { trackShopperOnboardingEventAction } from "@/lib/services/onboarding-actions";
-import type { InstallSurface } from "@/lib/pwa";
+import { isStandaloneDisplay, type InstallSurface } from "@/lib/pwa";
 
 function IosShareGlyph({ className }: { className?: string }) {
   return (
@@ -67,6 +67,20 @@ export function InstallStep({
   const [promptGone, setPromptGone] = useState(false);
   const [waiting, setWaiting] = useState(false);
 
+  useEffect(() => {
+    if (!waiting) return;
+    function maybeStart() {
+      if (isStandaloneDisplay()) onContinue();
+    }
+    maybeStart();
+    window.addEventListener("pageshow", maybeStart);
+    document.addEventListener("visibilitychange", maybeStart);
+    return () => {
+      window.removeEventListener("pageshow", maybeStart);
+      document.removeEventListener("visibilitychange", maybeStart);
+    };
+  }, [waiting, onContinue]);
+
   function added() {
     if (holdForHomeScreen) {
       setWaiting(true);
@@ -104,6 +118,11 @@ export function InstallStep({
             Tap the FINDIT icon you just added. That&apos;s where we&apos;ll
             show you how it works and sign you in.
           </p>
+        </div>
+        <div className="mt-8 space-y-2">
+          <Button type="button" size="xl" className="w-full" onClick={onContinue}>
+            Start FINDIT
+          </Button>
         </div>
       </div>
     );

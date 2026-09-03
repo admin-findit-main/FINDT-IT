@@ -8,6 +8,7 @@ import {
   isShopperOnboardingComplete,
 } from "@/lib/customer/onboarding-state";
 import { capturePwaInstallEvents } from "@/lib/pwa-install";
+import { AppScreenLoader } from "@/components/shared/load-progress";
 
 function sessionHasShopperCache(): boolean {
   if (typeof sessionStorage === "undefined") return false;
@@ -60,13 +61,7 @@ export function ShopperOnboardingGate({
   }, [accountType, pathname]);
 
   if (!ready) {
-    return (
-      <div
-        className="min-h-dvh bg-canvas"
-        aria-busy="true"
-        aria-label="Loading FINDIT"
-      />
-    );
+    return <AppScreenLoader />;
   }
 
   if (show) {

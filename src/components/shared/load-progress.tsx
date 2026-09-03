@@ -93,7 +93,9 @@ export function FindProgress({
   );
   if (size === "inline") return body;
   if (size === "page") {
-    return <div className="grid place-items-center px-6 py-10">{body}</div>;
+    return (
+      <div className="grid min-h-dvh place-items-center bg-canvas px-6">{body}</div>
+    );
   }
   return <div className="grid place-items-center px-6 py-6">{body}</div>;
 }
@@ -120,19 +122,46 @@ export function LoadMark({ percent, label }: { percent: number; label?: string }
   return <FindProgress percent={percent} label={label} size="card" />;
 }
 
-export function RouteBusyBar() {
+export function AppScreenLoader({
+  label = "Loading FINDIT",
+  tone = "light",
+}: {
+  label?: string;
+  tone?: "light" | "dark";
+}) {
+  const dark = tone === "dark";
   return (
     <div
-      className="h-0.5 w-full overflow-hidden bg-ink-100"
+      className={
+        dark
+          ? "grid min-h-dvh place-items-center bg-[#0B0B0C] px-6 text-white"
+          : "grid min-h-dvh place-items-center bg-canvas px-6 text-ink"
+      }
       role="status"
-      aria-label="Loading"
+      aria-live="polite"
+      aria-label={label}
     >
-      <div className="findit-route-bar h-full w-1/3 rounded-full bg-accent" />
+      <div className="flex w-full max-w-xs flex-col items-center text-center">
+        <BrandLogo kind="mark" tone={dark ? "dark" : "light"} className="h-9 w-auto" />
+        <div
+          className={`mt-5 h-1.5 w-full overflow-hidden rounded-full ${
+            dark ? "bg-white/15" : "bg-ink-100"
+          }`}
+        >
+          <div className="findit-route-bar h-full w-1/3 rounded-full bg-accent" />
+        </div>
+        <p className={`mt-3 text-sm font-semibold ${dark ? "text-white/80" : "text-ink"}`}>
+          {label}
+        </p>
+      </div>
     </div>
   );
 }
 
-/** Thin bar only while changing pages — does not wrap every fetch. */
+export function RouteBusyBar() {
+  return <AppScreenLoader />;
+}
+
 export function LoadProgressHost() {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);

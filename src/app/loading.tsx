@@ -1,5 +1,5 @@
-import { RouteBusyBar } from "@/components/shared/load-progress";
+import { AppScreenLoader } from "@/components/shared/load-progress";
 
 export default function RootLoading() {
-  return <RouteBusyBar />;
+  return <AppScreenLoader />;
 }
