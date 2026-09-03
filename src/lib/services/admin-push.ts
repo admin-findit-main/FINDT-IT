@@ -9,7 +9,7 @@ import { sendExpoPush } from "@/lib/services/expo-push";
 type ServiceAdmin = {
   from: (table: string) => {
     select: (columns: string) => any;
-    insert: (rows: unknown) => any;
+    insert: (rows: any) => any;
     delete: () => any;
   };
 };
