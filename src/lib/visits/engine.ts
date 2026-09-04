@@ -39,7 +39,11 @@ export async function issueHubCheckinTokenAction(): Promise<
 > {
   const linked = await resolveHubTerminalAction();
   if (!linked.ok) return { error: "This tablet is not connected to a store." };
-  if (linked.runtime.source !== "device" || !linked.runtime.deviceId) {
+  // A paired tablet can mint check-in tokens even when a manager is signed in
+  // on it; what matters is that the request carries a real device identity,
+  // since `store_checkin_tokens.device_id` is required and the shopper's scan
+  // is validated against that device being online.
+  if (!linked.runtime.deviceId) {
     return { error: "Check-in QR is for a paired FINDIT Hub tablet." };
   }
   const store = linked.runtime.store;

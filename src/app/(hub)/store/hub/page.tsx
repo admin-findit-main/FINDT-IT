@@ -88,6 +88,9 @@ export default function FinditHubPage() {
   const [source, setSource] = useState<"device" | "member" | null>(null);
   const [canManage, setCanManage] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
+  // Present whenever this browser is a paired Hub, whether or not a manager
+  // is also signed in on it. Check-in and the heartbeat key off this.
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [shiftLocked, setShiftLocked] = useState<boolean | null>(null);
   const [shiftName, setShiftName] = useState<string | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
@@ -123,8 +126,9 @@ export default function FinditHubPage() {
       setSource(runtime.source);
       setCanManage(runtime.canManage);
       setDeviceName(runtime.deviceName);
+      setDeviceId(runtime.deviceId);
       setStore(runtime.store);
-      if (runtime.source === "device") {
+      if (runtime.deviceId) {
         const beat = await touchHubDeviceAction().catch((err) => {
           console.error("[FINDIT Hub] device heartbeat failed", err);
           return { ok: false as const, reason: "disconnected" as const };
@@ -264,7 +268,7 @@ export default function FinditHubPage() {
   }, [storeId, loadQueue, shiftLocked]);
 
   useEffect(() => {
-    if (source !== "device") return;
+    if (!deviceId) return;
     const checkLink = async () => {
       if (document.visibilityState !== "visible") return;
       const linked = await resolveHubTerminalAction().catch((err) => {
@@ -297,7 +301,7 @@ export default function FinditHubPage() {
     void checkLink();
     const id = window.setInterval(checkLink, HUB_DEVICE_HEARTBEAT_MS);
     return () => window.clearInterval(id);
-  }, [source, goToLinking]);
+  }, [deviceId, goToLinking]);
 
   useEffect(() => {
     let wake: WakeLockSentinel | null = null;
@@ -441,7 +445,7 @@ export default function FinditHubPage() {
           ) : null}
         </div>
         <div className="flex items-center gap-3">
-          {source === "device" && active ? <HubCheckinPanel compact /> : null}
+          {deviceId && active ? <HubCheckinPanel compact /> : null}
           <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
             <span
               className={`h-2.5 w-2.5 rounded-full ${online ? "bg-emerald-400" : "bg-[#E5231B]"}`}
@@ -484,7 +488,7 @@ export default function FinditHubPage() {
             <p className="mt-4 text-2xl font-semibold text-white/80">Preparing Hub…</p>
           </div>
         ) : !active ? (
-          source === "device" ? (
+          deviceId ? (
             <div className="flex min-h-0 flex-1 items-center gap-8 md:gap-16">
               <div className="min-w-0 flex-1">
                 <BrandLogo kind="business" tone="dark" className="h-8 w-auto" />

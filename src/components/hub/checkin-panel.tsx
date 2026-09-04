@@ -3,13 +3,16 @@
 import { useEffect, useState } from "react";
 import { PairingQr } from "@/components/store/pairing-qr";
 import { issueHubCheckinTokenAction } from "@/lib/visits/engine";
-import { productOrigin } from "@/lib/config/product-hosts";
+import { isLocalHostname, productOrigin } from "@/lib/config/product-hosts";
 
 function checkinUrl(token: string) {
+  // `isLocalHostname` rather than an equality check on "localhost": the Hub is
+  // reached at store.localhost in development and at *.vercel.app on previews,
+  // and both of those serve /check-in path-based. Treating them as remote made
+  // the QR point at the production dashboard, so a scan left the environment
+  // under test.
   const origin =
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1")
+    typeof window !== "undefined" && isLocalHostname(window.location.host)
       ? window.location.origin
       : productOrigin("dashboard");
   return `${origin}/check-in?t=${encodeURIComponent(token)}`;

@@ -96,11 +96,39 @@ export const getHubRuntimeAction = cache(async (): Promise<HubRuntime | null> =>
 export async function resolveHubTerminalAction(): Promise<
   { ok: true; runtime: HubRuntime } | { ok: false; reason: HubRelinkReason }
 > {
-  const workspace = await getStoreWorkspaceAction();
+  // Both, in parallel: a signed-in manager keeps their own role and
+  // permissions, but a tablet that is genuinely paired must not lose its
+  // device identity just because someone is logged in on it. Without the
+  // device id the Hub cannot mint check-in tokens or send a heartbeat, so the
+  // check-in QR silently disappears and the device reads as offline.
+  // `inspectHubDeviceCookie` returns `absent` without touching the database
+  // when there is no cookie, so this costs nothing for a manager on a laptop.
+  const [workspace, device] = await Promise.all([
+    getStoreWorkspaceAction(),
+    inspectHubDeviceCookie(),
+  ]);
+
   if (workspace?.store) {
-    return { ok: true, runtime: runtimeFromWorkspace(workspace) };
+    const runtime = runtimeFromWorkspace(workspace);
+    // Only adopt the device identity when it belongs to the store this
+    // session is already acting for, so a check-in token can never pair one
+    // store's id with another store's device.
+    if (
+      device.status === "linked" &&
+      device.session.store_id === workspace.store.id
+    ) {
+      return {
+        ok: true,
+        runtime: {
+          ...runtime,
+          deviceId: device.session.id,
+          deviceName: device.session.device_name,
+        },
+      };
+    }
+    return { ok: true, runtime };
   }
-  const device = await inspectHubDeviceCookie();
+
   if (device.status === "linked") {
     return { ok: true, runtime: runtimeFromDevice(device.session) };
   }
@@ -472,7 +500,9 @@ export async function touchHubDeviceAction(): Promise<
 > {
   const linked = await resolveHubTerminalAction();
   if (!linked.ok) return linked;
-  if (linked.runtime.source !== "device" || !linked.runtime.deviceId) {
+  // Keyed on the device id, not the session source: a paired tablet still
+  // needs its heartbeat while a manager happens to be signed in on it.
+  if (!linked.runtime.deviceId) {
     return { ok: true };
   }
   if (isDemoMode()) {
