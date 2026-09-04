@@ -33,24 +33,25 @@
   --fd-ink-900: #0b0b0c;
 
   /* ---- Semantic surfaces ---------------------------------------------- */
-  --canvas: #f2f2f7;
+  /* Paper white, not a grey tray. Separation is drawn with rules, not tints. */
+  --canvas: #ffffff;
   --canvas-deep: #ffffff;
 
   --glass-1: rgba(255, 255, 255, 0.72);
   --glass-2: rgba(255, 255, 255, 0.86);
   --glass-3: rgba(255, 255, 255, 0.94);
-  --glass-chrome: rgba(255, 255, 255, 0.78);
+  --glass-chrome: rgba(255, 255, 255, 0.86);
   --glass-dark: rgba(255, 255, 255, 0.92);
 
-  --hairline: rgba(0, 0, 0, 0.14);
-  --hairline-strong: rgba(0, 0, 0, 0.08);
+  --hairline: rgba(0, 0, 0, 0.22);
+  --hairline-strong: rgba(0, 0, 0, 0.13);
   --highlight: rgba(255, 255, 255, 0.9);
 
   /* Opaque equivalents used when transparency is reduced or unsupported. */
   --solid-1: #ffffff;
   --solid-2: #ffffff;
-  --solid-3: #e5e5ea;
-  --solid-chrome: #f9f9fb;
+  --solid-3: #f0f0f2;
+  --solid-chrome: #ffffff;
 
   /* ---- Text ------------------------------------------------------------ */
   --ink: #1c1c1e;
@@ -89,9 +90,11 @@
   --blur-chrome: 10px;
   --glass-saturate: 120%;
 
-  --shadow-glass: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
-  --shadow-glass-lg: 0 2px 4px rgba(0, 0, 0, 0.04), 0 16px 40px rgba(0, 0, 0, 0.08);
-  --shadow-accent: 0 8px 20px -8px rgba(229, 35, 27, 0.45);
+  /* Panels are edged, not elevated. Only genuinely floating layers — dialogs,
+     sheets, popovers — get a shadow, and it stays tight rather than diffuse. */
+  --shadow-glass: none;
+  --shadow-glass-lg: 0 1px 1px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.1);
+  --shadow-accent: none;
 }
 
 @theme inline {
@@ -129,11 +132,25 @@
   --color-brand-white: var(--fd-white);
   --color-brand-red: var(--fd-red-500);
 
-  --radius-glass-sm: 10px;
-  --radius-glass-md: 12px;
-  --radius-glass-lg: 16px;
-  --radius-glass-xl: 20px;
-  --radius-glass-2xl: 24px;
+  /* Near-square geometry, mirroring `radius` in `packages/theme/src/tokens.ts`.
+     The stock Tailwind scale is overridden to the same values so screens that
+     reach for `rounded-xl`/`rounded-2xl` directly stay in the system instead of
+     re-introducing the pill-shaped card look. `rounded-full` is untouched: on
+     status pills and avatars the circle is semantic, not decoration. */
+  --radius-glass-sm: 2px;
+  --radius-glass-md: 3px;
+  --radius-glass-lg: 4px;
+  --radius-glass-xl: 5px;
+  --radius-glass-2xl: 6px;
+
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+  --radius-xl: 4px;
+  --radius-2xl: 5px;
+  --radius-3xl: 6px;
+  --radius-4xl: 8px;
 
   --shadow-glass: var(--shadow-glass);
   --shadow-glass-lg: var(--shadow-glass-lg);
@@ -196,24 +213,12 @@ h1 {
   background-color: var(--canvas);
 }
 
-/* Inverted canvas for the marketing hero. */
+/* Inverted canvas. Flat ink — no gradient wash behind the type. */
 .app-canvas-dark {
   position: relative;
   background-color: var(--fd-black);
   color: var(--ink-inverse);
   isolation: isolate;
-}
-
-.app-canvas-dark::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(52rem 34rem at 78% 0%, rgba(229, 35, 27, 0.42) 0%, transparent 58%),
-    radial-gradient(42rem 30rem at 12% 88%, rgba(229, 35, 27, 0.18) 0%, transparent 60%),
-    radial-gradient(38rem 26rem at 42% 40%, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -237,6 +242,7 @@ h1 {
   box-shadow: none;
 }
 
+/* `strong` is for layers that genuinely float above the page. */
 .glass-strong {
   box-shadow: var(--shadow-glass-lg);
 }
@@ -265,16 +271,16 @@ h1 {
   display: none;
 }
 
+/* Interactive panels answer with their edge, not by levitating. */
 .glass-lift {
   transition:
-    transform 220ms cubic-bezier(0.32, 0.72, 0, 1),
-    box-shadow 220ms cubic-bezier(0.32, 0.72, 0, 1),
-    background-color 180ms ease;
+    border-color 160ms ease,
+    background-color 160ms ease;
 }
 
 .glass-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-glass-lg), inset 0 1px 0 0 var(--highlight);
+  border-color: var(--hairline);
+  background-color: var(--fd-ink-50);
 }
 
 /* Pressed-state scale used on tappable glass. */
@@ -334,10 +340,6 @@ h1 {
     background-color: var(--solid-chrome);
     border-bottom: 1px solid var(--hairline-strong);
   }
-
-  .app-canvas-dark::before {
-    background: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -348,10 +350,6 @@ h1 {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-
-  .glass-lift:hover {
-    transform: none;
   }
 
   .glass-press:active {

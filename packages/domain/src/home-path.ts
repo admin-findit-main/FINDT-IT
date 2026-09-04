@@ -61,7 +61,8 @@ export function isCustomerSurfacePath(pathname: string): boolean {
     path.startsWith("/notifications") ||
     path.startsWith("/profile") ||
     path.startsWith("/plan") ||
-    path.startsWith("/welcome")
+    path.startsWith("/welcome") ||
+    path.startsWith("/check-in")
   );
 }
 

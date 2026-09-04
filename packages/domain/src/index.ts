@@ -27,3 +27,4 @@ export * from "./login-side";
 export * from "./account-deletion";
 export * from "./catalog";
 export * from "./classify";
+export * from "./usage-pricing";

@@ -18,6 +18,8 @@ import {
   getHubClockStateAction,
 } from "@/lib/services/shifts";
 import { HubClockGate } from "@/components/hub/clock-gate";
+import { HubCheckinPanel } from "@/components/hub/checkin-panel";
+import { HubEmployeeRewards } from "@/components/hub/employee-rewards";
 import { hubConnectHref } from "@/lib/hub/relink";
 import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
 import {
@@ -439,6 +441,7 @@ export default function FinditHubPage() {
           ) : null}
         </div>
         <div className="flex items-center gap-3">
+          {source === "device" && active ? <HubCheckinPanel compact /> : null}
           <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
             <span
               className={`h-2.5 w-2.5 rounded-full ${online ? "bg-emerald-400" : "bg-[#E5231B]"}`}
@@ -481,17 +484,38 @@ export default function FinditHubPage() {
             <p className="mt-4 text-2xl font-semibold text-white/80">Preparing Hub…</p>
           </div>
         ) : !active ? (
-          <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <BrandLogo kind="business" tone="dark" className="mx-auto h-8 w-auto" />
-            <h1 className="mt-6 text-5xl font-bold tracking-tight md:text-6xl">
-              Ready for requests
-            </h1>
-            <p className="mt-4 text-xl text-white/70">{store?.name}</p>
-            <p className="mt-10 flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-emerald-400">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-              Listening for nearby requests
-            </p>
-          </div>
+          source === "device" ? (
+            <div className="flex min-h-0 flex-1 items-center gap-8 md:gap-16">
+              <div className="min-w-0 flex-1">
+                <BrandLogo kind="business" tone="dark" className="h-8 w-auto" />
+                <h1 className="mt-6 text-4xl font-bold tracking-tight md:text-6xl">
+                  Ready for requests
+                </h1>
+                <p className="mt-4 text-xl text-white/70">{store?.name}</p>
+                <p className="mt-8 flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-emerald-400">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                  Listening for nearby requests
+                </p>
+                <HubEmployeeRewards />
+              </div>
+              <div className="w-[min(42vw,22rem)] shrink-0">
+                <HubCheckinPanel />
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center text-center">
+              <BrandLogo kind="business" tone="dark" className="mx-auto h-8 w-auto" />
+              <h1 className="mt-6 text-5xl font-bold tracking-tight md:text-6xl">
+                Ready for requests
+              </h1>
+              <p className="mt-4 text-xl text-white/70">{store?.name}</p>
+              <p className="mt-10 flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-emerald-400">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                Listening for nearby requests
+              </p>
+              <HubEmployeeRewards />
+            </div>
+          )
         ) : (
           <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden">
             <div className="flex shrink-0 items-center justify-between gap-4">

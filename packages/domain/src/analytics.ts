@@ -30,6 +30,15 @@ export const ANALYTICS_EVENTS = [
   "notifications_requested",
   "notifications_granted",
   "notifications_denied",
+  "store_selected",
+  "checkin_attempted",
+  "visit_verified",
+  "visit_rejected",
+  "billing_event_created",
+  "invoice_created",
+  "reward_created",
+  "reward_reversed",
+  "billing_dispute_created",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];

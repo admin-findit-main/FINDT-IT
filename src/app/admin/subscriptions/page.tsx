@@ -4,6 +4,7 @@ import {
   AdminBillingSettingsForm,
   AdminStoreBillingActions,
 } from "@/components/admin/billing-controls";
+import { AdminUsagePricingForm } from "@/components/admin/usage-pricing-form";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getAdminBillingAction } from "@/lib/billing/actions";
 import {
@@ -64,6 +65,14 @@ export default async function AdminSubscriptionsPage() {
           liveEnv={billing.liveEnv}
           checklistComplete={billing.checklistComplete}
         />
+      </Panel>
+
+      <Panel title="Usage pricing">
+        <p className="mb-4 text-sm text-ink-muted">
+          FINDIT calculates store bills from verified visits. Payment collection
+          stays off until launch.
+        </p>
+        <AdminUsagePricingForm />
       </Panel>
 
       <Panel title="Stores">

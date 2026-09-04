@@ -13,6 +13,7 @@ import {
   getStoreWorkspaceAction,
 } from "@/lib/services/actions";
 import { listStoreDevicesAction } from "@/lib/services/hub-devices";
+import { getStoreUsageSnapshotAction } from "@/lib/visits/engine";
 import { formatDurationSeconds } from "@/lib/services/request-lifecycle";
 import { isStoreOpenAt } from "@/lib/services/store-hours";
 import { formatRelativeTime, greetingForHour } from "@/lib/utils";
@@ -34,6 +35,8 @@ function OwnerOverview() {
   const [items, setItems] = useState<Incoming[]>([]);
   const [demand, setDemand] = useState<DemandItem[]>([]);
   const [hubConnected, setHubConnected] = useState(true);
+  const [verifiedCustomers, setVerifiedCustomers] = useState<number | null>(null);
+  const [estimatedBill, setEstimatedBill] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -44,17 +47,20 @@ function OwnerOverview() {
       return;
     }
     setStoreName(ws?.store?.name || "");
-    const [m, list, d, settings, devices] = await Promise.all([
+    const [m, list, d, settings, devices, usage] = await Promise.all([
       getStoreMetricsAction(id),
       getStoreIncomingRequestsAction(id, "all", "7d"),
       getStoreDemandAction(id),
       getStoreSettingsAction(id),
       listStoreDevicesAction(),
+      getStoreUsageSnapshotAction(),
     ]);
     setMetrics(m);
     setItems(list);
     setDemand(d);
     setHubConnected(devices.some((device) => !device.revoked_at));
+    setVerifiedCustomers(usage?.visits ?? null);
+    setEstimatedBill(usage?.formatBilled ?? null);
     if (settings?.hours?.length) {
       setOpenLabel(isStoreOpenAt(settings.hours).open ? "Open" : "Closed");
     } else {
@@ -133,7 +139,7 @@ function OwnerOverview() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           label="Waiting"
           value={metrics.waiting_today}
@@ -153,6 +159,15 @@ function OwnerOverview() {
               : "—"
           }
           hint={`${metrics.week_customer_finds} potential customers found this week`}
+        />
+        <MetricCard
+          label="Verified customers"
+          value={verifiedCustomers ?? "—"}
+          hint={
+            estimatedBill
+              ? `This month · ${estimatedBill}`
+              : "Checked in at your Hub"
+          }
         />
       </div>
 

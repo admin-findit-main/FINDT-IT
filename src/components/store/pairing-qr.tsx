@@ -3,7 +3,15 @@
 import { useMemo } from "react";
 import { encode } from "uqr";
 
-export function PairingQr({ value, label }: { value: string; label: string }) {
+export function PairingQr({
+  value,
+  label,
+  className,
+}: {
+  value: string;
+  label: string;
+  className?: string;
+}) {
   const svg = useMemo(() => {
     const qr = encode(value, { ecc: "M", border: 2 });
     const cells: string[] = [];
@@ -16,7 +24,7 @@ export function PairingQr({ value, label }: { value: string; label: string }) {
   }, [value]);
 
   return (
-    <div className="mx-auto w-52 rounded-2xl bg-white p-3">
+    <div className={className || "mx-auto w-52 rounded-2xl bg-white p-3"}>
       <div
         aria-label={label}
         role="img"

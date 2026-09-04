@@ -12,6 +12,7 @@ import { LocateMeButton } from "@/components/customer/locate-me-button";
 import { geolocateUsPlace } from "@/lib/customer/geolocate";
 import { SUPPORT_EMAIL } from "@/lib/auth/admin";
 import { DeleteAccountCard } from "@/components/account/delete-account-card";
+import { ShopperFinditPoints } from "@/components/customer/findit-points";
 import { SupportReportForm } from "@/components/shared/support-report-form";
 import {
   getCurrentProfile,
@@ -44,6 +45,8 @@ export default function ProfilePage() {
       <p className="mt-2 text-sm text-ink-muted">
         Your name, place, and alerts. Plans live on the Plan page.
       </p>
+
+      <ShopperFinditPoints />
 
       <Card className="mt-6 space-y-4 p-5">
         <div>

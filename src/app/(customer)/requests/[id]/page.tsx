@@ -32,6 +32,7 @@ import {
   submitPilotFeedbackAction,
   trackDirectionsClickAction,
 } from "@/lib/services/actions";
+import { selectStoreForRequestAction } from "@/lib/visits/engine";
 import { SupportReportForm } from "@/components/shared/support-report-form";
 import {
   LIVE_POLL_MS,
@@ -255,6 +256,20 @@ export default function RequestDetailPage() {
   async function markFound(storeId?: string | null) {
     setSelectedStoreId(storeId || null);
     setFoundStep("ask");
+  }
+
+  async function chooseStore(storeId: string) {
+    if (!data) return;
+    const result = await selectStoreForRequestAction({
+      requestId: data.id,
+      storeId,
+    });
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
+    setSelectedStoreId(storeId);
+    toast.success("Selected. Scan the FINDIT Hub when you arrive.");
   }
 
   async function saveAndLeave() {
@@ -542,13 +557,26 @@ export default function RequestDetailPage() {
                             <Button asChild size="lg" variant="secondary" className="w-full">
                               <a
                                 {...mapsDirectionsAnchorProps(store)}
-                                onClick={() =>
-                                  trackDirectionsClickAction(data.id, store.id)
-                                }
+                                onClick={() => {
+                                  void chooseStore(store.id);
+                                  trackDirectionsClickAction(data.id, store.id);
+                                }}
                               >
                                 Directions
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </a>
+                            </Button>
+                          ) : null}
+                          {canVisit ? (
+                            <Button
+                              size="lg"
+                              variant={selectedStoreId === store.id ? "secondary" : "outline"}
+                              className="col-span-2 w-full"
+                              onClick={() => void chooseStore(store.id)}
+                            >
+                              {selectedStoreId === store.id
+                                ? "Selected — scan Hub when you arrive"
+                                : "I’ll go here"}
                             </Button>
                           ) : null}
                           {canMarkFound ? (

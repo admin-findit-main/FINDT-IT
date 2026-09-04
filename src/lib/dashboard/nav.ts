@@ -87,7 +87,7 @@ export function dashTitle(pathname: string): { title: string; subtitle: string }
     "/store/shifts": { title: "Shifts", subtitle: "Hours, PINs, and who is on the Hub" },
     "/store/devices": { title: "Devices", subtitle: "Counter tablets connected to this store" },
     "/store/settings": { title: "Settings", subtitle: "This location and your login" },
-    "/store/subscription": { title: "Billing", subtitle: "FINDIT Business" },
+    "/store/subscription": { title: "Billing", subtitle: "Verified customers and this month’s bill" },
     "/store/notifications": { title: "Notifications", subtitle: "New asks and team updates" },
     "/store/account": { title: "Account", subtitle: "Your login" },
     "/admin": { title: "Overview", subtitle: "FINDIT network" },

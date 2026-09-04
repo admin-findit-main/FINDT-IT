@@ -462,6 +462,123 @@ export interface DevicePairingCode {
   created_at: string;
 }
 
+export interface FinditBillingConfig {
+  id: number;
+  base_monthly_cents: number;
+  visit_cents: number;
+  payg_max_visits: number;
+  payg_max_cents: number;
+  growth_min_visits: number;
+  growth_max_visits: number;
+  growth_monthly_cents: number;
+  business_min_visits: number;
+  business_max_visits: number;
+  business_monthly_cents: number;
+  high_volume_min_visits: number;
+  high_volume_max_visits: number;
+  high_volume_monthly_cents: number;
+  enterprise_min_visits: number;
+  trial_days: number;
+  employee_pool_percent: number;
+  employee_pool_max_cents: number | null;
+  employee_pool_enabled: boolean;
+  shopper_points_per_visit: number;
+  employee_points_per_visit: number;
+  shopper_max_rewarded_checkins_per_day: number;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface StoreSelection {
+  id: string;
+  shopper_id: string;
+  store_id: string;
+  request_id: string;
+  store_response_id: string | null;
+  created_at: string;
+}
+
+export interface VerifiedVisit {
+  id: string;
+  shopper_id: string;
+  store_id: string;
+  request_id: string;
+  store_selection_id: string | null;
+  store_response_id: string | null;
+  employee_user_id: string | null;
+  shift_employee_id: string | null;
+  hub_device_id: string | null;
+  checkin_token_id: string | null;
+  verification_method: string;
+  verified_at: string;
+  status: "pending" | "verified" | "rejected" | "fraud_review" | "reversed";
+  billable: boolean;
+  rewardable: boolean;
+  fraud_status: "clean" | "flagged" | "review" | "blocked";
+  reject_reason: string | null;
+  created_at: string;
+}
+
+export interface StoreUsageStatement {
+  id: string;
+  store_id: string;
+  billing_period_id: string;
+  status: string;
+  visit_count: number;
+  estimated_cents: number;
+  trial: boolean;
+  charged_cents: number;
+  tier_id: string | null;
+  payment_provider: string;
+  provider_customer_id: string | null;
+  provider_subscription_id: string | null;
+  provider_invoice_id: string | null;
+  provider_payment_id: string | null;
+  payment_status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoreBillingLedgerRow {
+  id: string;
+  store_id: string;
+  verified_visit_id: string | null;
+  billing_period_id: string;
+  statement_id: string | null;
+  event_type: string;
+  amount_cents: number;
+  description: string;
+  status: string;
+  created_at: string;
+}
+
+export interface RewardLedgerRow {
+  id: string;
+  user_id: string;
+  store_id: string | null;
+  verified_visit_id: string | null;
+  reward_type: string;
+  audience: "shopper" | "employee";
+  points: number;
+  estimated_value_cents: number | null;
+  status: string;
+  reason: string;
+  created_at: string;
+}
+
+export interface BillingDispute {
+  id: string;
+  store_id: string;
+  verified_visit_id: string | null;
+  ledger_id: string | null;
+  opened_by: string;
+  reason: string;
+  status: string;
+  admin_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Loose Supabase schema typing — regenerate with `supabase gen types` when connected. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Database = any;

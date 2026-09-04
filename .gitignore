@@ -50,6 +50,8 @@ yarn-error.log*
 .cursor/
 .agents/
 .mcp.json
+.idea/
+**/.idea/
 
 # vercel
 .vercel

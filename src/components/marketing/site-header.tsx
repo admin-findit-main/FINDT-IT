@@ -22,14 +22,14 @@ export function MarketingHeader() {
       <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3 sm:px-6">
         <BrandHomeLink href="/" className="shrink-0" />
         <nav
-          className="ml-2 hidden items-center gap-6 md:flex"
+          className="ml-4 hidden items-center gap-7 md:flex"
           aria-label="FINDIT"
         >
           {LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-ink-muted transition-colors hover:text-ink"
+              className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted transition-colors hover:text-ink"
             >
               {link.label}
             </Link>

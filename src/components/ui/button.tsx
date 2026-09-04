@@ -17,7 +17,7 @@ const buttonVariants = cva(
         ink: "bg-[var(--fd-black)] text-ink-inverse hover:bg-[var(--fd-ink-700)]",
         secondary: "glass text-ink hover:bg-glass-3",
         outline:
-          "border border-hairline-strong bg-white text-ink hover:bg-[var(--solid-3)]",
+          "border border-hairline bg-white text-ink hover:bg-[var(--solid-3)]",
         ghost: "text-ink-muted hover:bg-glass-2 hover:text-ink",
         success: "bg-stock text-ink-inverse hover:brightness-95",
         warning: "bg-order text-ink-inverse hover:brightness-95",

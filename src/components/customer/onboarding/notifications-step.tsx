@@ -58,8 +58,10 @@ export function NotificationsStep({
           to your request.
         </p>
 
+        {/* Deliberately keeps iOS banner geometry: this is a picture of a
+            system notification, not a FINDIT panel. */}
         <div
-          className="mt-8 rounded-[1.35rem] bg-white px-4 py-4 shadow-[0_8px_28px_rgba(0,0,0,0.08)]"
+          className="mt-8 rounded-[1.35rem] border border-hairline-strong bg-white px-4 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
           aria-hidden
         >
           <p className="text-[11px] font-semibold tracking-[0.12em] text-ink-muted">

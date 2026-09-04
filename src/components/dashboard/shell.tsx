@@ -322,10 +322,14 @@ export function MetricCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl border border-hairline-strong bg-white px-3 py-3 sm:px-4">
-      <p className="text-[11px] font-medium text-ink-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
-      {hint ? <p className="mt-0.5 text-[11px] text-ink-muted">{hint}</p> : null}
+    <div className="rounded-xl border border-hairline-strong bg-white px-3 py-3.5 sm:px-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-bold tabular-nums tracking-[-0.02em]">
+        {value}
+      </p>
+      {hint ? <p className="mt-1 text-[11px] text-ink-muted">{hint}</p> : null}
     </div>
   );
 }
@@ -342,7 +346,9 @@ export function Panel({
   return (
     <section className="rounded-xl border border-hairline-strong bg-white">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline-strong px-3 py-3 sm:px-4">
-        <h2 className="text-sm font-semibold">{title}</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">
+          {title}
+        </h2>
         {action}
       </div>
       <div className="p-3 sm:p-4">{children}</div>

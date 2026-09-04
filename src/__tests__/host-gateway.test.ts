@@ -201,4 +201,25 @@ describe("decideHostRouting", () => {
       }
     }
   });
+
+  it("sends Hub check-in scans to the shopper app", () => {
+    const fromWww = decideHostRouting(
+      req("www.askfindit.com", "/check-in"),
+      "anonymous"
+    );
+    expect(fromWww.kind).toBe("redirect");
+    if (fromWww.kind === "redirect") {
+      expect(fromWww.url.hostname).toBe("dashboard.askfindit.com");
+      expect(fromWww.url.pathname).toBe("/check-in");
+    }
+    const fromStore = decideHostRouting(
+      req("store.askfindit.com", "/check-in"),
+      "anonymous"
+    );
+    expect(fromStore.kind).toBe("redirect");
+    if (fromStore.kind === "redirect") {
+      expect(fromStore.url.hostname).toBe("dashboard.askfindit.com");
+      expect(fromStore.url.pathname).toBe("/check-in");
+    }
+  });
 });

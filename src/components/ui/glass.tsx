@@ -106,7 +106,7 @@ export const glassButtonVariants = cva(
         ink: "bg-[var(--fd-black)] text-ink-inverse hover:bg-[var(--fd-ink-700)]",
         /** Hairline outline on the canvas. */
         outline:
-          "border border-hairline-strong bg-white text-ink hover:bg-[var(--solid-3)]",
+          "border border-hairline bg-white text-ink hover:bg-[var(--solid-3)]",
         /** Text-only. */
         ghost: "text-ink-muted hover:bg-glass-2 hover:text-ink",
         /** Tinted red, for destructive-but-secondary actions. */
@@ -157,8 +157,12 @@ GlassButton.displayName = "GlassButton";
 /* Form controls                                                               */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Controls carry the stronger hairline: on a white canvas the border is the
+ * only thing telling the eye this is an editable field.
+ */
 const fieldClass =
-  "w-full rounded-glass-lg border border-hairline-strong bg-white text-ink placeholder:text-ink-subtle transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:border-accent focus-visible:ring-4 focus-visible:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full rounded-glass-lg border border-hairline bg-white text-ink placeholder:text-ink-subtle transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:border-accent focus-visible:ring-4 focus-visible:ring-accent-soft disabled:cursor-not-allowed disabled:opacity-50";
 
 export const GlassInput = React.forwardRef<
   HTMLInputElement,
@@ -223,7 +227,7 @@ export function GlassChip({
         "glass-press rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors",
         selected
           ? "bg-[var(--fd-black)] text-ink-inverse"
-          : "border border-hairline-strong bg-white text-ink-muted hover:bg-[var(--solid-3)] hover:text-ink",
+          : "border border-hairline bg-white text-ink-muted hover:bg-[var(--solid-3)] hover:text-ink",
         className
       )}
       {...props}

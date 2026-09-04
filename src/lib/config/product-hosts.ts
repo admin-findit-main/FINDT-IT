@@ -177,6 +177,7 @@ export function surfaceForAppPath(pathname: string): Exclude<ProductSurface, "lo
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
     path.startsWith("/start") ||
+    path.startsWith("/check-in") ||
     path.startsWith("/forgot-password") ||
     path.startsWith("/auth")
   ) {

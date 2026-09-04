@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Panel } from "@/components/dashboard/shell";
+import { formatCents } from "@findit/domain";
+import { MetricCard, Panel } from "@/components/dashboard/shell";
 import { isSoloAdmin } from "@/lib/auth/admin";
-import { getAdminStoreDetailAction, getCurrentProfile } from "@/lib/services/actions";
+import {
+  getAdminStoreDetailAction,
+  getCurrentProfile,
+  getStoreMetricsAction,
+} from "@/lib/services/actions";
+import { HUB_DEVICE_ONLINE_MS } from "@/lib/hub/constants";
+import { deviceIsOnline } from "@/lib/hub/format";
 import { formatRelativeTime } from "@/lib/utils";
+import { loadStoreUsageSnapshot } from "@/lib/visits/engine";
 import { AdminStoreActions } from "./store-actions";
 
 type Props = { params: Promise<{ id: string }> };
@@ -16,6 +24,18 @@ export default async function AdminStoreDetailPage({ params }: Props) {
   if (!detail) notFound();
 
   const { store, team, devices } = detail;
+  const [metrics, usage] = await Promise.all([
+    getStoreMetricsAction(store.id),
+    loadStoreUsageSnapshot(store.id, store.trial_ends_at, store.name),
+  ]);
+  const hubsOnline = devices.filter(
+    (device) =>
+      !device.revokedAt && deviceIsOnline(device.lastSeenAt, Date.now(), HUB_DEVICE_ONLINE_MS)
+  ).length;
+  const rate =
+    metrics.requests_today > 0
+      ? `${Math.round((metrics.answered_today / metrics.requests_today) * 1000) / 10}%`
+      : "—";
 
   return (
     <div className="space-y-6">
@@ -49,11 +69,54 @@ export default async function AdminStoreDetailPage({ params }: Props) {
                 : "—"}
             </dd>
           </div>
+          <div>
+            <dt className="text-ink-muted">Payment</dt>
+            <dd>{usage.trial ? "Trial — not charging" : "Collection disabled"}</dd>
+          </div>
         </dl>
         <div className="mt-6">
           <AdminStoreActions storeId={store.id} suspended={store.is_suspended} />
         </div>
       </Panel>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Requests received" value={metrics.total_received} hint="All-time" />
+        <MetricCard label="Responses" value={metrics.total_answered} hint={`Today ${rate}`} />
+        <MetricCard
+          label="Avg response time"
+          value={
+            metrics.avg_response_minutes != null
+              ? `${Math.round(metrics.avg_response_minutes)} min`
+              : "—"
+          }
+        />
+        <MetricCard
+          label="Verified visits"
+          value={usage.visits}
+          hint={usage.quote.tier.name}
+        />
+        <MetricCard
+          label="Estimated invoice"
+          value={usage.quote.contactSales ? "Contact FINDIT" : usage.formatEstimated}
+          hint={usage.trial ? `Trial ${usage.formatBilled}` : usage.formatBilled}
+        />
+        <MetricCard label="Store selections" value={usage.funnel.selected} />
+        <MetricCard
+          label="Employee pool"
+          value={
+            usage.poolEnabled ? formatCents(usage.poolCents) : "Off"
+          }
+          hint={usage.poolEnabled ? `${usage.poolPercent}% of eligible revenue` : undefined}
+        />
+        <MetricCard label="Rewards issued" value={usage.rewardPointsIssued} hint="Points this month" />
+        <MetricCard label="Fraud flags" value={usage.fraudCount} />
+        <MetricCard label="Billing disputes" value={usage.disputes.length} />
+        <MetricCard
+          label="Hubs"
+          value={`${hubsOnline}/${devices.filter((d) => !d.revokedAt).length}`}
+          hint="Online now"
+        />
+      </div>
 
       <Panel title={`Users · ${team.length}`}>
         {team.length === 0 ? (
@@ -84,10 +147,44 @@ export default async function AdminStoreDetailPage({ params }: Props) {
                 <span className="text-ink-muted">
                   {device.revokedAt
                     ? "Removed"
-                    : device.lastSeenAt
-                      ? `Last active ${formatRelativeTime(device.lastSeenAt)}`
-                      : "Never seen"}
+                    : deviceIsOnline(device.lastSeenAt, Date.now(), HUB_DEVICE_ONLINE_MS)
+                      ? "Online"
+                      : device.lastSeenAt
+                        ? `Last active ${formatRelativeTime(device.lastSeenAt)}`
+                        : "Never seen"}
                 </span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
+
+      {usage.statements.length ? (
+        <Panel title="Usage statements">
+          <ul className="divide-y divide-black/[0.06] text-sm">
+            {usage.statements.map((row) => (
+              <li key={row.id} className="flex justify-between gap-3 py-3">
+                <div>
+                  <p className="font-medium capitalize">{row.status}</p>
+                  <p className="text-ink-muted">
+                    {row.visit_count} verified visits
+                    {row.trial ? " · trial" : ""}
+                  </p>
+                </div>
+                <p className="tabular-nums">{formatCents(row.estimated_cents)}</p>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
+
+      {usage.disputes.length ? (
+        <Panel title="Billing disputes">
+          <ul className="divide-y divide-black/[0.06] text-sm">
+            {usage.disputes.map((row) => (
+              <li key={row.id} className="py-3">
+                <p className="font-medium capitalize">{row.status}</p>
+                <p className="text-ink-muted">{row.reason}</p>
               </li>
             ))}
           </ul>

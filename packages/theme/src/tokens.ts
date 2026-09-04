@@ -136,24 +136,29 @@ export const darkTheme = {
   accentGlow: "rgba(229, 35, 27, 0.22)",
 } as const;
 
-/** Light counterpart: same cherry accent, inverted canvas and ink. */
+/**
+ * Light counterpart: same cherry accent, inverted canvas and ink.
+ *
+ * The canvas is paper white rather than a grey tray: structure comes from
+ * hairline rules and the grid, not from cards floating on a tint.
+ */
 export const lightTheme = {
   scheme: "light" as const,
   status: statusLight,
-  canvas: "#F2F2F7",
+  canvas: "#FFFFFF",
   canvasDeep: "#FFFFFF",
   glass1: "rgba(255, 255, 255, 0.72)",
   glass2: "rgba(255, 255, 255, 0.86)",
   glass3: "rgba(255, 255, 255, 0.94)",
-  glassChrome: "rgba(255, 255, 255, 0.78)",
+  glassChrome: "rgba(255, 255, 255, 0.86)",
   glassDark: "rgba(255, 255, 255, 0.92)",
-  hairline: "rgba(0, 0, 0, 0.14)",
-  hairlineStrong: "rgba(0, 0, 0, 0.08)",
+  hairline: "rgba(0, 0, 0, 0.22)",
+  hairlineStrong: "rgba(0, 0, 0, 0.13)",
   highlight: "rgba(255, 255, 255, 0.90)",
   solid1: "#FFFFFF",
   solid2: "#FFFFFF",
-  solid3: "#E5E5EA",
-  solidChrome: "#F9F9FB",
+  solid3: "#F0F0F2",
+  solidChrome: "#FFFFFF",
   flatFill: {
     subtle: "rgba(255, 255, 255, 0.88)",
     base: "rgba(255, 255, 255, 0.94)",
@@ -193,12 +198,17 @@ export const blur = {
 /** Saturation boost applied alongside blur — what makes it read as glass, not fog. */
 export const saturate = 200;
 
+/**
+ * Near-square geometry. Panels and buttons get just enough radius to avoid a
+ * hard mitre; `pill` stays fully round for status pills and avatars, where the
+ * shape is doing semantic work rather than decoration.
+ */
 export const radius = {
-  sm: 10,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 24,
+  sm: 2,
+  md: 3,
+  lg: 4,
+  xl: 5,
+  xxl: 6,
   pill: 999,
 } as const;
 
@@ -245,28 +255,33 @@ export const typography = {
   },
 } as const;
 
-/** Native shadow presets (iOS values; `elevation` covers Android). */
+/**
+ * Native shadow presets (iOS values; `elevation` covers Android).
+ *
+ * Panels sit flat on the canvas and are edged with a hairline instead, so only
+ * chrome that genuinely floats above content casts anything.
+ */
 export const shadow = {
   card: {
     shadowColor: "#000000",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
   chrome: {
     shadowColor: "#000000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: -1 },
-    elevation: 4,
+    elevation: 2,
   },
   accent: {
     shadowColor: palette.red500,
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
 } as const;
 
