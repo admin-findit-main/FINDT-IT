@@ -700,11 +700,14 @@ async function loadStoreUsageSnapshot(
   trialEndsAt: string | null,
   storeName?: string
 ) {
-  const pricing = await loadUsagePricing();
+  // Started, not awaited: pricing isn't needed until the tallies come back, so
+  // it rides alongside the query batch below instead of adding a round trip.
+  const pricingPromise = loadUsagePricing();
   const { start, end } = utcMonthPeriod();
   const trial = isTrialStore(trialEndsAt);
 
   if (isDemoMode()) {
+    const pricing = await pricingPromise;
     const visits = visitsMemory().visits.filter((row) => row.store_id === storeId);
     const quote = quoteUsageBill(visits.length, pricing);
     const billedCents = trial ? 0 : quote.estimatedCents;
@@ -756,6 +759,7 @@ async function loadStoreUsageSnapshot(
 
   const admin = await adminClient();
   const [
+    pricing,
     { count: matched },
     { count: responses },
     { count: selected },
@@ -767,6 +771,7 @@ async function loadStoreUsageSnapshot(
     { data: statementRows },
     { data: rewardRows },
   ] = await Promise.all([
+    pricingPromise,
     admin
       .from("request_targets")
       .select("*", { count: "exact", head: true })

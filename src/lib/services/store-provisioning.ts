@@ -241,16 +241,27 @@ export async function computeStoreDemandFromSupabase(storeId: string): Promise<D
   const requestIds = [...new Set((targets || []).map((t) => t.request_id))];
   if (!requestIds.length) return [];
 
-  const { data: requests } = await supabase
-    .from("customer_requests")
-    .select("id, product_name, normalized_product_name")
-    .in("id", requestIds);
+  // Both only need the target request ids, so they go out together.
+  const [{ data: requests }, { data: storeResponses }] = await Promise.all([
+    supabase
+      .from("customer_requests")
+      .select("id, product_name, normalized_product_name")
+      .in("id", requestIds),
+    supabase
+      .from("store_responses")
+      .select("request_id, response_type")
+      .eq("store_id", storeId)
+      .in("request_id", requestIds),
+  ]);
 
-  const { data: storeResponses } = await supabase
-    .from("store_responses")
-    .select("request_id, response_type")
-    .eq("store_id", storeId)
-    .in("request_id", requestIds);
+  // First write wins, matching the `.find()` this replaces: nothing constrains
+  // store_responses to one row per (store_id, request_id).
+  const responseByRequest = new Map<string, { request_id: string; response_type: string }>();
+  for (const response of storeResponses || []) {
+    if (!responseByRequest.has(response.request_id)) {
+      responseByRequest.set(response.request_id, response);
+    }
+  }
 
   const map = new Map<string, DemandItem>();
   for (const req of requests || []) {
@@ -271,7 +282,7 @@ export async function computeStoreDemandFromSupabase(storeId: string): Promise<D
         consider_stocking: false,
       } satisfies DemandItem);
     item.request_count += 1;
-    const response = (storeResponses || []).find((r) => r.request_id === req.id);
+    const response = responseByRequest.get(req.id);
     if (!response) item.unanswered_count += 1;
     if (response?.response_type === "out_of_stock") item.out_of_stock_count += 1;
     if (response?.response_type === "in_stock") item.in_stock_count += 1;
@@ -319,71 +330,88 @@ export async function computeStoreMetricsFromSupabase(storeId: string): Promise<
   const yStart = new Date(start);
   yStart.setDate(yStart.getDate() - 1);
 
-  const { data: yesterdayTargets } = await supabase
-    .from("request_targets")
-    .select("request_id")
-    .eq("store_id", storeId)
-    .gte("created_at", yStart.toISOString())
-    .lt("created_at", start.toISOString());
+  // Two round trips, not ten. Only the three response lookups genuinely
+  // depend on earlier results (they need the target request ids), so
+  // everything else is issued at once. The response tallies are counted in
+  // Postgres rather than fetched as rows, which also drops an unbounded
+  // `store_responses` read that PostgREST would have capped on a busy store.
+  const responseCount = (responseType?: string) => {
+    const query = supabase
+      .from("store_responses")
+      .select("*", { count: "exact", head: true })
+      .eq("store_id", storeId);
+    return responseType ? query.eq("response_type", responseType) : query;
+  };
+
+  const [
+    { data: yesterdayTargets },
+    { data: todayTargets },
+    { data: weekTargets },
+    { count: totalReceived },
+    { count: answeredCount },
+    { count: inStockCount },
+    { count: outCount },
+    { count: canOrderCount },
+    { count: weekFinds },
+    { data: store },
+  ] = await Promise.all([
+    supabase
+      .from("request_targets")
+      .select("request_id")
+      .eq("store_id", storeId)
+      .gte("created_at", yStart.toISOString())
+      .lt("created_at", start.toISOString()),
+    supabase
+      .from("request_targets")
+      .select("request_id, created_at")
+      .eq("store_id", storeId)
+      .gte("created_at", start.toISOString()),
+    supabase
+      .from("request_targets")
+      .select("request_id, response_time_seconds, created_at")
+      .eq("store_id", storeId)
+      .gte("created_at", week.toISOString()),
+    supabase
+      .from("request_targets")
+      .select("*", { count: "exact", head: true })
+      .eq("store_id", storeId),
+    responseCount(),
+    responseCount("in_stock"),
+    responseCount("out_of_stock"),
+    responseCount("can_order"),
+    supabase
+      .from("customer_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("fulfilled_store_id", storeId)
+      .gte("fulfilled_at", week.toISOString()),
+    supabase.from("stores").select("avg_response_minutes").eq("id", storeId).single(),
+  ]);
+
   const yesterdayIds = (yesterdayTargets || []).map((t) => t.request_id);
-  const { data: yesterdayResponses } = yesterdayIds.length
-    ? await supabase
-        .from("store_responses")
-        .select("request_id")
-        .eq("store_id", storeId)
-        .in("request_id", yesterdayIds)
-    : { data: [] as { request_id: string }[] };
-
-  const { data: todayTargets } = await supabase
-    .from("request_targets")
-    .select("request_id, created_at")
-    .eq("store_id", storeId)
-    .gte("created_at", start.toISOString());
-
   const todayIds = (todayTargets || []).map((t) => t.request_id);
-  const { data: todayResponses } = todayIds.length
-    ? await supabase
-        .from("store_responses")
-        .select("request_id, response_type")
-        .eq("store_id", storeId)
-        .in("request_id", todayIds)
-    : { data: [] as { request_id: string; response_type: string }[] };
-
-  const { count: totalReceived } = await supabase
-    .from("request_targets")
-    .select("*", { count: "exact", head: true })
-    .eq("store_id", storeId);
-
-  const { data: allResponses } = await supabase
-    .from("store_responses")
-    .select("response_type, created_at, request_id")
-    .eq("store_id", storeId);
-
-  const answered = (allResponses || []).length;
-  const total = totalReceived || 1;
-  const inStock = (allResponses || []).filter((r) => r.response_type === "in_stock").length;
-  const out = (allResponses || []).filter((r) => r.response_type === "out_of_stock").length;
-  const canOrder = (allResponses || []).filter((r) => r.response_type === "can_order").length;
-
-  const { data: weekTargets } = await supabase
-    .from("request_targets")
-    .select("request_id, response_time_seconds, created_at")
-    .eq("store_id", storeId)
-    .gte("created_at", week.toISOString());
   const weekIds = (weekTargets || []).map((t) => t.request_id);
-  const { data: weekResponses } = weekIds.length
-    ? await supabase
-        .from("store_responses")
-        .select("request_id, response_type")
-        .eq("store_id", storeId)
-        .in("request_id", weekIds)
-    : { data: [] as { request_id: string; response_type: string }[] };
 
-  const { count: weekFinds } = await supabase
-    .from("customer_requests")
-    .select("*", { count: "exact", head: true })
-    .eq("fulfilled_store_id", storeId)
-    .gte("fulfilled_at", week.toISOString());
+  const responsesFor = async (ids: string[]) => {
+    if (!ids.length) return [] as { request_id: string; response_type: string }[];
+    const { data } = await supabase
+      .from("store_responses")
+      .select("request_id, response_type")
+      .eq("store_id", storeId)
+      .in("request_id", ids);
+    return data || [];
+  };
+
+  const [yesterdayResponses, todayResponses, weekResponses] = await Promise.all([
+    responsesFor(yesterdayIds),
+    responsesFor(todayIds),
+    responsesFor(weekIds),
+  ]);
+
+  const answered = answeredCount || 0;
+  const total = totalReceived || 1;
+  const inStock = inStockCount || 0;
+  const out = outCount || 0;
+  const canOrder = canOrderCount || 0;
 
   const weekTimes = (weekTargets || [])
     .filter((t) => t.response_time_seconds != null)
@@ -392,12 +420,6 @@ export async function computeStoreMetricsFromSupabase(storeId: string): Promise<
     weekTimes.length > 0
       ? Math.round(weekTimes.reduce((a, b) => a + b, 0) / weekTimes.length)
       : null;
-
-  const { data: store } = await supabase
-    .from("stores")
-    .select("avg_response_minutes")
-    .eq("id", storeId)
-    .single();
 
   return {
     requests_today: todayTargets?.length || 0,
