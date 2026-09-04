@@ -1,25 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MetricCard, Panel } from "@/components/dashboard/shell";
 import { Skeleton } from "@/components/ui/primitives";
 import {
-  getStoreDemandAction,
-  getStoreIncomingRequestsAction,
-  getStoreMetricsAction,
-  getStoreSettingsAction,
-  getStoreWorkspaceAction,
-} from "@/lib/services/actions";
-import { listStoreDevicesAction } from "@/lib/services/hub-devices";
-import { getStoreUsageSnapshotAction } from "@/lib/visits/engine";
+  getStoreOverviewAction,
+  type StoreOverview,
+} from "@/lib/services/store-overview";
 import { formatDurationSeconds } from "@/lib/services/request-lifecycle";
 import { isStoreOpenAt } from "@/lib/services/store-hours";
 import { formatRelativeTime, greetingForHour } from "@/lib/utils";
-import type { CustomerRequest, DemandItem, StoreMetrics, StoreResponse } from "@/types/database";
 
-type Incoming = CustomerRequest & { response: StoreResponse | null };
+type OwnerData = Extract<StoreOverview, { mode: "owner" }>;
 
 function delta(today: number, yesterday: number) {
   if (!yesterday) return today ? "New vs yesterday" : "No traffic yesterday";
@@ -28,67 +22,26 @@ function delta(today: number, yesterday: number) {
   return `${sign}${pct}% vs yesterday`;
 }
 
-function OwnerOverview() {
-  const [storeName, setStoreName] = useState("");
-  const [openLabel, setOpenLabel] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState<StoreMetrics | null>(null);
-  const [items, setItems] = useState<Incoming[]>([]);
-  const [demand, setDemand] = useState<DemandItem[]>([]);
-  const [hubConnected, setHubConnected] = useState(true);
-  const [verifiedCustomers, setVerifiedCustomers] = useState<number | null>(null);
-  const [estimatedBill, setEstimatedBill] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+function OwnerOverview({ data }: { data: OwnerData }) {
+  const {
+    storeName,
+    metrics,
+    requests,
+    demand,
+    hubConnected,
+    hours,
+    verifiedCustomers,
+    estimatedBill,
+  } = data;
 
-  const load = useCallback(async () => {
-    const ws = await getStoreWorkspaceAction();
-    const id = ws?.store?.id;
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-    setStoreName(ws?.store?.name || "");
-    const [m, list, d, settings, devices, usage] = await Promise.all([
-      getStoreMetricsAction(id),
-      getStoreIncomingRequestsAction(id, "all", "7d"),
-      getStoreDemandAction(id),
-      getStoreSettingsAction(id),
-      listStoreDevicesAction(),
-      getStoreUsageSnapshotAction(),
-    ]);
-    setMetrics(m);
-    setItems(list);
-    setDemand(d);
-    setHubConnected(devices.some((device) => !device.revoked_at));
-    setVerifiedCustomers(usage?.visits ?? null);
-    setEstimatedBill(usage?.formatBilled ?? null);
-    if (settings?.hours?.length) {
-      setOpenLabel(isStoreOpenAt(settings.hours).open ? "Open" : "Closed");
-    } else {
-      setOpenLabel(null);
-    }
-    setLoading(false);
-  }, []);
+  // Resolved here rather than on the server so both read the viewer's clock.
+  const openLabel = hours?.length
+    ? isStoreOpenAt(hours).open
+      ? "Open"
+      : "Closed"
+    : null;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  if (loading) {
-    return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-      </div>
-    );
-  }
-
-  if (!metrics) {
-    return <p className="text-sm text-ink-muted">No store is linked to this account.</p>;
-  }
-
-  const waiting = items.filter((i) => !i.response);
+  const waiting = requests.filter((i) => !i.response);
   const missed = demand
     .filter((d) => d.out_of_stock_count > 0)
     .sort((a, b) => b.out_of_stock_count - a.out_of_stock_count)
@@ -197,11 +150,11 @@ function OwnerOverview() {
             </Link>
           }
         >
-          {items.length === 0 ? (
+          {requests.length === 0 ? (
             <p className="text-sm text-ink-muted">No requests in the last 7 days.</p>
           ) : (
             <ul className="divide-y divide-black/[0.06]">
-              {items.slice(0, 8).map((row) => (
+              {requests.slice(0, 8).map((row) => (
                 <li key={row.id}>
                   <Link
                     href={`/store/requests/${row.id}`}
@@ -263,21 +216,36 @@ function OwnerOverview() {
 
 export default function StoreHomePage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"loading" | "owner" | "employee">("loading");
+  const [overview, setOverview] = useState<StoreOverview | null>(null);
 
   useEffect(() => {
-    getStoreWorkspaceAction().then((ws) => {
-      if (ws?.canManageStore) {
-        setMode("owner");
-        return;
-      }
-      setMode("employee");
-      router.replace("/store/hub");
+    let cancelled = false;
+    getStoreOverviewAction().then((result) => {
+      if (cancelled) return;
+      setOverview(result);
+      if (result.mode === "employee") router.replace("/store/hub");
     });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
-  if (mode === "loading" || mode === "employee") {
-    return <Skeleton className="h-40" />;
+  if (!overview || overview.mode === "employee") {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+      </div>
+    );
   }
-  return <OwnerOverview />;
+
+  if (overview.mode === "no-store") {
+    return (
+      <p className="text-sm text-ink-muted">No store is linked to this account.</p>
+    );
+  }
+
+  return <OwnerOverview data={overview} />;
 }

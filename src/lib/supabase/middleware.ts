@@ -161,11 +161,15 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  let user = null;
+  // Verified locally against the cached JWKS (the project uses asymmetric
+  // signing keys), so this no longer costs an Auth round trip per navigation.
+  // `getClaims` still refreshes an expiring session via `getSession`.
+  let user: { id: string; email?: string } | null = null;
   try {
-    const result = await supabase.auth.getUser();
-    user = result.data.user;
-  } catch (err) {
+    const { data } = await supabase.auth.getClaims();
+    const claims = data?.claims;
+    if (claims?.sub) user = { id: claims.sub, email: claims.email };
+  } catch {
     console.error("[FINDIT] session refresh failed", {
       path,
       ip:

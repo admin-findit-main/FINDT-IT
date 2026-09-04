@@ -666,7 +666,36 @@ export async function getStoreUsageSnapshotAction() {
   return loadStoreUsageSnapshot(store.id, store.trial_ends_at, store.name);
 }
 
-export async function loadStoreUsageSnapshot(
+/**
+ * Admin-only read of another store's statement.
+ *
+ * The store id, name and trial date are re-read from the database rather than
+ * taken from the caller, so the billing period and trial pricing can't be
+ * spoofed by whoever invokes this.
+ */
+export async function getAdminStoreUsageSnapshotAction(storeId: string) {
+  const profile = await getCurrentProfile();
+  if (!profile || !isSoloAdmin(profile)) return null;
+
+  const admin = await adminClient();
+  const { data: store } = await admin
+    .from("stores")
+    .select("id, name, trial_ends_at")
+    .eq("id", storeId)
+    .maybeSingle();
+  if (!store) return null;
+
+  return loadStoreUsageSnapshot(store.id, store.trial_ends_at, store.name);
+}
+
+/**
+ * Deliberately NOT exported: every export from a `"use server"` module is a
+ * callable endpoint, and this one trusts a caller-supplied store id and trial
+ * date. Exporting it let any signed-in browser read — and re-price — another
+ * store's ledger, visits and disputes. Reach it through
+ * `getStoreUsageSnapshotAction` or `getAdminStoreUsageSnapshotAction`.
+ */
+async function loadStoreUsageSnapshot(
   storeId: string,
   trialEndsAt: string | null,
   storeName?: string

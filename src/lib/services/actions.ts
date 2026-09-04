@@ -140,12 +140,21 @@ async function setDemoSessionCookie(sessionId: string | null) {
   });
 }
 
+/**
+ * Resolves the signed-in user for this request.
+ *
+ * `getClaims()` rather than `getUser()`: this project signs JWTs with an
+ * asymmetric key, so the token is verified locally against a cached JWKS
+ * instead of costing a round trip to the Auth server on every request and
+ * every server action. It still calls `getSession()` internally, so expiring
+ * sessions are refreshed and re-cookied exactly as before.
+ */
 const getSupabaseUser = cache(async () => {
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  const user = claims?.sub ? { id: claims.sub, email: claims.email } : null;
   return { supabase, user };
 });
 

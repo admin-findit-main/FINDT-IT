@@ -11,7 +11,7 @@ import {
 import { HUB_DEVICE_ONLINE_MS } from "@/lib/hub/constants";
 import { deviceIsOnline } from "@/lib/hub/format";
 import { formatRelativeTime } from "@/lib/utils";
-import { loadStoreUsageSnapshot } from "@/lib/visits/engine";
+import { getAdminStoreUsageSnapshotAction } from "@/lib/visits/engine";
 import { AdminStoreActions } from "./store-actions";
 
 type Props = { params: Promise<{ id: string }> };
@@ -26,8 +26,9 @@ export default async function AdminStoreDetailPage({ params }: Props) {
   const { store, team, devices } = detail;
   const [metrics, usage] = await Promise.all([
     getStoreMetricsAction(store.id),
-    loadStoreUsageSnapshot(store.id, store.trial_ends_at, store.name),
+    getAdminStoreUsageSnapshotAction(store.id),
   ]);
+  if (!usage) notFound();
   const hubsOnline = devices.filter(
     (device) =>
       !device.revokedAt && deviceIsOnline(device.lastSeenAt, Date.now(), HUB_DEVICE_ONLINE_MS)
