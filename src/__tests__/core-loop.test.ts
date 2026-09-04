@@ -15,6 +15,7 @@ import {
 import {
   AGE_RESTRICTED_ID_REQUIRED,
   CUSTOMER_PLANS,
+  PLUS_PRICE_MONTHLY,
   STORE_PLANS,
   createdInMonthlyFindWindow,
 } from "@/lib/config/constants";
@@ -38,7 +39,10 @@ describe("normalizeProductName", () => {
 describe("plan config", () => {
   it("exposes customer and store pricing from config", () => {
     expect(CUSTOMER_PLANS.free.monthlyRequests).toBe(5);
-    expect(CUSTOMER_PLANS.plus.priceMonthly).toBeNull();
+    // Against the constant, not a literal: FINDIT+ carried no price while it
+    // was bundled with the pilot, and hard-coding that made the test outlive
+    // the decision to charge for it.
+    expect(CUSTOMER_PLANS.plus.priceMonthly).toBe(PLUS_PRICE_MONTHLY);
     expect(STORE_PLANS.starter.priceMonthly).toBe(99);
     expect(STORE_PLANS.pro.priceMonthly).toBe(99);
   });

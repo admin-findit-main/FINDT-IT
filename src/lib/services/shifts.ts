@@ -266,7 +266,10 @@ export async function deleteShiftEmployeeAction(employeeId: string) {
 export async function getHubClockStateAction(): Promise<HubClockState> {
   const linked = await resolveHubTerminalAction();
   if (!linked.ok) return { required: false };
-  if (linked.runtime.source !== "device") return { required: false };
+  // Presence of a device, not the session type: a manager signed in on a
+  // paired tablet still resolves as a member, and gating on that skipped the
+  // clock gate entirely, so visits lost their employee attribution.
+  if (!linked.runtime.deviceId) return { required: false };
   const storeId = linked.runtime.store.id;
 
   if (isDemoMode()) {
@@ -350,7 +353,7 @@ export async function clockInHubAction(pinValue: string): Promise<HubClockInResu
 
   const linked = await resolveHubTerminalAction();
   if (!linked.ok) return { error: "This tablet is not connected to a store." };
-  if (linked.runtime.source !== "device") {
+  if (!linked.runtime.deviceId) {
     return { error: "Clock in from the store Hub tablet." };
   }
   const storeId = linked.runtime.store.id;

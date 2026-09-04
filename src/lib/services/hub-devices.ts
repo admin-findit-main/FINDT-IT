@@ -36,6 +36,15 @@ export type HubRuntime = {
   canManage: boolean;
   deviceName: string | null;
   deviceId: string | null;
+  /**
+   * Why this session has no `deviceId`, or `null` when it has one.
+   *
+   * A signed-in manager always resolves to a usable Hub, so the reason a
+   * tablet is not paired never reaches the page as an error. Without it the
+   * Hub can only render a dead end: check-in and the shift clock both need a
+   * device, but the screen would claim everything is ready.
+   */
+  deviceIssue: HubRelinkReason | null;
 };
 
 export type StoreDeviceView = {
@@ -62,8 +71,17 @@ async function requireStoreManager(storeId?: string) {
   return { profile, storeId: id };
 }
 
+/** `"absent"` means this browser was never paired; the rest mean it was, and
+ * the link broke — `inspectHubDeviceCookie` has already dropped the cookie. */
+function deviceIssueFrom(
+  status: Exclude<HubRelinkReason, "missing"> | "absent"
+): HubRelinkReason {
+  return status === "absent" ? "missing" : status;
+}
+
 function runtimeFromWorkspace(
-  workspace: NonNullable<Awaited<ReturnType<typeof getStoreWorkspaceAction>>>
+  workspace: NonNullable<Awaited<ReturnType<typeof getStoreWorkspaceAction>>>,
+  deviceIssue: HubRelinkReason | null
 ): HubRuntime {
   return {
     store: workspace.store!,
@@ -72,6 +90,7 @@ function runtimeFromWorkspace(
     canManage: workspace.canManageStore,
     deviceName: null,
     deviceId: null,
+    deviceIssue,
   };
 }
 
@@ -85,6 +104,7 @@ function runtimeFromDevice(
     canManage: false,
     deviceName: device.device_name,
     deviceId: device.id,
+    deviceIssue: null,
   };
 }
 
@@ -109,7 +129,6 @@ export async function resolveHubTerminalAction(): Promise<
   ]);
 
   if (workspace?.store) {
-    const runtime = runtimeFromWorkspace(workspace);
     // Only adopt the device identity when it belongs to the store this
     // session is already acting for, so a check-in token can never pair one
     // store's id with another store's device.
@@ -120,13 +139,17 @@ export async function resolveHubTerminalAction(): Promise<
       return {
         ok: true,
         runtime: {
-          ...runtime,
+          ...runtimeFromWorkspace(workspace, null),
           deviceId: device.session.id,
           deviceName: device.session.device_name,
         },
       };
     }
-    return { ok: true, runtime };
+    // A device paired to a different store is no more usable here than none
+    // at all, so it reads as unpaired rather than leaking the other store.
+    const issue =
+      device.status === "linked" ? "missing" : deviceIssueFrom(device.status);
+    return { ok: true, runtime: runtimeFromWorkspace(workspace, issue) };
   }
 
   if (device.status === "linked") {

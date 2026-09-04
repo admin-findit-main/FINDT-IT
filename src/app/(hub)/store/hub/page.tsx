@@ -20,7 +20,11 @@ import {
 import { HubClockGate } from "@/components/hub/clock-gate";
 import { HubCheckinPanel } from "@/components/hub/checkin-panel";
 import { HubEmployeeRewards } from "@/components/hub/employee-rewards";
-import { hubConnectHref } from "@/lib/hub/relink";
+import {
+  hubConnectHref,
+  hubRelinkMessage,
+  type HubRelinkReason,
+} from "@/lib/hub/relink";
 import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
 import {
   HUB_DEVICE_HEARTBEAT_MS,
@@ -91,6 +95,9 @@ export default function FinditHubPage() {
   // Present whenever this browser is a paired Hub, whether or not a manager
   // is also signed in on it. Check-in and the heartbeat key off this.
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  // Why there is no device, so an unpaired tablet can say so instead of
+  // showing a ready screen with no way to check anyone in.
+  const [deviceIssue, setDeviceIssue] = useState<HubRelinkReason | null>(null);
   const [shiftLocked, setShiftLocked] = useState<boolean | null>(null);
   const [shiftName, setShiftName] = useState<string | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
@@ -127,6 +134,7 @@ export default function FinditHubPage() {
       setCanManage(runtime.canManage);
       setDeviceName(runtime.deviceName);
       setDeviceId(runtime.deviceId);
+      setDeviceIssue(runtime.deviceIssue);
       setStore(runtime.store);
       if (runtime.deviceId) {
         const beat = await touchHubDeviceAction().catch((err) => {
@@ -445,7 +453,18 @@ export default function FinditHubPage() {
           ) : null}
         </div>
         <div className="flex items-center gap-3">
-          {deviceId && active ? <HubCheckinPanel compact /> : null}
+          {active && deviceId ? <HubCheckinPanel compact /> : null}
+          {/* A busy store can sit on the request view all day and never see the
+              idle screen, so the unpaired state has to be reachable here too. */}
+          {active && !deviceId ? (
+            <button
+              type="button"
+              onClick={() => goToLinking(deviceIssue)}
+              className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/10"
+            >
+              Check-in off
+            </button>
+          ) : null}
           <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
             <span
               className={`h-2.5 w-2.5 rounded-full ${online ? "bg-emerald-400" : "bg-[#E5231B]"}`}
@@ -507,17 +526,40 @@ export default function FinditHubPage() {
               </div>
             </div>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center text-center">
-              <BrandLogo kind="business" tone="dark" className="mx-auto h-8 w-auto" />
-              <h1 className="mt-6 text-5xl font-bold tracking-tight md:text-6xl">
-                Ready for requests
-              </h1>
-              <p className="mt-4 text-xl text-white/70">{store?.name}</p>
-              <p className="mt-10 flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-emerald-400">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                Listening for nearby requests
-              </p>
-              <HubEmployeeRewards />
+            <div className="flex min-h-0 flex-1 items-center gap-8 md:gap-16">
+              <div className="min-w-0 flex-1">
+                <BrandLogo kind="business" tone="dark" className="h-8 w-auto" />
+                <h1 className="mt-6 text-4xl font-bold tracking-tight md:text-6xl">
+                  Ready for requests
+                </h1>
+                <p className="mt-4 text-xl text-white/70">{store?.name}</p>
+                <p className="mt-8 flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-emerald-400">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                  Listening for nearby requests
+                </p>
+                <HubEmployeeRewards />
+              </div>
+              <div className="w-[min(42vw,22rem)] shrink-0 rounded-2xl border border-white/15 bg-white/5 p-6">
+                <p className="text-sm uppercase tracking-[0.2em] text-white/40">
+                  Check-in
+                </p>
+                <p className="mt-3 text-xl font-semibold">
+                  {deviceIssue === "missing"
+                    ? "This tablet isn’t connected"
+                    : "This tablet needs reconnecting"}
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-white/60">
+                  {hubRelinkMessage(deviceIssue) ||
+                    "Connect it to show a check-in QR and clock staff in. Answering requests works either way."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => goToLinking(deviceIssue)}
+                  className="mt-6 min-h-12 w-full rounded-full bg-white px-6 text-sm font-semibold text-black"
+                >
+                  Connect this device
+                </button>
+              </div>
             </div>
           )
         ) : (
@@ -758,11 +800,20 @@ export default function FinditHubPage() {
               <p className="mt-1 text-sm text-white/70">Clocked in as {shiftName}</p>
             ) : null}
             <p className="mt-2 text-sm text-white/50">
-              {source === "device"
+              {deviceId
                 ? "This terminal is connected to the store. The owner can disconnect it from Devices in FINDIT Business."
                 : "Countertop terminal for this store. Exit returns to FINDIT Business — this screen does not sign you out of FINDIT."}
             </p>
-            {source === "device" && shiftName ? (
+            {!deviceId ? (
+              <button
+                type="button"
+                onClick={() => goToLinking(deviceIssue)}
+                className="mt-6 min-h-14 w-full rounded-2xl bg-white text-lg font-semibold text-black"
+              >
+                Connect this device
+              </button>
+            ) : null}
+            {deviceId && shiftName ? (
               <button
                 type="button"
                 onClick={async () => {
