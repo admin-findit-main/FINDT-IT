@@ -63,6 +63,20 @@ type Detail = CustomerRequest & {
 };
 
 const STORES_PAGE_SIZE = 5;
+/** How long after creation a request still counts as "just sent". */
+const RECENT_REQUEST_MS = 20_000;
+
+/**
+ * Read the clock outside render.
+ *
+ * Callers set this alongside `data` so both land in the same commit: deferring
+ * it to an effect would render one frame with `searching` false, which shows
+ * the "not enough stores in this area" notice on a request that was just sent.
+ */
+function isRecentlyCreated(createdAt: string | null | undefined) {
+  if (!createdAt) return false;
+  return Date.now() - new Date(createdAt).getTime() < RECENT_REQUEST_MS;
+}
 
 function detailFromPending(pending: PendingFind): Detail {
   return {
@@ -130,6 +144,7 @@ export default function RequestDetailPage() {
   const [expandedReplyId, setExpandedReplyId] = useState<string | null>(null);
   const [feedbackDone, setFeedbackDone] = useState(false);
   const [visibleStoreCount, setVisibleStoreCount] = useState(STORES_PAGE_SIZE);
+  const [recentlyCreated, setRecentlyCreated] = useState(false);
   const searchingRef = useRef(false);
   const primedResponses = useRef(false);
   const seenResponseIds = useRef<Set<string>>(new Set());
@@ -138,6 +153,7 @@ export default function RequestDetailPage() {
     const result = await getCustomerRequestAction(params.id);
     if (result) {
       setData(result);
+      setRecentlyCreated(isRecentlyCreated(result.created_at));
       clearPendingFind(params.id);
     }
     setLoading(false);
@@ -147,7 +163,9 @@ export default function RequestDetailPage() {
   useEffect(() => {
     const pending = readPendingFind(params.id);
     if (pending) {
-      setData(detailFromPending(pending));
+      const detail = detailFromPending(pending);
+      setData(detail);
+      setRecentlyCreated(isRecentlyCreated(detail.created_at));
       setLoading(false);
     }
     void load();
@@ -232,15 +250,16 @@ export default function RequestDetailPage() {
     !expired &&
     data?.status !== "cancelled" &&
     data?.status !== "fulfilled";
-  const recentlyCreated = Boolean(
-    data && Date.now() - new Date(data.created_at).getTime() < 20_000
-  );
   const searching = Boolean(
     openRequest &&
       responses.length === 0 &&
       (storesContacted > 0 || recentlyCreated)
   );
-  searchingRef.current = searching || loading;
+  // Synced in an effect rather than during render. Only the poll timer reads
+  // this, to pick the faster interval, and it cannot fire before this commit.
+  useEffect(() => {
+    searchingRef.current = searching || loading;
+  }, [searching, loading]);
   const waitingOnMore = Boolean(
     openRequest && responses.length > 0 && storesContacted > responses.length
   );

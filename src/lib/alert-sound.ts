@@ -6,7 +6,7 @@ let audioCtx: AudioContext | null = null;
 let hubAudio: HTMLAudioElement | null = null;
 let customerAudio: HTMLAudioElement | null = null;
 let pendingKind: AlertKind | null = null;
-let wavCache: Partial<Record<AlertKind, string>> = {};
+const wavCache: Partial<Record<AlertKind, string>> = {};
 
 function encodeWavBeep(input: {
   seconds: number;

@@ -31,6 +31,20 @@ type RealtimeAuthClient = {
   };
 };
 
+/**
+ * Hold the latest `value` in a ref without writing to it during render.
+ *
+ * Only realtime callbacks read this, and those cannot run before the commit
+ * that assigns it, so syncing in an effect loses nothing.
+ */
+function useLatestRef<T>(value: T) {
+  const ref = useRef(value);
+  useEffect(() => {
+    ref.current = value;
+  }, [value]);
+  return ref;
+}
+
 function realtimeConfigured() {
   if (typeof window === "undefined") return false;
   if (process.env.NEXT_PUBLIC_FINDIT_DEMO_MODE === "true") return false;
@@ -64,8 +78,7 @@ export function useRequestRealtime(
   requestId: string | undefined,
   { onChange }: RealtimeHandlers
 ): RealtimeSync {
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  const onChangeRef = useLatestRef(onChange);
   const [sync, setSync] = useState<RealtimeSync>({
     state: requestId ? "connecting" : "idle",
     percent: requestId ? 18 : 0,
@@ -145,7 +158,9 @@ export function useRequestRealtime(
       authSub?.unsubscribe();
       channel?.unsubscribe();
     };
-  }, [requestId]);
+    // `onChangeRef` is a stable ref object; it is listed only because the
+    // custom hook hides that fact from the exhaustive-deps rule.
+  }, [requestId, onChangeRef]);
 
   return sync;
 }
@@ -154,8 +169,7 @@ export function useStoreInboxRealtime(
   storeId: string | undefined,
   { onChange }: RealtimeHandlers
 ): RealtimeSync {
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  const onChangeRef = useLatestRef(onChange);
   const [sync, setSync] = useState<RealtimeSync>({
     state: storeId ? "connecting" : "idle",
     percent: storeId ? 18 : 0,
@@ -235,7 +249,8 @@ export function useStoreInboxRealtime(
       authSub?.unsubscribe();
       channel?.unsubscribe();
     };
-  }, [storeId]);
+    // Stable ref object; see the note in `useRequestRealtime`.
+  }, [storeId, onChangeRef]);
 
   return sync;
 }

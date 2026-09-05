@@ -394,6 +394,7 @@ export default function CustomerHomePage() {
       createdAt: created.created_at,
       expiresAt: created.expires_at,
       storesTargeted,
+      // eslint-disable-next-line react-hooks/purity -- submit handler, never render
       startedAt: Date.now(),
     });
     router.push(`/requests/${created.id}`);

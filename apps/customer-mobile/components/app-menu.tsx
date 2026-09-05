@@ -213,14 +213,20 @@ function CustomerMenuDrawer() {
     ],
   }));
 
+  // The two writes below are Reanimated shared values assigned inside gesture
+  // worklets on the UI thread. Mutating `.value` is that library's only API for
+  // it; the lint rule sees the gesture built during render and cannot tell the
+  // callbacks run later.
   const closePan = Gesture.Pan()
     .activeOffsetX([-16, 16])
     .onUpdate((event) => {
       const next = 1 + event.translationX / panelWidth;
+      // eslint-disable-next-line react-hooks/immutability -- shared value, gesture worklet
       progress.value = Math.min(1, Math.max(0, next));
     })
     .onEnd((event) => {
       const shouldClose = event.velocityX < -650 || progress.value < 0.55;
+      // eslint-disable-next-line react-hooks/immutability -- shared value, gesture worklet
       progress.value = withTiming(shouldClose ? 0 : 1, {
         duration,
         easing: OPEN_CURVE,

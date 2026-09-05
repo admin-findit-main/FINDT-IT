@@ -67,7 +67,11 @@ function RootNavigator() {
     pendingRequestId.current = id;
   };
   const openRequestRef = useRef(openRequest);
-  openRequestRef.current = openRequest;
+  // Synced in an effect rather than during render. Only the deep-link effect
+  // below reads it, and that cannot run before this commit.
+  useEffect(() => {
+    openRequestRef.current = openRequest;
+  });
   const navTheme = useMemo(
     () => ({
       ...(scheme === "light" ? DefaultTheme : DarkTheme),

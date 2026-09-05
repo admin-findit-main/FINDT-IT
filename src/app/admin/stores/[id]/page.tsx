@@ -29,9 +29,13 @@ export default async function AdminStoreDetailPage({ params }: Props) {
     getAdminStoreUsageSnapshotAction(store.id),
   ]);
   if (!usage) notFound();
+  // One clock read for the whole page, so the summary count and the per-device
+  // rows below cannot disagree about which devices are online.
+  // eslint-disable-next-line react-hooks/purity -- server component: renders once per request
+  const now = Date.now();
   const hubsOnline = devices.filter(
     (device) =>
-      !device.revokedAt && deviceIsOnline(device.lastSeenAt, Date.now(), HUB_DEVICE_ONLINE_MS)
+      !device.revokedAt && deviceIsOnline(device.lastSeenAt, now, HUB_DEVICE_ONLINE_MS)
   ).length;
   const rate =
     metrics.requests_today > 0
@@ -148,7 +152,7 @@ export default async function AdminStoreDetailPage({ params }: Props) {
                 <span className="text-ink-muted">
                   {device.revokedAt
                     ? "Removed"
-                    : deviceIsOnline(device.lastSeenAt, Date.now(), HUB_DEVICE_ONLINE_MS)
+                    : deviceIsOnline(device.lastSeenAt, now, HUB_DEVICE_ONLINE_MS)
                       ? "Online"
                       : device.lastSeenAt
                         ? `Last active ${formatRelativeTime(device.lastSeenAt)}`

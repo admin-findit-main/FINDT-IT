@@ -5,10 +5,15 @@ import {
 } from "@findit/domain";
 import { isExpoPushToken, sendWebPush } from "@/lib/services/web-push";
 import { sendExpoPush } from "@/lib/services/expo-push";
+import type { createServiceClient } from "@/lib/supabase/admin";
 
-type ServiceAdmin = {
-  from: (table: string) => any;
-};
+/**
+ * The service-role client, typed from its factory rather than restated here.
+ *
+ * A hand-written shape for `from()` cost the callers a cast to this type and
+ * gave up column checking on every query in the file.
+ */
+type ServiceAdmin = ReturnType<typeof createServiceClient>;
 
 type TokenRow = { token: string; user_id: string };
 

@@ -410,7 +410,10 @@ export function IosSwitch({
 }) {
   const theme = useAppTheme();
   const reducedMotion = useReducedMotion();
-  const progress = React.useRef(new Animated.Value(value ? 1 : 0)).current;
+  // A lazy `useState` initializer, not a ref: this reads the instance during
+  // render, and it also stops `new Animated.Value` from being constructed and
+  // thrown away on every render the way the eager `useRef` argument was.
+  const [progress] = React.useState(() => new Animated.Value(value ? 1 : 0));
 
   React.useEffect(() => {
     if (reducedMotion) {
