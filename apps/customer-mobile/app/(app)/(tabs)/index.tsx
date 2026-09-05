@@ -185,6 +185,7 @@ export default function HomeFindItScreen() {
 
   const uploadImage = async (uri: string, userId: string) => {
     const ext = uri.split(".").pop()?.split("?")[0] || "jpg";
+    // eslint-disable-next-line react-hooks/purity -- upload handler, never render
     const path = `${userId}/${Date.now()}.${ext}`;
     const res = await fetch(uri);
     const blob = await res.blob();
@@ -673,7 +674,11 @@ export default function HomeFindItScreen() {
                 size="lg"
                 loading={busy}
                 disabled={busy || atCap}
-                onPress={onSubmit}
+                // Called with no argument on purpose. Passing `onSubmit`
+                // directly handed the press event to `ageOk`, which is truthy,
+                // so age-restricted finds skipped the ID prompt and reported
+                // themselves as confirmed.
+                onPress={() => void onSubmit()}
                 style={styles.cta}
               />
               <Text style={[styles.usage, { color: theme.inkSubtle }]}>
