@@ -675,9 +675,10 @@ export default function HomeFindItScreen() {
                 loading={busy}
                 disabled={busy || atCap}
                 // Called with no argument on purpose. Passing `onSubmit`
-                // directly handed the press event to `ageOk`, which is truthy,
-                // so age-restricted finds skipped the ID prompt and reported
-                // themselves as confirmed.
+                // directly handed the press event to `ageOk`; an event object
+                // is truthy, so the ID prompt never opened, and the request
+                // then failed `z.boolean()` on `ageRestrictedConfirmed` as a
+                // generic form error.
                 onPress={() => void onSubmit()}
                 style={styles.cta}
               />
