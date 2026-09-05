@@ -15,16 +15,37 @@ export function boundSlug(value: unknown, max = 80): string | null {
   return trimmed;
 }
 
+/**
+ * Node's `Buffer`, read off the global instead of as a bare identifier.
+ *
+ * This module is imported by the React Native apps, where `Buffer` does not
+ * exist: naming it directly both failed to type-check there and would have
+ * thrown a ReferenceError had `atob` ever been missing.
+ */
+function decodeBase64(padded: string): string | null {
+  if (typeof atob === "function") return atob(padded);
+  const buffer = (
+    globalThis as {
+      Buffer?: {
+        from(
+          input: string,
+          encoding: string
+        ): { toString(encoding: string): string };
+      };
+    }
+  ).Buffer;
+  if (!buffer) return null;
+  return buffer.from(padded, "base64").toString("utf8");
+}
+
 function jwtPayload(token: string): { role?: string } | null {
   const parts = token.split(".");
   if (parts.length < 2) return null;
   try {
     const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
-    const json =
-      typeof atob === "function"
-        ? atob(padded)
-        : Buffer.from(parts[1], "base64url").toString("utf8");
+    const json = decodeBase64(padded);
+    if (json === null) return null;
     return JSON.parse(json) as { role?: string };
   } catch {
     return null;

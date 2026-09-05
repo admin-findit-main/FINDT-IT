@@ -204,7 +204,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select("first_name, account_type, email")
           .eq("id", user.id)
           .maybeSingle();
-        const coerced = coerceSoloAdminProfile(row || { email: user.email }, user.email);
+        // The fallback carries the same keys as the selected row so the
+        // argument is one shape, not a union missing `first_name`.
+        const coerced = coerceSoloAdminProfile(
+          row || {
+            first_name: null,
+            account_type: null,
+            email: user.email ?? null,
+          },
+          user.email
+        );
         return { needsName: customerNeedsFirstName(coerced) };
       },
       sendEmailOtp: async ({ email, createIfMissing }) => {
@@ -245,7 +254,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select("first_name, account_type, email")
           .eq("id", user.id)
           .maybeSingle();
-        const coerced = coerceSoloAdminProfile(row || { email: user.email }, user.email);
+        // The fallback carries the same keys as the selected row so the
+        // argument is one shape, not a union missing `first_name`.
+        const coerced = coerceSoloAdminProfile(
+          row || {
+            first_name: null,
+            account_type: null,
+            email: user.email ?? null,
+          },
+          user.email
+        );
         return { needsName: customerNeedsFirstName(coerced) };
       },
       completeFirstName: async (firstName) => {

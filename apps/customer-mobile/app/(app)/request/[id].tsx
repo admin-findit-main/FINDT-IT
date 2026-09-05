@@ -171,6 +171,11 @@ export default function RequestDetailScreen() {
                   state?: string;
                   postal_code?: string;
                   is_verified?: boolean;
+                  // Selected by `store:stores(*)` and passed to
+                  // `mapsDirectionsUrl`, which prefers coordinates over the
+                  // address when it has them.
+                  latitude?: number | null;
+                  longitude?: number | null;
                 }
               | undefined;
             const tone = toneForResponse(r.response_type);
