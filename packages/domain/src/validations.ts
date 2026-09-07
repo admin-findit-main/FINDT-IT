@@ -79,8 +79,8 @@ export const createRequestSchema = z.object({
   imageStoragePath: z.string().max(500).optional().or(z.literal("")).nullable(),
   forceDuplicate: z.boolean().optional().default(false),
   clientRequestKey: z.string().uuid().optional(),
-  latitude: z.coerce.number().optional().nullable(),
-  longitude: z.coerce.number().optional().nullable(),
+  latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+  longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
   ageRestrictedConfirmed: z.boolean().optional().default(false),
   categoryConfirmed: z.boolean().optional().default(false),
 });

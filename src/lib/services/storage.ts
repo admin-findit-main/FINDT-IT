@@ -111,6 +111,7 @@ export async function uploadRequestImage(input: {
     });
   if (error) return { error: error.message };
 
-  const { data } = supabase.storage.from(REQUEST_IMAGES_BUCKET).getPublicUrl(path);
-  return { path, publicUrl: data.publicUrl };
+  // Persist only the object path. Readers receive short-lived signed URLs
+  // after request ownership/store-target authorization.
+  return { path, publicUrl: path };
 }

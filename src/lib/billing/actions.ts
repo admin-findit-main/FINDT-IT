@@ -56,7 +56,13 @@ async function requireStoreOwner() {
 
 async function requireShopper() {
   const profile = await getCurrentProfile();
-  if (!profile) return { error: "Please sign in" as const };
+  if (
+    !profile ||
+    profile.account_type !== "customer" ||
+    isSoloAdmin(profile)
+  ) {
+    return { error: "Shopper account required" as const };
+  }
   return { profile };
 }
 

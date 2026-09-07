@@ -193,8 +193,7 @@ export default function HomeFindItScreen() {
       .from(REQUEST_IMAGES_BUCKET)
       .upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: true });
     if (upErr) throw upErr;
-    const { data } = supabase.storage.from(REQUEST_IMAGES_BUCKET).getPublicUrl(path);
-    return { url: data.publicUrl, path };
+    return { url: path, path };
   };
 
   const animateStep = () => {

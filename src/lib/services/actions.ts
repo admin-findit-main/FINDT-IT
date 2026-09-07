@@ -14,7 +14,6 @@ import {
   demoApproveStoreApplication,
   demoCountCustomerRequestsThisMonth,
   demoCreateRequest,
-  demoCreateStore,
   demoCurrentUser,
   demoDeleteAccount,
   demoFulfillRequest,
@@ -38,7 +37,7 @@ import {
   getDemoState,
   DEMO_SESSION_COOKIE,
 } from "@/lib/demo/store";
-import { createRequestSchema, storeJoinApplicationSchema, storeOnboardingSchema } from "@/lib/validations";
+import { createRequestSchema, storeJoinApplicationSchema } from "@/lib/validations";
 import { normalizeProductName } from "@/lib/utils";
 import { notifyCustomerDevices, notifyEmployeeDevices } from "@/lib/services/expo-push";
 import {
@@ -114,6 +113,18 @@ import { isStoreOpenAt } from "@/lib/services/store-hours";
 import { trackEvent } from "@/lib/services/analytics";
 import { getHubDeviceSession } from "@/lib/hub/session";
 import { notifySupportInbox } from "@/lib/services/support-inbox";
+
+async function signRequestImageUrl(value: string | null | undefined) {
+  const imageSigning = await import("@/lib/services/request-images-server");
+  return imageSigning.signRequestImageUrl(value);
+}
+
+async function signRequestImageUrls(
+  values: (string | null | undefined)[]
+) {
+  const imageSigning = await import("@/lib/services/request-images-server");
+  return imageSigning.signRequestImageUrls(values);
+}
 
 async function getDemoSessionId(): Promise<string | null> {
   try {
@@ -253,6 +264,46 @@ async function getStoreActor(storeId: string): Promise<StoreActor | null> {
     };
   }
   return null;
+}
+
+function storeFacingRequest(
+  request: CustomerRequest,
+  signedImageUrl: string | null
+): CustomerRequest {
+  return {
+    id: request.id,
+    customer_id: "",
+    product_name: request.product_name,
+    normalized_product_name: request.normalized_product_name,
+    description: request.description,
+    image_url: signedImageUrl,
+    image_storage_path: null,
+    category: request.category,
+    city: request.city,
+    state: request.state,
+    postal_code: String(request.postal_code || "").slice(0, 3),
+    radius_miles: request.radius_miles,
+    latitude: null,
+    longitude: null,
+    status: request.status,
+    expires_at: request.expires_at,
+    stores_targeted: request.stores_targeted,
+    detected_business_type: null,
+    detected_category: null,
+    detected_subcategory: null,
+    routing_confidence: null,
+    classification_status: null,
+    client_request_key: null,
+    classification_reason: null,
+    category_confirmed: Boolean(request.category_confirmed),
+    fulfilled_at: null,
+    fulfilled_store_id: null,
+    found_with_findit: null,
+    still_looking_count: request.still_looking_count || 0,
+    last_rebroadcast_at: null,
+    created_at: request.created_at,
+    updated_at: request.updated_at,
+  };
 }
 
 function loginSideForAccount(input: {
@@ -1124,7 +1175,7 @@ export async function createCustomerRequestAction(raw: unknown) {
   });
 
   after(() =>
-    routeRequestToStoresAction(request.id).catch((err) => {
+    routeRequestToStores(request.id).catch((err) => {
       console.error("[FINDIT] Route after create failed", err);
     })
   );
@@ -1187,7 +1238,7 @@ async function notifyStoresOfNewRequest(input: {
   });
 }
 
-export async function routeRequestToStoresAction(requestId: string): Promise<number> {
+async function routeRequestToStores(requestId: string): Promise<number> {
   if (isDemoMode()) return demoRouteRequestToStores(requestId);
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
@@ -1416,8 +1467,12 @@ export async function getCustomerRequestAction(requestId: string) {
       .eq("request_id", id),
   ]);
   if (!request) return null;
+  const signedImageUrl = await signRequestImageUrl(
+    request.image_storage_path || request.image_url
+  );
   return {
     ...(request as CustomerRequest),
+    image_url: signedImageUrl,
     responses: (responses || []) as (StoreResponse & { store?: Store })[],
     targets_count: (request as CustomerRequest).stores_targeted,
   };
@@ -1721,7 +1776,13 @@ export async function getStoreIncomingRequestsAction(
         const response = state.responses.find(
           (r) => r.request_id === t.request_id && r.store_id === id
         );
-        return request ? { ...request, target: t, response: response || null } : null;
+        return request
+          ? {
+              ...storeFacingRequest(request, request.image_url),
+              target: t,
+              response: response || null,
+            }
+          : null;
       })
       .filter(Boolean)
       .filter((item) => {
@@ -1793,13 +1854,24 @@ export async function getStoreIncomingRequestsAction(
   const responseByRequest = new Map(
     (responses || []).map((response) => [response.request_id, response as StoreResponse])
   );
+  const imageValues = rows.map(
+    (row: { request?: CustomerRequest | CustomerRequest[] | null }) => {
+      const request = Array.isArray(row.request) ? row.request[0] : row.request;
+      return request?.image_storage_path || request?.image_url || null;
+    }
+  );
+  const signedImages = await signRequestImageUrls(imageValues);
 
   return rows
     .map((row: { id: string; request?: CustomerRequest | CustomerRequest[] | null }) => {
       const request = Array.isArray(row.request) ? row.request[0] : row.request;
       if (!request) return null;
+      const imageValue = request.image_storage_path || request.image_url;
       return {
-        ...request,
+        ...storeFacingRequest(
+          request,
+          imageValue ? signedImages.get(imageValue) || null : null
+        ),
         target: { id: row.id },
         response: responseByRequest.get(request.id) || null,
       };
@@ -1852,94 +1924,6 @@ export const getUserStoresAction = cache(async (): Promise<(Store & { role: stri
       return { ...(store as Store), role: d.role };
     });
 });
-
-export async function createStoreAction(raw: unknown) {
-  const parsed = storeOnboardingSchema.safeParse(raw);
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message || "Invalid store data" };
-  }
-  const profile = await getCurrentProfile();
-  if (!profile) return { error: "Unauthorized" };
-  const location = normalizeStoreLocation({
-    streetAddress: parsed.data.streetAddress,
-    city: parsed.data.city,
-    state: parsed.data.state,
-    postalCode: parsed.data.postalCode,
-  });
-
-  if (isDemoMode()) {
-    const store = demoCreateStore({
-      ownerId: profile.id,
-      name: parsed.data.name,
-      categories: parsed.data.categories,
-      streetAddress: location.street,
-      city: location.city,
-      state: location.state,
-      postalCode: location.postalCode,
-      phone: parsed.data.phone,
-      website: parsed.data.website,
-      serviceZips: parsed.data.serviceZips,
-      requestCategories: parsed.data.requestCategories,
-      ageRestricted: parsed.data.ageRestricted,
-    });
-    return { store };
-  }
-
-  const { createClient } = await import("@/lib/supabase/server");
-  const { slugify } = await import("@/lib/utils");
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Unauthorized" };
-
-  const slug = slugify(parsed.data.name);
-  const { data: store, error } = await supabase
-    .from("stores")
-    .insert({
-      owner_id: user.id,
-      name: parsed.data.name,
-      slug,
-      street_address: location.street,
-      city: location.city,
-      state: location.state,
-      postal_code: location.postalCode,
-      phone: parsed.data.phone || null,
-      website: parsed.data.website || null,
-      age_restricted: parsed.data.ageRestricted,
-    })
-    .select("*")
-    .single();
-
-  if (error || !store) return { error: error?.message || "Failed" };
-
-  await supabase.from("store_members").insert({
-    store_id: store.id,
-    user_id: user.id,
-    role: "owner",
-    status: "active",
-  });
-  await supabase.from("store_categories").insert(
-    parsed.data.categories.map((category) => ({ store_id: store.id, category }))
-  );
-  await supabase.from("store_service_areas").insert(
-    parsed.data.serviceZips.map((postal_code) => ({
-      store_id: store.id,
-      postal_code,
-      city: parsed.data.city,
-      state: parsed.data.state,
-    }))
-  );
-  await supabase.from("subscriptions").insert({
-    store_id: store.id,
-    provider: "fastspring",
-    plan: "free",
-    plan_id: "trial",
-    status: "trial",
-  });
-
-  return { store: store as Store };
-}
 
 export async function getStoreDemandAction(storeId: string): Promise<DemandItem[]> {
   if (!(await canViewOwnerAnalytics(storeId))) return [];
@@ -3187,7 +3171,7 @@ export async function expandCustomerRequestRadiusAction(
     .eq("customer_id", user.id);
   if (updateError) return { error: "Couldn't look farther." };
 
-  const storesTargeted = await routeRequestToStoresAction(id);
+  const storesTargeted = await routeRequestToStores(id);
   return { ok: true as const, radiusMiles: miles, storesTargeted };
 }
 
@@ -3229,13 +3213,49 @@ export async function submitPilotFeedbackAction(input: {
 }) {
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Please sign in" };
+  const role =
+    profile.account_type === "customer"
+      ? "customer"
+      : profile.account_type === "business"
+        ? "store"
+        : null;
+  if (!role || input.role !== role) return { error: "Feedback role is invalid." };
+  const requestId = input.requestId ? boundUuid(input.requestId) : null;
+  const storeId = input.storeId ? boundUuid(input.storeId) : null;
+  if (
+    (input.requestId && !requestId) ||
+    (input.storeId && !storeId) ||
+    !requestId
+  ) {
+    return { error: "Feedback reference is invalid." };
+  }
 
   if (isDemoMode()) {
+    const state = getDemoState();
+    const request = state.requests.find((row) => row.id === requestId);
+    const authorized =
+      role === "customer"
+        ? request?.customer_id === profile.id
+        : Boolean(
+            storeId &&
+              state.storeMembers.some(
+                (member) =>
+                  member.user_id === profile.id &&
+                  member.store_id === storeId &&
+                  member.status === "active"
+              ) &&
+              state.targets.some(
+                (target) =>
+                  target.request_id === requestId &&
+                  target.store_id === storeId
+              )
+          );
+    if (!authorized) return { error: "Feedback reference is invalid." };
     getDemoState().events.push({
       event_name: "pilot_feedback_submitted",
       user_id: profile.id,
-      store_id: input.storeId,
-      request_id: input.requestId,
+      store_id: storeId || undefined,
+      request_id: requestId,
       created_at: new Date().toISOString(),
     });
     const liked =
@@ -3252,11 +3272,40 @@ export async function submitPilotFeedbackAction(input: {
 
   const { supabase, user } = await getSupabaseUser();
   if (!user) return { error: "Please sign in" };
+  if (role === "customer") {
+    const { data: ownedRequest } = await supabase
+      .from("customer_requests")
+      .select("id")
+      .eq("id", requestId)
+      .eq("customer_id", user.id)
+      .maybeSingle();
+    if (!ownedRequest) return { error: "Feedback reference is invalid." };
+    if (storeId) {
+      const { data: response } = await supabase
+        .from("store_responses")
+        .select("id")
+        .eq("request_id", requestId)
+        .eq("store_id", storeId)
+        .maybeSingle();
+      if (!response) return { error: "Feedback reference is invalid." };
+    }
+  } else {
+    if (!storeId || !(await getStoreActor(storeId))) {
+      return { error: "Feedback reference is invalid." };
+    }
+    const { data: target } = await supabase
+      .from("request_targets")
+      .select("id")
+      .eq("request_id", requestId)
+      .eq("store_id", storeId)
+      .maybeSingle();
+    if (!target) return { error: "Feedback reference is invalid." };
+  }
   const { error } = await supabase.from("pilot_feedback").insert({
     user_id: user.id,
-    role: input.role,
-    request_id: input.requestId || null,
-    store_id: input.storeId || null,
+    role,
+    request_id: requestId,
+    store_id: storeId,
     helpful: input.helpful ?? null,
     relevance: input.relevance ?? null,
     note: input.note || null,
@@ -3264,8 +3313,8 @@ export async function submitPilotFeedbackAction(input: {
   if (error) return { error: "Couldn't save feedback." };
   await trackEvent("pilot_feedback_submitted", {
     userId: user.id,
-    requestId: input.requestId,
-    storeId: input.storeId,
+    requestId,
+    storeId,
   });
   const liked =
     input.helpful === true ? "Liked" : input.helpful === false ? "Disliked" : "Feedback";

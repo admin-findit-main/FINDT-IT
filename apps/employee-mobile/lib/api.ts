@@ -1,85 +1,80 @@
 import { invokeRespondToRequest } from "@findit/supabase-client";
 import { supabase } from "./supabase";
 
+type SafeStoreRequest = {
+  id: string;
+  product_name: string;
+  description: string | null;
+  image_url: string | null;
+  category: string | null;
+  city: string;
+  state: string;
+  postal_code: string;
+  status: string;
+  expires_at: string;
+  created_at: string;
+};
+
+type StoreQueueItem = {
+  targetId: string;
+  request: SafeStoreRequest;
+  responseType: string | null;
+  created_at: string;
+};
+
+type StoreRequestDetail = {
+  request: SafeStoreRequest;
+  target: Record<string, unknown>;
+  response: {
+    response_type: string;
+    [key: string]: unknown;
+  } | null;
+};
+
+type StoreActivityItem = {
+  id: string;
+  response_type: string;
+  created_at: string;
+  request?: { product_name?: string } | { product_name?: string }[] | null;
+};
+
+async function fetchStoreMobileData<T>(
+  mode: "queue" | "detail" | "activity",
+  storeId: string,
+  requestId?: string
+): Promise<T | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) return null;
+  const origin = (
+    process.env.EXPO_PUBLIC_APP_URL || "https://store.askfindit.com"
+  ).replace(/\/$/, "");
+  const response = await fetch(`${origin}/api/store/mobile-data`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ mode, storeId, requestId }),
+  });
+  if (!response.ok) return null;
+  const body = (await response.json()) as { data?: T };
+  return body.data ?? null;
+}
+
 export async function fetchStoreQueue(storeId: string) {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-
-  const { data: targets } = await supabase
-    .from("request_targets")
-    .select("*, request:customer_requests(*)")
-    .eq("store_id", storeId)
-    .gte("created_at", start.toISOString())
-    .order("created_at", { ascending: false });
-
-  const { data: responses } = await supabase
-    .from("store_responses")
-    .select("request_id, response_type")
-    .eq("store_id", storeId);
-
-  const responded = new Map(
-    (responses || []).map((r) => [r.request_id, r.response_type])
+  return (
+    (await fetchStoreMobileData<StoreQueueItem[]>("queue", storeId)) || []
   );
-
-  return (targets || [])
-    .map((t: Record<string, unknown>) => {
-      const request = Array.isArray(t.request) ? t.request[0] : t.request;
-      if (!request || typeof request !== "object") return null;
-      const req = request as {
-        id: string;
-        product_name: string;
-        description: string | null;
-        image_url: string | null;
-        category: string | null;
-        city: string;
-        status: string;
-        expires_at: string;
-        created_at: string;
-      };
-      if (["cancelled", "expired", "fulfilled"].includes(req.status)) return null;
-      if (new Date(req.expires_at).getTime() < Date.now()) return null;
-      return {
-        targetId: t.id as string,
-        request: req,
-        responseType: responded.get(req.id) || null,
-        created_at: t.created_at as string,
-      };
-    })
-    .filter(Boolean);
 }
 
 export async function fetchRequestForStore(requestId: string, storeId: string) {
-  const { data: target } = await supabase
-    .from("request_targets")
-    .select("*")
-    .eq("request_id", requestId)
-    .eq("store_id", storeId)
-    .maybeSingle();
-  if (!target) return null;
-
-  const { data: request } = await supabase
-    .from("customer_requests")
-    .select("*")
-    .eq("id", requestId)
-    .single();
-  if (!request) return null;
-
-  const { data: response } = await supabase
-    .from("store_responses")
-    .select("*")
-    .eq("request_id", requestId)
-    .eq("store_id", storeId)
-    .maybeSingle();
-
-  await supabase
-    .from("request_targets")
-    .update({
-      opened_at: target.opened_at || new Date().toISOString(),
-      viewed_at: new Date().toISOString(),
-    })
-    .eq("id", target.id);
-
-  return { request, target, response };
+  return fetchStoreMobileData<StoreRequestDetail>(
+    "detail",
+    storeId,
+    requestId
+  );
 }
 
 export async function respondToRequest(input: {
@@ -152,11 +147,7 @@ export async function deleteMyAccount(confirmation: string) {
 }
 
 export async function fetchActivity(storeId: string) {
-  const { data } = await supabase
-    .from("store_responses")
-    .select("*, request:customer_requests(product_name)")
-    .eq("store_id", storeId)
-    .order("created_at", { ascending: false })
-    .limit(40);
-  return data || [];
+  return (
+    (await fetchStoreMobileData<StoreActivityItem[]>("activity", storeId)) || []
+  );
 }

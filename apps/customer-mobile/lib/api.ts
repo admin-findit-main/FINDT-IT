@@ -45,6 +45,26 @@ export async function fetchRequestDetail(requestId: string) {
     .eq("id", requestId)
     .single();
   if (!request) return null;
+  const legacyProductImage =
+    request.image_url?.split("/product-images/")[1] || null;
+  const imageBucket = legacyProductImage ? "product-images" : "request-images";
+  const imagePath =
+    request.image_storage_path ||
+    (request.image_url && !/^https?:\/\//i.test(request.image_url)
+      ? request.image_url
+      : request.image_url?.split("/request-images/")[1] ||
+        legacyProductImage);
+  if (imagePath) {
+    const { data: signed } = await supabase.storage
+      .from(imageBucket)
+      .createSignedUrl(
+        decodeURIComponent(imagePath.split("?")[0]),
+        15 * 60
+      );
+    request.image_url = signed?.signedUrl || null;
+  } else {
+    request.image_url = null;
+  }
   const { data: responses } = await supabase
     .from("store_responses")
     .select("*, store:stores(*)")

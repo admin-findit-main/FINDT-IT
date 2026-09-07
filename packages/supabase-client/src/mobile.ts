@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@findit/types";
+import { looksLikeServiceRoleKey } from "@findit/domain";
 
 export type MobileClientOptions = {
   supabaseUrl: string;
@@ -38,12 +39,8 @@ export function createMobileClient(
       "Missing Supabase URL or anon key. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY."
     );
   }
-  if (
-    options.supabaseAnonKey.includes("service_role") ||
-    options.supabaseAnonKey.length > 500
-  ) {
-    // Heuristic guard — refuse obviously wrong keys
-    console.warn(
+  if (looksLikeServiceRoleKey(options.supabaseAnonKey)) {
+    throw new Error(
       "[findit] Refusing to create mobile client with a suspicious key. Use the anon/publishable key only."
     );
   }
