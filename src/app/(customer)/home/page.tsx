@@ -58,6 +58,7 @@ import {
   type ShortPlace,
   classifyRequest,
   classificationLabel,
+  classificationHint,
 } from "@findit/domain";
 
 type Step = "query" | "radius";
@@ -144,6 +145,9 @@ export default function CustomerHomePage() {
   });
   const needsCategoryConfirm =
     guessed.status === "needs_confirm" && !categoryConfirmed && !category;
+  // Narrowed here rather than at the call site: the confirm handler closes
+  // over it, and a property access does not stay narrowed inside a closure.
+  const guessedCategory = guessed.productCategory;
 
   function goNextFromQuery() {
     if (upgrade) {
@@ -552,33 +556,38 @@ export default function CustomerHomePage() {
             {needsCategoryConfirm ? (
               <div className="mt-4 rounded-2xl border border-hairline-strong bg-white p-4">
                 <p className="text-sm font-semibold text-ink">
-                  We think you&apos;re looking for:
+                  {guessed.businessTypeName
+                    ? "We think you're looking for:"
+                    : "Which kind of store should we ask?"}
                 </p>
-                <p className="mt-1 text-base font-bold text-ink">
-                  {classificationLabel(guessed)}
+                {guessed.businessTypeName ? (
+                  <p className="mt-1 text-base font-bold text-ink">
+                    {classificationLabel(guessed)}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-xs text-ink-muted">
+                  {classificationHint(guessed)}
                 </p>
-                <p className="mt-1 text-xs text-ink-muted">{guessed.reason}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      if (guessed.productCategory) setCategory(guessed.productCategory);
-                      setCategoryConfirmed(true);
-                    }}
-                    disabled={!guessed.productCategory}
-                  >
-                    Yes, search nearby
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCategoryConfirmed(false)}
-                  >
-                    Change category
-                  </Button>
-                </div>
+                {/* No "Change category" button here. This block renders only
+                    while `needsCategoryConfirm` is true, which requires
+                    `!categoryConfirmed`, so the old button set that flag to
+                    the value it already held and nothing happened -- it could
+                    not dismiss the block or reveal anything. Changing the
+                    category is what the chips immediately below do. */}
+                {guessedCategory ? (
+                  <div className="mt-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        setCategory(guessedCategory);
+                        setCategoryConfirmed(true);
+                      }}
+                    >
+                      Yes, search nearby
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             ) : guessed.businessTypeName && (category || categoryConfirmed) ? (
               <p className="mt-3 text-sm text-ink-muted">

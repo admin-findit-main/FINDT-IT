@@ -225,6 +225,25 @@ export function classificationLabel(result: ClassificationResult): string {
   return result.businessTypeName;
 }
 
+/**
+ * Shopper-facing version of `reason`.
+ *
+ * `reason` is a diagnostic written in the operator's voice -- "Ask the customer
+ * to confirm a category", "Confirm before routing", "customer chip is X" -- and
+ * the find funnel was rendering it verbatim, so shoppers were being told to ask
+ * themselves things. This keeps `reason` intact for logs and admin and gives
+ * the funnel copy addressed to the person reading it.
+ */
+export function classificationHint(result: ClassificationResult): string {
+  if (!result.businessTypeName) {
+    return "Pick the closest category so we ask the right stores.";
+  }
+  if (result.alternatives.length > 1) {
+    return "This could fit a few kinds of store. Pick the closest one.";
+  }
+  return "Looks right? Confirm, or pick a different category.";
+}
+
 export function matchKindForStore(input: {
   classification: ClassificationResult;
   store: {

@@ -129,11 +129,16 @@ export default function RequestDetailScreen() {
       <GlassCard>
         <Text style={[styles.title, { color: theme.ink }]}>{detail.product_name}</Text>
         <Text style={[styles.meta, { color: theme.inkMuted }]}>
+          {/* Cancelled before expired: isRequestExpired() counts a cancelled
+              request as expired, so checking expired first labelled a Find
+              the shopper had cancelled as "Expired". */}
           {detail.status === "fulfilled"
             ? "You found it"
-            : expired
-              ? "Expired"
-              : detail.status.replace(/_/g, " ")}{" "}
+            : detail.status === "cancelled"
+              ? "You cancelled this Find"
+              : expired
+                ? "Expired"
+                : detail.status.replace(/_/g, " ")}{" "}
           · {formatExpiresIn(detail.expires_at)}
         </Text>
         <Text style={[styles.meta, { color: theme.inkMuted }]}>

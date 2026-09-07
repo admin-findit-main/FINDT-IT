@@ -357,13 +357,17 @@ export default function RequestDetailPage() {
     );
   }
 
+  // Cancelled is checked before expired: isRequestExpired() treats a
+  // cancelled request as expired, so testing `expired` first told a shopper
+  // who had just cancelled their own Find that it had expired, and left the
+  // "Cancelled" branch unreachable.
   const headline =
     data.status === "fulfilled"
       ? "Found"
-      : expired
-        ? "Expired request"
-        : data.status === "cancelled"
-          ? "Cancelled"
+      : data.status === "cancelled"
+        ? "Cancelled"
+        : expired
+          ? "Expired request"
           : searching
             ? "Asking nearby stores"
             : responses.length
@@ -406,10 +410,10 @@ export default function RequestDetailPage() {
           <span className="text-sm text-ink-muted">
             {data.status === "fulfilled"
               ? "You found it"
-              : expired
-                ? "This request has expired."
-                : data.status === "cancelled"
-                  ? "Cancelled"
+              : data.status === "cancelled"
+                ? "You cancelled this Find"
+                : expired
+                  ? "This request has expired."
                   : searching
                     ? "Waiting for stores"
                     : responses.length
