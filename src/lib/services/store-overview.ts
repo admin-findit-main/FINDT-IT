@@ -41,7 +41,9 @@ export type StoreOverview =
  *
  * Time-dependent labels (the greeting, open/closed) are deliberately left to
  * the caller: resolving them here would use the server's clock rather than the
- * viewer's.
+ * viewer's. The store page awaits this on the server and renders those two
+ * labels in `components/store/owner-clock.tsx`, which fills them in after
+ * mount from the browser's clock.
  */
 export async function getStoreOverviewAction(): Promise<StoreOverview> {
   const workspace = await getStoreWorkspaceAction();

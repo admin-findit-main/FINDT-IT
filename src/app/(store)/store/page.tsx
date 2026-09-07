@@ -1,17 +1,13 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 import { MetricCard, Panel } from "@/components/dashboard/shell";
-import { Skeleton } from "@/components/ui/primitives";
+import { StoreGreeting, StoreOpenLabel } from "@/components/store/owner-clock";
 import {
   getStoreOverviewAction,
   type StoreOverview,
 } from "@/lib/services/store-overview";
 import { formatDurationSeconds } from "@/lib/services/request-lifecycle";
-import { isStoreOpenAt } from "@/lib/services/store-hours";
-import { formatRelativeTime, greetingForHour } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils";
 
 type OwnerData = Extract<StoreOverview, { mode: "owner" }>;
 
@@ -34,13 +30,6 @@ function OwnerOverview({ data }: { data: OwnerData }) {
     estimatedBill,
   } = data;
 
-  // Resolved here rather than on the server so both read the viewer's clock.
-  const openLabel = hours?.length
-    ? isStoreOpenAt(hours).open
-      ? "Open"
-      : "Closed"
-    : null;
-
   const waiting = requests.filter((i) => !i.response);
   const missed = demand
     .filter((d) => d.out_of_stock_count > 0)
@@ -55,11 +44,9 @@ function OwnerOverview({ data }: { data: OwnerData }) {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-ink-muted">{greetingForHour()}</p>
+        <StoreGreeting />
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">{storeName || "Store"}</h1>
-        {openLabel ? (
-          <p className="mt-1 text-sm text-ink-muted">{openLabel}</p>
-        ) : null}
+        <StoreOpenLabel hours={hours} />
       </div>
 
       {!hubConnected ? (
@@ -214,32 +201,26 @@ function OwnerOverview({ data }: { data: OwnerData }) {
   );
 }
 
-export default function StoreHomePage() {
-  const router = useRouter();
-  const [overview, setOverview] = useState<StoreOverview | null>(null);
+/**
+ * Server component, matching /admin.
+ *
+ * This page used to be `"use client"`: it shipped a skeleton, waited for the
+ * bundle to hydrate, and only then called getStoreOverviewAction() over the
+ * network. The HTML was already fast (~280ms) but real content did not appear
+ * until ~4.0s, because the database work could not start until the browser
+ * had downloaded and run JavaScript. /admin fetched on the server and had
+ * content at ~1.0s with the same queries underneath.
+ *
+ * Awaiting here moves the same single round trip to the server, so the markup
+ * arrives with the numbers already in it. The (store)/loading.tsx boundary
+ * covers the wait, so there is still no blank screen.
+ */
+export default async function StoreHomePage() {
+  const overview = await getStoreOverviewAction();
 
-  useEffect(() => {
-    let cancelled = false;
-    getStoreOverviewAction().then((result) => {
-      if (cancelled) return;
-      setOverview(result);
-      if (result.mode === "employee") router.replace("/store/hub");
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
-
-  if (!overview || overview.mode === "employee") {
-    return (
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-      </div>
-    );
-  }
+  // Employees get the Hub, not the owner dashboard. Redirecting on the server
+  // avoids rendering a dashboard frame that a router.replace then throws away.
+  if (overview.mode === "employee") redirect("/store/hub");
 
   if (overview.mode === "no-store") {
     return (
