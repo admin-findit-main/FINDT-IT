@@ -62,7 +62,6 @@ describe("pretty store and dashboard paths", () => {
     expect(surfaceForAppPath("/stores/acme")).toBe("www");
     expect(surfaceForAppPath("/store")).toBe("store");
     expect(surfaceForAppPath("/store/requests")).toBe("store");
-    expect(surfaceForAppPath("/check-in")).toBe("dashboard");
   });
 
   it("maps dashboard.askfindit.com/ to the existing /home page", () => {

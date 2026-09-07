@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings, UserRoundSearch } from "lucide-react";
+import { Settings } from "lucide-react";
 import { estimateRoutingDistanceMiles, isRequestExpired } from "@findit/domain";
 import {
   markStoreRequestOpenedAction,
@@ -18,12 +18,10 @@ import {
   getHubClockStateAction,
 } from "@/lib/services/shifts";
 import { HubClockGate } from "@/components/hub/clock-gate";
-import { HubCheckinPanel } from "@/components/hub/checkin-panel";
 import { HubEmployeeRewards } from "@/components/hub/employee-rewards";
-import { HubCustomerLookup } from "@/components/hub/customer-lookup";
+import { HubCustomerWorkspace } from "@/components/hub/customer-workspace";
 import {
   hubConnectHref,
-  hubRelinkMessage,
   type HubRelinkReason,
 } from "@/lib/hub/relink";
 import { useStoreInboxRealtime } from "@/lib/supabase/realtime";
@@ -89,16 +87,14 @@ export default function FinditHubPage() {
   const [sentFlash, setSentFlash] = useState(false);
   const [newFlash, setNewFlash] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [customerLookupOpen, setCustomerLookupOpen] = useState(false);
+  const [hubSection, setHubSection] = useState<"requests" | "customers">("requests");
   const [clock, setClock] = useState(0);
   const [source, setSource] = useState<"device" | "member" | null>(null);
   const [canManage, setCanManage] = useState(false);
   const [deviceName, setDeviceName] = useState<string | null>(null);
   // Present whenever this browser is a paired Hub, whether or not a manager
-  // is also signed in on it. Check-in and the heartbeat key off this.
+  // is also signed in on it. Device heartbeat and shift identity key off this.
   const [deviceId, setDeviceId] = useState<string | null>(null);
-  // Why there is no device, so an unpaired tablet can say so instead of
-  // showing a ready screen with no way to check anyone in.
   const [deviceIssue, setDeviceIssue] = useState<HubRelinkReason | null>(null);
   const [shiftLocked, setShiftLocked] = useState<boolean | null>(null);
   const [shiftName, setShiftName] = useState<string | null>(null);
@@ -455,29 +451,26 @@ export default function FinditHubPage() {
           ) : null}
         </div>
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              setSettingsOpen(false);
-              setCustomerLookupOpen(true);
-            }}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 px-3 text-xs font-semibold text-white/75 hover:bg-white/10"
-          >
-            <UserRoundSearch className="h-4 w-4" />
-            <span className="hidden sm:inline">Customer lookup</span>
-          </button>
-          {active && deviceId ? <HubCheckinPanel compact /> : null}
-          {/* A busy store can sit on the request view all day and never see the
-              idle screen, so the unpaired state has to be reachable here too. */}
-          {active && !deviceId ? (
+          <div className="flex rounded-xl border border-white/15 p-1">
             <button
               type="button"
-              onClick={() => goToLinking(deviceIssue)}
-              className="rounded-full border border-white/20 px-3 py-1.5 text-xs font-semibold text-white/70 hover:bg-white/10"
+              onClick={() => setHubSection("requests")}
+              className={`min-h-9 rounded-lg px-4 text-xs font-bold ${
+                hubSection === "requests" ? "bg-white text-black" : "text-white/60"
+              }`}
             >
-              Check-in off
+              Requests
             </button>
-          ) : null}
+            <button
+              type="button"
+              onClick={() => setHubSection("customers")}
+              className={`min-h-9 rounded-lg px-4 text-xs font-bold ${
+                hubSection === "customers" ? "bg-white text-black" : "text-white/60"
+              }`}
+            >
+              Customers
+            </button>
+          </div>
           <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
             <span
               className={`h-2.5 w-2.5 rounded-full ${online ? "bg-emerald-400" : "bg-[#E5231B]"}`}
@@ -509,7 +502,9 @@ export default function FinditHubPage() {
       ) : null}
 
       <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-5 md:px-8">
-        {sentFlash ? (
+        {hubSection === "customers" ? (
+          <HubCustomerWorkspace />
+        ) : sentFlash ? (
           <div className="flex flex-1 flex-col items-center justify-center text-center">
             <p className="text-6xl font-bold text-emerald-400">✓</p>
             <p className="mt-4 text-3xl font-bold tracking-tight">RESPONSE SENT</p>
@@ -520,61 +515,23 @@ export default function FinditHubPage() {
             <p className="mt-4 text-2xl font-semibold text-white/80">Preparing Hub…</p>
           </div>
         ) : !active ? (
-          deviceId ? (
-            <div className="flex min-h-0 flex-1 items-center gap-8 md:gap-16">
-              <div className="min-w-0 flex-1">
-                <BrandLogo kind="business" tone="dark" className="h-8 w-auto" />
-                <h1 className="mt-6 text-4xl font-bold tracking-tight md:text-6xl">
-                  Ready for requests
-                </h1>
-                <p className="mt-4 text-xl text-white/70">{store?.name}</p>
-                <p className="mt-8 flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-emerald-400">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                  Listening for nearby requests
-                </p>
-                <HubEmployeeRewards />
-              </div>
-              <div className="w-[min(42vw,22rem)] shrink-0">
-                <HubCheckinPanel />
-              </div>
+          <div className="flex min-h-0 flex-1 items-center">
+            <div className="min-w-0 flex-1">
+              <BrandLogo kind="business" tone="dark" className="h-8 w-auto" />
+              <h1 className="mt-6 text-4xl font-bold tracking-tight md:text-6xl">
+                Ready for requests
+              </h1>
+              <p className="mt-4 text-xl text-white/70">{store?.name}</p>
+              <p className="mt-8 flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-emerald-400">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                Listening for nearby requests
+              </p>
+              <p className="mt-5 max-w-xl text-base text-white/50">
+                Open Customers above to look up, add, or remove store customers.
+              </p>
+              <HubEmployeeRewards />
             </div>
-          ) : (
-            <div className="flex min-h-0 flex-1 items-center gap-8 md:gap-16">
-              <div className="min-w-0 flex-1">
-                <BrandLogo kind="business" tone="dark" className="h-8 w-auto" />
-                <h1 className="mt-6 text-4xl font-bold tracking-tight md:text-6xl">
-                  Ready for requests
-                </h1>
-                <p className="mt-4 text-xl text-white/70">{store?.name}</p>
-                <p className="mt-8 flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-emerald-400">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                  Listening for nearby requests
-                </p>
-                <HubEmployeeRewards />
-              </div>
-              <div className="w-[min(42vw,22rem)] shrink-0 rounded-2xl border border-white/15 bg-white/5 p-6">
-                <p className="text-sm uppercase tracking-[0.2em] text-white/40">
-                  Check-in
-                </p>
-                <p className="mt-3 text-xl font-semibold">
-                  {deviceIssue === "missing"
-                    ? "This tablet isn’t connected"
-                    : "This tablet needs reconnecting"}
-                </p>
-                <p className="mt-3 text-sm leading-relaxed text-white/60">
-                  {hubRelinkMessage(deviceIssue) ||
-                    "Connect it to show a check-in QR and clock staff in. Answering requests works either way."}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => goToLinking(deviceIssue)}
-                  className="mt-6 min-h-12 w-full rounded-full bg-white px-6 text-sm font-semibold text-black"
-                >
-                  Connect this device
-                </button>
-              </div>
-            </div>
-          )
+          </div>
         ) : (
           <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col overflow-hidden">
             <div className="flex shrink-0 items-center justify-between gap-4">
@@ -800,10 +757,6 @@ export default function FinditHubPage() {
           </div>
         )}
       </main>
-
-      {customerLookupOpen ? (
-        <HubCustomerLookup onClose={() => setCustomerLookupOpen(false)} />
-      ) : null}
 
       {settingsOpen ? (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/70 p-6 md:items-center">

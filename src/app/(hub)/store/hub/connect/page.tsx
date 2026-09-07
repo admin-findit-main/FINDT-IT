@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BrandLogo } from "@/components/brand/logo";
-import { PairingQr } from "@/components/store/pairing-qr";
 import { formatPairingCode } from "@/lib/hub/format";
 import { hubRelinkMessage, parseHubRelinkReason } from "@/lib/hub/relink";
 import {
@@ -25,7 +24,6 @@ function HubConnectClient() {
   const params = useSearchParams();
   const notice = hubRelinkMessage(parseHubRelinkReason(params.get("reason")));
   const [code, setCode] = useState<string | null>(null);
-  const [pairUrl, setPairUrl] = useState("");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -43,7 +41,6 @@ function HubConnectClient() {
       return;
     }
     setCode(result.code);
-    setPairUrl(result.pairUrl);
     setExpiresAt(result.expiresAt);
   }, [router]);
 
@@ -104,14 +101,6 @@ function HubConnectClient() {
                 ? "Code expired"
                 : `Expires in ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`}
             </p>
-            {pairUrl ? (
-              <div className="mt-8">
-                <PairingQr value={pairUrl} label="Pairing QR code" />
-                <p className="mt-3 text-xs text-white/45">
-                  Owner scans this QR or types the code under Devices.
-                </p>
-              </div>
-            ) : null}
           </>
         ) : (
           <p className="mt-10 text-white/60">Preparing a pairing code…</p>

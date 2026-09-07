@@ -2,7 +2,7 @@
 
 import { cache } from "react";
 import type { Store, StoreDevice, StoreMemberRole } from "@/types/database";
-import { isDemoMode, appUrl } from "@/lib/config/env";
+import { isDemoMode } from "@/lib/config/env";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { logSecurityEvent } from "@/lib/security/audit";
@@ -41,8 +41,8 @@ export type HubRuntime = {
    *
    * A signed-in manager always resolves to a usable Hub, so the reason a
    * tablet is not paired never reaches the page as an error. Without it the
-   * Hub can only render a dead end: check-in and the shift clock both need a
-   * device, but the screen would claim everything is ready.
+   * Hub device pairing is optional for signed-in managers, but required for
+   * device heartbeat and PIN-based shift identity.
    */
   deviceIssue: HubRelinkReason | null;
 };
@@ -119,8 +119,7 @@ export async function resolveHubTerminalAction(): Promise<
   // Both, in parallel: a signed-in manager keeps their own role and
   // permissions, but a tablet that is genuinely paired must not lose its
   // device identity just because someone is logged in on it. Without the
-  // device id the Hub cannot mint check-in tokens or send a heartbeat, so the
-  // check-in QR silently disappears and the device reads as offline.
+  // device id the Hub cannot send a heartbeat or bind PIN-based shifts.
   // `inspectHubDeviceCookie` returns `absent` without touching the database
   // when there is no cookie, so this costs nothing for a manager on a laptop.
   const [workspace, device] = await Promise.all([
@@ -130,8 +129,8 @@ export async function resolveHubTerminalAction(): Promise<
 
   if (workspace?.store) {
     // Only adopt the device identity when it belongs to the store this
-    // session is already acting for, so a check-in token can never pair one
-    // store's id with another store's device.
+    // session is already acting for, so one store can never adopt another
+    // store's device identity.
     if (
       device.status === "linked" &&
       device.session.store_id === workspace.store.id
@@ -160,7 +159,7 @@ export async function resolveHubTerminalAction(): Promise<
 }
 
 export async function createHubPairingAction(): Promise<
-  { code: string; expiresAt: string; pairUrl: string } | { error: string }
+  { code: string; expiresAt: string } | { error: string }
 > {
   const limited = await consumeRateLimit({
     bucket: "hub-pairing",
@@ -176,7 +175,6 @@ export async function createHubPairingAction(): Promise<
     return {
       code: created.code,
       expiresAt: created.expiresAt,
-      pairUrl: `${appUrl()}/store/devices?pair=${created.code}`,
     };
   }
 
@@ -201,7 +199,6 @@ export async function createHubPairingAction(): Promise<
       return {
         code,
         expiresAt,
-        pairUrl: `${appUrl()}/store/devices?pair=${code}`,
       };
     }
     code = generatePairingCode();

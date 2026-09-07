@@ -44,7 +44,7 @@ export function StoreUsagePanel({ snapshot }: { snapshot: StoreUsageSnapshot }) 
         <MetricCard
           label="Verified FINDIT customers"
           value={snapshot.visits}
-          hint="Checked in at your Hub this month"
+          hint="Historical verified visits this month"
         />
         <MetricCard
           label="Current FINDIT bill"
@@ -101,8 +101,7 @@ export function StoreUsagePanel({ snapshot }: { snapshot: StoreUsageSnapshot }) 
       <Panel title="Verified customers">
         {snapshot.visitsSafe.length === 0 ? (
           <p className="text-sm text-ink-muted">
-            No Hub check-ins this month yet. A visit counts after a shopper
-            selects your store and scans the Hub QR.
+            No historical verified visits this month.
           </p>
         ) : (
           <ul className="divide-y divide-black/[0.06] text-sm">

@@ -110,7 +110,7 @@ export function AdminUsagePricingForm() {
         {field("employeePointsPerVisit", "Employee points per verified visit")}
         {field(
           "shopperMaxRewardedCheckinsPerDay",
-          "Max rewarded shopper check-ins / day"
+          "Legacy shopper reward limit / day"
         )}
       </div>
       <Button type="submit" disabled={busy}>

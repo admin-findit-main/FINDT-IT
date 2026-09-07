@@ -288,7 +288,7 @@ export default function RequestDetailPage() {
       return;
     }
     setSelectedStoreId(storeId);
-    toast.success("Selected. Scan the FINDIT Hub when you arrive.");
+    toast.success("Selected. Tell store staff when you arrive.");
   }
 
   async function saveAndLeave() {
@@ -598,7 +598,7 @@ export default function RequestDetailPage() {
                               onClick={() => void chooseStore(store.id)}
                             >
                               {selectedStoreId === store.id
-                                ? "Selected — scan Hub when you arrive"
+                                ? "Selected — tell store staff when you arrive"
                                 : "I’ll go here"}
                             </Button>
                           ) : null}

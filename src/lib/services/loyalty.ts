@@ -22,6 +22,8 @@ export type CustomerLookupResult =
       status: "found";
       maskedPhone: string;
       displayName: string;
+      relationshipId: string | null;
+      isStoreCustomer: boolean;
       pointsBalance: number;
       confirmedPurchases: number;
       recentRequest: {
@@ -58,6 +60,13 @@ function safeCustomerName(profile: {
     profile.display_name?.trim().split(/\s+/)[0] ||
     "FINDIT customer"
   );
+}
+
+function maskEmail(email: string | null | undefined) {
+  if (!email) return "Contact unavailable";
+  const [local, domain] = email.split("@");
+  if (!local || !domain) return "Contact unavailable";
+  return `${local.slice(0, 1)}***@${domain}`;
 }
 
 async function requireStoreOperator(): Promise<
@@ -181,30 +190,52 @@ export async function saveShopperPhoneAction(
   };
 }
 
-async function lookupVerifiedCustomer(
-  phoneE164: string
-): Promise<
+async function lookupCustomerIdentifier(rawIdentifier: string): Promise<
   | {
-      id: string;
-      first_name: string | null;
-      display_name: string | null;
+      customer: {
+        id: string;
+        first_name: string | null;
+        display_name: string | null;
+      } | null;
+      contactLabel: string;
     }
-  | null
+  | { error: string }
 > {
+  const identifier = rawIdentifier.trim();
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
+  if (identifier.includes("@")) {
+    const email = identifier.toLowerCase();
+    if (
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ) {
+      return { error: "Enter a valid customer email." };
+    }
+    const { data } = await admin
+      .from("profiles")
+      .select("id, first_name, display_name")
+      .eq("email", email)
+      .eq("account_type", "customer")
+      .eq("is_suspended", false)
+      .maybeSingle();
+    return { customer: data, contactLabel: maskEmail(email) };
+  }
+
+  const parsed = normalizePhoneToE164(identifier);
+  if (!parsed.ok) return { error: parsed.error };
   const { data } = await admin
     .from("profiles")
     .select("id, first_name, display_name")
-    .eq("phone_e164", phoneE164)
+    .eq("phone_e164", parsed.e164)
     .eq("phone_verified", true)
     .eq("account_type", "customer")
     .eq("is_suspended", false)
     .maybeSingle();
-
-  if (!data) return null;
-
-  return data;
+  return {
+    customer: data,
+    contactLabel: maskPhoneE164(parsed.e164),
+  };
 }
 
 export async function lookupHubCustomerAction(
@@ -212,9 +243,6 @@ export async function lookupHubCustomerAction(
 ): Promise<CustomerLookupResult> {
   const operator = await requireStoreOperator();
   if (!operator.ok) return { status: "error", error: operator.error };
-
-  const parsed = normalizePhoneToE164(rawPhone);
-  if (!parsed.ok) return { status: "error", error: parsed.error };
 
   const limited = await consumeRateLimit({
     bucket: "customer-lookup",
@@ -225,13 +253,15 @@ export async function lookupHubCustomerAction(
   if (!limited.ok) return { status: "error", error: limited.error };
 
   if (isDemoMode()) {
-    return { status: "not_found", maskedPhone: maskPhoneE164(parsed.e164) };
+    return { status: "not_found", maskedPhone: "Customer not found" };
   }
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  const profile = await lookupVerifiedCustomer(parsed.e164);
-  const maskedPhone = maskPhoneE164(parsed.e164);
+  const lookup = await lookupCustomerIdentifier(rawPhone);
+  if ("error" in lookup) return { status: "error", error: lookup.error };
+  const profile = lookup.customer;
+  const maskedPhone = lookup.contactLabel;
 
   void trackEvent("customer_lookup", {
     userId: operator.actor.employeeUserId,
@@ -245,7 +275,7 @@ export async function lookupHubCustomerAction(
   const [{ data: relationship }, { data: recent }] = await Promise.all([
     admin
       .from("store_customers")
-      .select("points_balance, confirmed_purchases")
+      .select("id, points_balance, confirmed_purchases, removed_at")
       .eq("store_id", operator.actor.storeId)
       .eq("customer_id", profile.id)
       .maybeSingle(),
@@ -287,10 +317,206 @@ export async function lookupHubCustomerAction(
     status: "found",
     maskedPhone,
     displayName: safeCustomerName(profile),
+    relationshipId: relationship?.id || null,
+    isStoreCustomer: Boolean(relationship && !relationship.removed_at),
     pointsBalance: relationship?.points_balance || 0,
     confirmedPurchases: relationship?.confirmed_purchases || 0,
     recentRequest,
   };
+}
+
+export async function getHubCustomersAction() {
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return { error: operator.error, rows: [] };
+  if (isDemoMode()) return { rows: [] };
+
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data, error } = await admin
+    .from("store_customers")
+    .select(
+      "id, points_balance, confirmed_purchases, last_seen_at, customer:profiles(first_name, display_name, email, phone_e164, phone_verified)"
+    )
+    .eq("store_id", operator.actor.storeId)
+    .is("removed_at", null)
+    .not("customer_id", "is", null)
+    .order("last_seen_at", { ascending: false })
+    .limit(100);
+  if (error) return { error: "Could not load customers.", rows: [] };
+
+  return {
+    rows: (data || []).map((row) => {
+      const customer = Array.isArray(row.customer)
+        ? row.customer[0]
+        : row.customer;
+      return {
+        id: row.id,
+        displayName: safeCustomerName(customer || {}),
+        maskedPhone:
+          customer?.phone_verified && customer.phone_e164
+            ? maskPhoneE164(customer.phone_e164)
+            : maskEmail(customer?.email),
+        pointsBalance: row.points_balance,
+        confirmedPurchases: row.confirmed_purchases,
+        lastSeenAt: row.last_seen_at,
+      };
+    }),
+  };
+}
+
+export async function addHubCustomerAction(rawPhone: string) {
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return { ok: false as const, error: operator.error };
+  const limited = await consumeRateLimit({
+    bucket: "customer-relationship",
+    limit: 30,
+    windowMs: 10 * 60_000,
+    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
+  });
+  if (!limited.ok) return { ok: false as const, error: limited.error };
+  if (isDemoMode()) return { ok: false as const, error: "No verified demo customer found." };
+
+  const lookup = await lookupCustomerIdentifier(rawPhone);
+  if ("error" in lookup) return { ok: false as const, error: lookup.error };
+  const customer = lookup.customer;
+  if (!customer) {
+    return { ok: false as const, error: "No FINDIT customer found." };
+  }
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const now = new Date().toISOString();
+  const { data: existing } = await admin
+    .from("store_customers")
+    .select("id, points_balance")
+    .eq("store_id", operator.actor.storeId)
+    .eq("customer_id", customer.id)
+    .maybeSingle();
+  let result = existing;
+  let writeError: { code?: string } | null = null;
+  if (existing) {
+    const updated = await admin
+      .from("store_customers")
+      .update({
+        removed_at: null,
+        marketing_opt_in: false,
+        last_seen_at: now,
+        updated_at: now,
+      })
+      .eq("id", existing.id)
+      .eq("store_id", operator.actor.storeId)
+      .select("id, points_balance")
+      .single();
+    result = updated.data;
+    writeError = updated.error;
+  } else {
+    const inserted = await admin
+      .from("store_customers")
+      .insert({
+        store_id: operator.actor.storeId,
+        customer_id: customer.id,
+        marketing_opt_in: false,
+        removed_at: null,
+        last_seen_at: now,
+        updated_at: now,
+      })
+      .select("id, points_balance")
+      .single();
+    result = inserted.data;
+    writeError = inserted.error;
+    if (inserted.error?.code === "23505") {
+      const retry = await admin
+        .from("store_customers")
+        .update({
+          removed_at: null,
+          marketing_opt_in: false,
+          last_seen_at: now,
+          updated_at: now,
+        })
+        .eq("store_id", operator.actor.storeId)
+        .eq("customer_id", customer.id)
+        .select("id, points_balance")
+        .single();
+      result = retry.data;
+      writeError = retry.error;
+    }
+  }
+  if (writeError || !result) {
+    return { ok: false as const, error: "Could not add this customer." };
+  }
+
+  void Promise.all([
+    trackEvent("store_customer_added", {
+      userId: operator.actor.employeeUserId,
+      storeId: operator.actor.storeId,
+    }),
+    logSecurityEvent({
+      actorId: operator.actor.employeeUserId,
+      action: "store_customer_added",
+      resource: result.id,
+      metadata: {
+        storeId: operator.actor.storeId,
+        hubDeviceId: operator.actor.hubDeviceId,
+        shiftEmployeeId: operator.actor.shiftEmployeeId,
+      },
+    }),
+  ]);
+  return {
+    ok: true as const,
+    relationshipId: result.id,
+    pointsBalance: result.points_balance,
+  };
+}
+
+export async function removeHubCustomerAction(relationshipId: string) {
+  const id = boundUuid(relationshipId);
+  if (!id) return { ok: false as const, error: "Customer not found." };
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return { ok: false as const, error: operator.error };
+
+  const limited = await consumeRateLimit({
+    bucket: "customer-relationship",
+    limit: 30,
+    windowMs: 10 * 60_000,
+    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
+  });
+  if (!limited.ok) return { ok: false as const, error: limited.error };
+  if (!isDemoMode()) {
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const admin = createServiceClient();
+    const { data, error } = await admin
+      .from("store_customers")
+      .update({
+        removed_at: new Date().toISOString(),
+        marketing_opt_in: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .eq("store_id", operator.actor.storeId)
+      .is("removed_at", null)
+      .select("id")
+      .maybeSingle();
+    if (error || !data) {
+      return { ok: false as const, error: "Could not remove this customer." };
+    }
+  }
+
+  void Promise.all([
+    trackEvent("store_customer_removed", {
+      userId: operator.actor.employeeUserId,
+      storeId: operator.actor.storeId,
+    }),
+    logSecurityEvent({
+      actorId: operator.actor.employeeUserId,
+      action: "store_customer_removed",
+      resource: id,
+      metadata: {
+        storeId: operator.actor.storeId,
+        hubDeviceId: operator.actor.hubDeviceId,
+        shiftEmployeeId: operator.actor.shiftEmployeeId,
+      },
+    }),
+  ]);
+  return { ok: true as const };
 }
 
 async function confirmPurchase(input: {
@@ -414,11 +640,11 @@ export async function confirmLookupPurchaseAction(input: {
 }): Promise<PurchaseResult> {
   const operator = await requireStoreOperator();
   if (!operator.ok) return { ok: false, error: operator.error };
-  const parsed = normalizePhoneToE164(input.phone);
-  if (!parsed.ok) return { ok: false, error: parsed.error };
-  const customer = await lookupVerifiedCustomer(parsed.e164);
+  const lookup = await lookupCustomerIdentifier(input.phone);
+  if ("error" in lookup) return { ok: false, error: lookup.error };
+  const customer = lookup.customer;
   if (!customer) {
-    return { ok: false, error: "No verified FINDIT customer found." };
+    return { ok: false, error: "No FINDIT customer found." };
   }
   return confirmPurchase({
     actor: operator.actor,
@@ -508,6 +734,7 @@ export async function getStoreCustomersAction(cursorValue?: string) {
       "id, points_balance, lifetime_points, confirmed_purchases, marketing_opt_in, first_seen_at, last_seen_at, customer:profiles(first_name, display_name)"
     )
     .eq("store_id", workspace.store.id)
+    .is("removed_at", null)
     .not("customer_id", "is", null)
     .order("last_seen_at", { ascending: false })
     .order("id", { ascending: false })
@@ -649,6 +876,7 @@ export async function getMyStoreRewardsAction() {
       "id, points_balance, lifetime_points, confirmed_purchases, last_seen_at, store:stores(id, name, slug)"
     )
     .eq("customer_id", profile.id)
+    .is("removed_at", null)
     .order("last_seen_at", { ascending: false })
     .limit(50);
   return data || [];

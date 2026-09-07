@@ -268,6 +268,7 @@ export async function fetchMyStoreRewards() {
       "id, points_balance, confirmed_purchases, last_seen_at, store:stores(id, name)"
     )
     .eq("customer_id", user.id)
+    .is("removed_at", null)
     .order("last_seen_at", { ascending: false })
     .limit(50);
   return data || [];

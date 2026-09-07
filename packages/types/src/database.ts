@@ -584,6 +584,7 @@ export interface StoreCustomer {
   marketing_opt_in: boolean;
   first_seen_at: string;
   last_seen_at: string;
+  removed_at: string | null;
   created_at: string;
   updated_at: string;
 }

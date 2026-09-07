@@ -14,6 +14,7 @@ const FAIL_CLOSED_BUCKETS = new Set([
   "create-request",
   "profile-phone",
   "customer-lookup",
+  "customer-relationship",
   "confirm-purchase",
   "store-mobile-read",
   "account-delete",
