@@ -832,6 +832,10 @@ async function loadStoreUsageSnapshot(
       .from("reward_ledger")
       .select("points")
       .eq("store_id", storeId)
+      // FINDIT-funded points only. Store loyalty points sit in the same table
+      // but are funded by the store, so counting them here would report them
+      // as a FINDIT reward cost on the store's usage statement.
+      .eq("program", "findit")
       .eq("status", "confirmed")
       .gte("created_at", start.toISOString()),
   ]);
@@ -929,6 +933,11 @@ export async function getShopperPointsAction() {
     .select("points")
     .eq("user_id", profile.id)
     .eq("audience", "shopper")
+    // This is the FINDIT Points balance shown on the shopper's Rewards screen.
+    // Store loyalty points are a per-store currency and are read from
+    // store_customers.points_balance instead; adding them here would present
+    // one meaningless total spendable at neither.
+    .eq("program", "findit")
     .eq("status", "confirmed");
   const points = (data || []).reduce((sum, row) => sum + Number(row.points || 0), 0);
   const { count } = await admin
@@ -983,6 +992,9 @@ export async function getEmployeeRewardsAction() {
         .select("points")
         .eq("user_id", profile.id)
         .eq("audience", "employee")
+        // The employee incentive is a FINDIT program; store loyalty points
+        // belong to shoppers and must not appear in an employee's total.
+        .eq("program", "findit")
         .eq("status", "confirmed"),
     ]);
   return {
