@@ -1,7 +1,8 @@
-import { DEFAULT_USAGE_PRICING, formatCents } from "@findit/domain";
 import {
+  BUSINESS_PRICE_MONTHLY,
   FREE_MONTHLY_REQUEST_LIMIT,
   PLUS_PRICE_MONTHLY,
+  STORE_TRIAL_DAYS,
 } from "@/lib/config/constants";
 import { MarketingSection, SectionTitle } from "@/components/marketing/section";
 
@@ -9,16 +10,10 @@ const PLUS_PRICE = Number.isInteger(PLUS_PRICE_MONTHLY)
   ? `$${PLUS_PRICE_MONTHLY}`
   : `$${PLUS_PRICE_MONTHLY.toFixed(2)}`;
 
-/**
- * Store pricing is read from the usage config rather than typed in, so the
- * answer here can never drift from what the product actually bills.
- */
 const STORE_COST = [
   `Shoppers start free, with ${FREE_MONTHLY_REQUEST_LIMIT} Finds each month.`,
   `FINDIT+ is ${PLUS_PRICE}/month for more Finds and a wider search.`,
-  `Stores start at ${formatCents(DEFAULT_USAGE_PRICING.baseMonthlyCents)}/month + ${formatCents(
-    DEFAULT_USAGE_PRICING.visitCents
-  )} per verified customer visit, after a ${DEFAULT_USAGE_PRICING.trialDays}-day trial.`,
+  `FINDIT Business is $${BUSINESS_PRICE_MONTHLY}/month after a ${STORE_TRIAL_DAYS}-day trial.`,
   "Payments are coming soon. Enjoy the free trial until then.",
 ].join(" ");
 

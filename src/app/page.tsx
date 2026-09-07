@@ -1,7 +1,6 @@
 import {
   FREE_MONTHLY_REQUEST_LIMIT,
   PLUS_PRICE_MONTHLY,
-  STORE_TRIAL_DAYS,
 } from "@/lib/config/constants";
 import { BrandLogo } from "@/components/brand/logo";
 import { MarketingHeader } from "@/components/marketing/site-header";
@@ -139,8 +138,7 @@ export default function LandingPage() {
           </SectionTitle>
           <SectionLede>
             Nearby shoppers ask for products you already sell. Answer from the
-            counter. Usage is based on verified customer visits after a{" "}
-            {STORE_TRIAL_DAYS}-day trial — not on requests or replies alone.
+            counter, manage customers, and confirm purchases from one Hub.
           </SectionLede>
           <a
             href="/join"

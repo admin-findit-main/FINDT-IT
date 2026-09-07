@@ -1,10 +1,8 @@
 import { Panel } from "@/components/dashboard/shell";
 import { PaymentsComingSoon } from "@/components/shared/coming-soon";
 import { StoreBillingActions } from "@/components/store/billing-actions";
-import { StoreUsagePanel } from "@/components/store/usage-panel";
 import { getStoreBillingAction } from "@/lib/billing/actions";
 import { BILLING_METHOD_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/config/constants";
-import { getStoreUsageSnapshotAction } from "@/lib/visits/engine";
 
 function fmtDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -12,10 +10,7 @@ function fmtDate(value: string | null | undefined) {
 }
 
 export default async function StoreSubscriptionPage() {
-  const [billing, snapshot] = await Promise.all([
-    getStoreBillingAction(),
-    getStoreUsageSnapshotAction(),
-  ]);
+  const billing = await getStoreBillingAction();
   if (!billing) {
     return <p className="text-sm text-ink-muted">No store linked.</p>;
   }
@@ -26,8 +21,6 @@ export default async function StoreSubscriptionPage() {
 
   return (
     <div className="space-y-8">
-      {snapshot ? <StoreUsagePanel snapshot={snapshot} /> : null}
-
       {!settings.billing_required ? (
         <div>
           <p className="text-sm text-ink-muted">

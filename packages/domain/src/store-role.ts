@@ -22,6 +22,8 @@ export function canManageFromRole(role: StoreMemberRole | string): boolean {
 export function isOwnerOnlyStorePath(pathname: string): boolean {
   return (
     pathname.startsWith("/store/demand") ||
+    pathname.startsWith("/store/customers") ||
+    pathname.startsWith("/store/rewards") ||
     pathname.startsWith("/store/team") ||
     pathname.startsWith("/store/shifts") ||
     pathname.startsWith("/store/settings") ||

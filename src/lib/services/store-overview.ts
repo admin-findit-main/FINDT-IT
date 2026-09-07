@@ -8,7 +8,6 @@ import {
   getStoreWorkspaceAction,
 } from "@/lib/services/actions";
 import { listStoreDevicesAction } from "@/lib/services/hub-devices";
-import { getStoreUsageSnapshotAction } from "@/lib/visits/engine";
 
 type Incoming = Awaited<ReturnType<typeof getStoreIncomingRequestsAction>>;
 type Settings = Awaited<ReturnType<typeof getStoreSettingsAction>>;
@@ -26,8 +25,6 @@ export type StoreOverview =
       demand: Demand;
       hubConnected: boolean;
       hours: NonNullable<Settings>["hours"] | null;
-      verifiedCustomers: number | null;
-      estimatedBill: string | null;
     };
 
 /**
@@ -52,13 +49,12 @@ export async function getStoreOverviewAction(): Promise<StoreOverview> {
   const store = workspace.store;
   if (!store?.id) return { mode: "no-store" };
 
-  const [metrics, requests, demand, settings, devices, usage] = await Promise.all([
+  const [metrics, requests, demand, settings, devices] = await Promise.all([
     getStoreMetricsAction(store.id),
     getStoreIncomingRequestsAction(store.id, "all", "7d"),
     getStoreDemandAction(store.id),
     getStoreSettingsAction(store.id),
     listStoreDevicesAction(),
-    getStoreUsageSnapshotAction(),
   ]);
 
   return {
@@ -69,7 +65,5 @@ export async function getStoreOverviewAction(): Promise<StoreOverview> {
     demand,
     hubConnected: devices.some((device) => !device.revoked_at),
     hours: settings?.hours ?? null,
-    verifiedCustomers: usage?.visits ?? null,
-    estimatedBill: usage?.formatBilled ?? null,
   };
 }

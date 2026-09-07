@@ -1,5 +1,4 @@
 import { Panel } from "@/components/dashboard/shell";
-import { AdminUsagePricingForm } from "@/components/admin/usage-pricing-form";
 import { isSupabaseConfigured, isDemoMode, isPilotMode } from "@/lib/config/env";
 
 export default function AdminSystemPage() {
@@ -25,7 +24,7 @@ export default function AdminSystemPage() {
         </div>
         <div>
           <dt className="text-ink-muted">Billing</dt>
-          <dd>Usage engine on · payment collection off</dd>
+          <dd>Subscription billing · controlled from Billing</dd>
         </div>
         <div>
           <dt className="text-ink-muted">Health</dt>
@@ -36,9 +35,6 @@ export default function AdminSystemPage() {
           <dd>Never displayed on this page</dd>
         </div>
       </dl>
-    </Panel>
-    <Panel title="Usage pricing">
-      <AdminUsagePricingForm />
     </Panel>
     </div>
   );

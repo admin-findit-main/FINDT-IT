@@ -12,7 +12,7 @@ export default function NotFoundScreen() {
           <GlassCard level="strong" style={styles.card}>
             <Text style={styles.title}>This screen doesn&apos;t exist.</Text>
 
-            <Link href="/" style={styles.link}>
+            <Link href="/(app)/(tabs)" style={styles.link}>
               <Text style={styles.linkText}>Go to home screen!</Text>
             </Link>
           </GlassCard>

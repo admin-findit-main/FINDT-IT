@@ -26,8 +26,6 @@ function OwnerOverview({ data }: { data: OwnerData }) {
     demand,
     hubConnected,
     hours,
-    verifiedCustomers,
-    estimatedBill,
   } = data;
 
   const waiting = requests.filter((i) => !i.response);
@@ -79,7 +77,7 @@ function OwnerOverview({ data }: { data: OwnerData }) {
         </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Waiting"
           value={metrics.waiting_today}
@@ -99,15 +97,6 @@ function OwnerOverview({ data }: { data: OwnerData }) {
               : "—"
           }
           hint={`${metrics.week_customer_finds} potential customers found this week`}
-        />
-        <MetricCard
-          label="Verified customers"
-          value={verifiedCustomers ?? "—"}
-          hint={
-            estimatedBill
-              ? `This month · ${estimatedBill}`
-              : "Checked in at your Hub"
-          }
         />
       </div>
 

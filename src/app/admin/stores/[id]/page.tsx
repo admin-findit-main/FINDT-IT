@@ -96,18 +96,18 @@ export default async function AdminStoreDetailPage({ params }: Props) {
           }
         />
         <MetricCard
-          label="Verified visits"
+          label="Historical verified visits"
           value={usage.visits}
-          hint={usage.quote.tier.name}
+          hint="Legacy usage records"
         />
         <MetricCard
-          label="Estimated invoice"
+          label="Legacy invoice estimate"
           value={usage.quote.contactSales ? "Contact FINDIT" : usage.formatEstimated}
           hint={usage.trial ? `Trial ${usage.formatBilled}` : usage.formatBilled}
         />
         <MetricCard label="Store selections" value={usage.funnel.selected} />
         <MetricCard
-          label="Employee pool"
+          label="Legacy employee pool"
           value={
             usage.poolEnabled ? formatCents(usage.poolCents) : "Off"
           }
@@ -165,14 +165,14 @@ export default async function AdminStoreDetailPage({ params }: Props) {
       ) : null}
 
       {usage.statements.length ? (
-        <Panel title="Usage statements">
+        <Panel title="Historical usage statements">
           <ul className="divide-y divide-black/[0.06] text-sm">
             {usage.statements.map((row) => (
               <li key={row.id} className="flex justify-between gap-3 py-3">
                 <div>
                   <p className="font-medium capitalize">{row.status}</p>
                   <p className="text-ink-muted">
-                    {row.visit_count} verified visits
+                    {row.visit_count} historical verified visits
                     {row.trial ? " · trial" : ""}
                   </p>
                 </div>
