@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Panel } from "@/components/dashboard/shell";
 import { Skeleton } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/button";
 import { estimateRoutingDistanceMiles, formatShortPlace, isAgeRestrictedFind } from "@findit/domain";
 import {
   getStoreIncomingRequestsAction,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/services/actions";
 import { formatDurationSeconds } from "@/lib/services/request-lifecycle";
 import { formatRelativeTime } from "@/lib/utils";
+import { confirmRequestPurchaseAction } from "@/lib/services/loyalty";
 import type { CustomerRequest, Store, StoreResponse } from "@/types/database";
 
 type Incoming = CustomerRequest & { response: StoreResponse | null };
@@ -21,6 +23,8 @@ export default function StoreRequestDetailPage() {
   const [row, setRow] = useState<Incoming | null>(null);
   const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmingPurchase, setConfirmingPurchase] = useState(false);
+  const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -104,6 +108,7 @@ export default function StoreRequestDetailPage() {
       ) : null}
       <Panel title="Your store response">
         {row.response ? (
+          <>
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             <div>
               <dt className="text-ink-muted">Status</dt>
@@ -134,6 +139,44 @@ export default function StoreRequestDetailPage() {
               </dd>
             </div>
           </dl>
+          {["in_stock", "can_order"].includes(row.response.response_type) ? (
+            <div className="mt-5 border-t border-hairline-strong pt-5">
+              <p className="text-sm font-semibold">Did the customer purchase here?</p>
+              <p className="mt-1 text-xs text-ink-muted">
+                Confirm once. FINDIT calculates this store’s points automatically.
+              </p>
+              {purchaseMessage ? (
+                <p className="mt-3 text-sm text-ink">{purchaseMessage}</p>
+              ) : (
+                <Button
+                  className="mt-3"
+                  disabled={confirmingPurchase}
+                  onClick={async () => {
+                    setConfirmingPurchase(true);
+                    const result = await confirmRequestPurchaseAction({
+                      requestId: row.id,
+                      operationId: crypto.randomUUID(),
+                    });
+                    setConfirmingPurchase(false);
+                    if (!result.ok) {
+                      setPurchaseMessage(result.error);
+                      return;
+                    }
+                    setPurchaseMessage(
+                      result.alreadyConfirmed
+                        ? "This purchase was already confirmed."
+                        : result.pointsAwarded > 0
+                          ? `Purchase confirmed. ${result.pointsAwarded} points awarded.`
+                          : "Purchase confirmed. Store rewards are currently off."
+                    );
+                  }}
+                >
+                  {confirmingPurchase ? "Confirming…" : "Confirm purchase"}
+                </Button>
+              )}
+            </div>
+          ) : null}
+          </>
         ) : (
           <p className="text-sm text-ink-muted">No response yet. Answer from Requests or FINDIT Hub.</p>
         )}

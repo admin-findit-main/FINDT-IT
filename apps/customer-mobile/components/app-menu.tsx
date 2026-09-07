@@ -46,11 +46,12 @@ const ITEMS: {
   href: Href;
   label: string;
   icon: React.ComponentProps<typeof FontAwesome>["name"];
-  match: "index" | "requests" | "notifications" | "plan" | "profile";
+  match: "index" | "requests" | "notifications" | "rewards" | "plan" | "profile";
 }[] = [
   { href: "/(app)/(tabs)", label: "Find", icon: "search", match: "index" },
   { href: "/(app)/(tabs)/requests", label: "Requests", icon: "list", match: "requests" },
   { href: "/(app)/(tabs)/notifications", label: "Alerts", icon: "bell", match: "notifications" },
+  { href: "/(app)/(tabs)/rewards", label: "Rewards", icon: "gift", match: "rewards" },
   { href: "/(app)/(tabs)/plan", label: "Plan", icon: "star", match: "plan" },
   { href: "/(app)/(tabs)/profile", label: "Profile", icon: "user", match: "profile" },
 ];
@@ -62,11 +63,18 @@ function activeMenuKey(pathname: string, segments: string[]) {
   const path = pathname.replace(/\/$/, "") || "/";
   if (path.includes("/request/")) return "requests";
   const leaf = segments.filter(Boolean).at(-1) || "";
-  if (leaf === "requests" || leaf === "notifications" || leaf === "profile" || leaf === "plan") {
+  if (
+    leaf === "requests" ||
+    leaf === "notifications" ||
+    leaf === "rewards" ||
+    leaf === "profile" ||
+    leaf === "plan"
+  ) {
     return leaf;
   }
   if (path.includes("/requests")) return "requests";
   if (path.includes("/notifications")) return "notifications";
+  if (path.includes("/rewards")) return "rewards";
   if (path.includes("/plan")) return "plan";
   if (path.includes("/profile")) return "profile";
   return "index";

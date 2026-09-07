@@ -55,6 +55,9 @@ export interface Profile {
   email: string | null;
   /** Customer auth phone in E.164. Never send this to stores. */
   phone_e164: string | null;
+  /** Set only after the shopper proves control of phone_e164. */
+  phone_verified: boolean;
+  phone_verified_at: string | null;
   first_name: string | null;
   last_name: string | null;
   display_name: string | null;
@@ -70,6 +73,8 @@ export interface Profile {
   notify_request_expired: boolean;
   notify_new_request: boolean;
   notify_demand_alerts: boolean;
+  /** Global store-promotion preference; store-scoped consent is separate. */
+  notify_store_promotions: boolean;
   is_suspended: boolean;
   created_at: string;
   updated_at: string;
@@ -557,6 +562,9 @@ export interface RewardLedgerRow {
   user_id: string;
   store_id: string | null;
   verified_visit_id: string | null;
+  store_purchase_id: string | null;
+  employee_user_id: string | null;
+  program: "findit" | "store_loyalty";
   reward_type: string;
   audience: "shopper" | "employee";
   points: number;
@@ -564,6 +572,46 @@ export interface RewardLedgerRow {
   status: string;
   reason: string;
   created_at: string;
+}
+
+export interface StoreCustomer {
+  id: string;
+  store_id: string;
+  customer_id: string | null;
+  points_balance: number;
+  lifetime_points: number;
+  confirmed_purchases: number;
+  marketing_opt_in: boolean;
+  first_seen_at: string;
+  last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StorePurchase {
+  id: string;
+  store_id: string;
+  store_customer_id: string;
+  customer_id: string | null;
+  employee_user_id: string | null;
+  shift_employee_id: string | null;
+  hub_device_id: string | null;
+  request_id: string | null;
+  source: "request" | "phone_lookup";
+  points_awarded: number;
+  status: "confirmed" | "reversed";
+  idempotency_key: string;
+  confirmed_at: string;
+  created_at: string;
+}
+
+export interface StoreRewardSettings {
+  store_id: string;
+  enabled: boolean;
+  points_per_purchase: number;
+  reward_threshold_points: number;
+  reward_value_cents: number;
+  updated_at: string;
 }
 
 export interface BillingDispute {

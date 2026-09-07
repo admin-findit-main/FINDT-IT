@@ -20,7 +20,7 @@ import { AppChrome } from "@/components/app-menu";
 import { PlaceFields } from "@/components/place-fields";
 import { SettingsChoice, SettingsSection, SettingsToggle } from "@/components/settings-row";
 import { useAppearance } from "@/lib/appearance";
-import { deleteMyAccount, updateMyProfile } from "@/lib/api";
+import { deleteMyAccount, updateMyPhone, updateMyProfile } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export default function ProfileScreen() {
@@ -28,10 +28,14 @@ export default function ProfileScreen() {
   const { profile, signOut, refreshProfile } = useAuth();
   const { scheme, setScheme } = useAppearance();
   const [firstName, setFirstName] = useState(profile?.first_name || "");
+  const [phone, setPhone] = useState(profile?.phone_e164 || "");
   const [place, setPlace] = useState<ShortPlace>(() => shortPlaceFromProfile(profile));
   const [notifyInStock, setNotifyInStock] = useState(profile?.notify_in_stock ?? true);
   const [notifyCanOrder, setNotifyCanOrder] = useState(profile?.notify_can_order ?? true);
   const [notifyExpired, setNotifyExpired] = useState(profile?.notify_request_expired ?? true);
+  const [notifyPromotions, setNotifyPromotions] = useState(
+    profile?.notify_store_promotions ?? false
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -40,18 +44,22 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     setFirstName(profile?.first_name || "");
+    setPhone(profile?.phone_e164 || "");
     setPlace(shortPlaceFromProfile(profile));
     setNotifyInStock(profile?.notify_in_stock ?? true);
     setNotifyCanOrder(profile?.notify_can_order ?? true);
     setNotifyExpired(profile?.notify_request_expired ?? true);
+    setNotifyPromotions(profile?.notify_store_promotions ?? false);
   }, [
     profile?.first_name,
+    profile?.phone_e164,
     profile?.default_city,
     profile?.default_state,
     profile?.default_postal_code,
     profile?.notify_in_stock,
     profile?.notify_can_order,
     profile?.notify_request_expired,
+    profile?.notify_store_promotions,
   ]);
 
   return (
@@ -91,6 +99,25 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </GlassCard>
+        <GlassCard>
+          <GlassInput
+            label="Phone for in-store rewards (optional)"
+            value={phone}
+            onChangeText={(value) => {
+              setPhone(value);
+              setSaved(false);
+            }}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            placeholder="(571) 259-9714"
+            containerStyle={{ marginBottom: 0 }}
+          />
+          <Text style={[styles.hint, { color: theme.inkMuted }]}>
+            {profile?.phone_verified
+              ? "Verified for store lookup."
+              : "Email remains your login. Unverified numbers cannot be found by stores."}
+          </Text>
+        </GlassCard>
 
         <SettingsSection title="Place" />
         <GlassCard>
@@ -129,6 +156,14 @@ export default function ProfileScreen() {
               setNotifyExpired(next);
               setSaved(false);
             }}
+          />
+          <SettingsToggle
+            label="Store promotions"
+            value={notifyPromotions}
+            onChange={(next) => {
+              setNotifyPromotions(next);
+              setSaved(false);
+            }}
             last
           />
         </GlassCard>
@@ -145,18 +180,26 @@ export default function ProfileScreen() {
             setSaving(true);
             setError(null);
             setSaved(false);
-            const result = await updateMyProfile({
-              firstName,
-              city: place.city,
-              state: place.state,
-              postalCode: place.postalCode,
-              notifyInStock,
-              notifyCanOrder,
-              notifyRequestExpired: notifyExpired,
-            });
+            const [result, phoneResult] = await Promise.all([
+              updateMyProfile({
+                firstName,
+                city: place.city,
+                state: place.state,
+                postalCode: place.postalCode,
+                notifyInStock,
+                notifyCanOrder,
+                notifyRequestExpired: notifyExpired,
+                notifyStorePromotions: notifyPromotions,
+              }),
+              updateMyPhone(phone),
+            ]);
             setSaving(false);
             if (result.error) {
               setError(result.error);
+              return;
+            }
+            if (phoneResult.error) {
+              setError(phoneResult.error);
               return;
             }
             await refreshProfile();

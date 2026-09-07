@@ -12,6 +12,9 @@ const FAIL_CLOSED_BUCKETS = new Set([
   "hub-claim",
   "hub-clock",
   "create-request",
+  "profile-phone",
+  "customer-lookup",
+  "confirm-purchase",
   "account-delete",
 ]);
 

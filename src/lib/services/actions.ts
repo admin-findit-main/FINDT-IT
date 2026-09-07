@@ -2280,6 +2280,7 @@ export async function updateProfileAction(input: {
   notifyInStock?: boolean;
   notifyCanOrder?: boolean;
   notifyRequestExpired?: boolean;
+  notifyStorePromotions?: boolean;
 }) {
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Unauthorized" };
@@ -2294,6 +2295,8 @@ export async function updateProfileAction(input: {
     if (input.notifyCanOrder !== undefined) profile.notify_can_order = input.notifyCanOrder;
     if (input.notifyRequestExpired !== undefined)
       profile.notify_request_expired = input.notifyRequestExpired;
+    if (input.notifyStorePromotions !== undefined)
+      profile.notify_store_promotions = input.notifyStorePromotions;
     profile.updated_at = new Date().toISOString();
     return { profile };
   }
@@ -2311,6 +2314,7 @@ export async function updateProfileAction(input: {
       notify_in_stock: input.notifyInStock,
       notify_can_order: input.notifyCanOrder,
       notify_request_expired: input.notifyRequestExpired,
+      notify_store_promotions: input.notifyStorePromotions,
     })
     .eq("id", user.id)
     .select("*")

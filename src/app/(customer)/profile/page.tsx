@@ -19,6 +19,7 @@ import {
   signOutAction,
   updateProfileAction,
 } from "@/lib/services/actions";
+import { saveShopperPhoneAction } from "@/lib/services/loyalty";
 import type { Profile } from "@/types/database";
 import {
   formatShortPlace,
@@ -30,10 +31,15 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [phone, setPhone] = useState("");
 
   useEffect(() => {
     getCurrentProfile().then(setProfile);
   }, []);
+
+  useEffect(() => {
+    if (profile) setPhone(profile.phone_e164 || "");
+  }, [profile]);
 
   if (!profile) {
     return <div className="px-5 pt-8 text-sm text-ink-muted">Loading profile…</div>;
@@ -59,11 +65,29 @@ export default function ProfilePage() {
           />
         </div>
         <div>
-          <Label>{profile.email ? "Email" : "Phone"}</Label>
+          <Label>Email</Label>
           <Input
-            value={profile.email || profile.phone_e164 || ""}
+            value={profile.email || ""}
             disabled
           />
+        </div>
+        <div>
+          <Label htmlFor="shopper-phone">Phone for in-store rewards (optional)</Label>
+          <Input
+            id="shopper-phone"
+            type="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="(571) 259-9714"
+          />
+          <p className="mt-1 text-xs text-ink-muted">
+            {profile.phone_verified
+              ? "Verified. Stores can use this number to find your rewards."
+              : profile.phone_e164
+                ? "Not verified yet. Stores cannot find this account until verification is available."
+                : "Email remains your login. This number is only for store lookup and rewards."}
+          </p>
         </div>
         <div>
           <Label>Place</Label>
@@ -119,6 +143,7 @@ export default function ProfilePage() {
               ["notify_in_stock", "In Stock replies"],
               ["notify_can_order", "Can Order replies"],
               ["notify_request_expired", "Request expiration"],
+              ["notify_store_promotions", "Store promotions"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -145,19 +170,40 @@ export default function ProfilePage() {
           disabled={saving}
           onClick={async () => {
             setSaving(true);
-            const result = await updateProfileAction({
-              firstName: profile.first_name || "",
-              lastName: profile.last_name || "",
-              city: profile.default_city || "",
-              state: profile.default_state || "VA",
-              postalCode: profile.default_postal_code || "",
-              notifyInStock: profile.notify_in_stock,
-              notifyCanOrder: profile.notify_can_order,
-              notifyRequestExpired: profile.notify_request_expired,
-            });
+            const [result, phoneResult] = await Promise.all([
+              updateProfileAction({
+                firstName: profile.first_name || "",
+                lastName: profile.last_name || "",
+                city: profile.default_city || "",
+                state: profile.default_state || "VA",
+                postalCode: profile.default_postal_code || "",
+                notifyInStock: profile.notify_in_stock,
+                notifyCanOrder: profile.notify_can_order,
+                notifyRequestExpired: profile.notify_request_expired,
+                notifyStorePromotions: profile.notify_store_promotions,
+              }),
+              saveShopperPhoneAction(phone),
+            ]);
             setSaving(false);
-            if (result.error) toast.error(result.error);
-            else toast.success("Saved");
+            if (result.error) {
+              toast.error(result.error);
+              return;
+            }
+            if (!phoneResult.ok) {
+              toast.error(phoneResult.error);
+              return;
+            }
+            if (result.profile) {
+              setProfile({
+                ...result.profile,
+                phone_e164: phoneResult.phoneE164,
+                phone_verified: phoneResult.verified,
+                phone_verified_at: phoneResult.verified
+                  ? result.profile.phone_verified_at
+                  : null,
+              });
+            }
+            toast.success("Saved");
           }}
         >
           Save changes

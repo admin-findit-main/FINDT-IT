@@ -187,6 +187,7 @@ export async function updateMyProfile(input: {
   notifyInStock?: boolean;
   notifyCanOrder?: boolean;
   notifyRequestExpired?: boolean;
+  notifyStorePromotions?: boolean;
 }) {
   const {
     data: { user },
@@ -202,9 +203,54 @@ export async function updateMyProfile(input: {
   if (input.notifyRequestExpired !== undefined) {
     patch.notify_request_expired = input.notifyRequestExpired;
   }
+  if (input.notifyStorePromotions !== undefined) {
+    patch.notify_store_promotions = input.notifyStorePromotions;
+  }
   const { error } = await supabase.from("profiles").update(patch).eq("id", user.id);
   if (error) return { error: error.message };
   return { ok: true as const };
+}
+
+export async function updateMyPhone(phone: string) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) return { error: "Please sign in" };
+  const origin = (
+    process.env.EXPO_PUBLIC_APP_URL || "https://dashboard.askfindit.com"
+  ).replace(/\/$/, "");
+  const response = await fetch(`${origin}/api/profile/phone`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ phone }),
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    ok?: boolean;
+  };
+  if (!response.ok) {
+    return { error: body.error || "Could not save that phone number." };
+  }
+  return { ok: true as const };
+}
+
+export async function fetchMyStoreRewards() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase
+    .from("store_customers")
+    .select(
+      "id, points_balance, confirmed_purchases, last_seen_at, store:stores(id, name)"
+    )
+    .eq("customer_id", user.id)
+    .order("last_seen_at", { ascending: false })
+    .limit(50);
+  return data || [];
 }
 
 export async function updateMyPlace(input: {

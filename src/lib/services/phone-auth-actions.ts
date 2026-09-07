@@ -275,6 +275,27 @@ export async function verifyPhoneOtpAction(input: {
 
     if (!profile) return { error: "Account created, but profile is missing. Refresh and try again." };
 
+    // Reaching this line means Supabase Auth accepted the SMS OTP, so this is
+    // the only existing path allowed to set the loyalty lookup phone verified.
+    // The flag stays false for numbers merely typed into Profile.
+    const { createServiceClient } = await import("@/lib/supabase/admin");
+    const verificationAdmin = createServiceClient();
+    const verifiedAt = new Date().toISOString();
+    await verificationAdmin
+      .from("profiles")
+      .update({
+        phone_e164: parsed.e164,
+        phone_verified: true,
+        phone_verified_at: verifiedAt,
+      })
+      .eq("id", user.id);
+    profile = {
+      ...profile,
+      phone_e164: parsed.e164,
+      phone_verified: true,
+      phone_verified_at: verifiedAt,
+    };
+
     const coerced = coerceSoloAdminProfile(profile, user.email) as Profile;
     if (coerced.is_suspended) {
       await supabase.auth.signOut();

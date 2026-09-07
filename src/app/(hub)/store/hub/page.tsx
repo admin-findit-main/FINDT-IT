@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings } from "lucide-react";
+import { Settings, UserRoundSearch } from "lucide-react";
 import { estimateRoutingDistanceMiles, isRequestExpired } from "@findit/domain";
 import {
   markStoreRequestOpenedAction,
@@ -20,6 +20,7 @@ import {
 import { HubClockGate } from "@/components/hub/clock-gate";
 import { HubCheckinPanel } from "@/components/hub/checkin-panel";
 import { HubEmployeeRewards } from "@/components/hub/employee-rewards";
+import { HubCustomerLookup } from "@/components/hub/customer-lookup";
 import {
   hubConnectHref,
   hubRelinkMessage,
@@ -88,6 +89,7 @@ export default function FinditHubPage() {
   const [sentFlash, setSentFlash] = useState(false);
   const [newFlash, setNewFlash] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [customerLookupOpen, setCustomerLookupOpen] = useState(false);
   const [clock, setClock] = useState(0);
   const [source, setSource] = useState<"device" | "member" | null>(null);
   const [canManage, setCanManage] = useState(false);
@@ -262,10 +264,10 @@ export default function FinditHubPage() {
   const onRealtime = useCallback(() => {
     if (storeId && shiftLocked === false) void loadQueue(storeId, { silent: true });
   }, [storeId, loadQueue, shiftLocked]);
-  useStoreInboxRealtime(storeId, { onChange: onRealtime });
+  const inboxSync = useStoreInboxRealtime(storeId, { onChange: onRealtime });
 
   useEffect(() => {
-    if (!storeId || shiftLocked !== false) return;
+    if (!storeId || shiftLocked !== false || inboxSync.state === "live") return;
     const tick = () => {
       if (document.visibilityState !== "visible") return;
       void loadQueue(storeId, { silent: true });
@@ -273,7 +275,7 @@ export default function FinditHubPage() {
     tick();
     const id = window.setInterval(tick, HUB_INBOX_POLL_MS);
     return () => window.clearInterval(id);
-  }, [storeId, loadQueue, shiftLocked]);
+  }, [storeId, loadQueue, shiftLocked, inboxSync.state]);
 
   useEffect(() => {
     if (!deviceId) return;
@@ -453,6 +455,17 @@ export default function FinditHubPage() {
           ) : null}
         </div>
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setSettingsOpen(false);
+              setCustomerLookupOpen(true);
+            }}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 px-3 text-xs font-semibold text-white/75 hover:bg-white/10"
+          >
+            <UserRoundSearch className="h-4 w-4" />
+            <span className="hidden sm:inline">Customer lookup</span>
+          </button>
           {active && deviceId ? <HubCheckinPanel compact /> : null}
           {/* A busy store can sit on the request view all day and never see the
               idle screen, so the unpaired state has to be reachable here too. */}
@@ -787,6 +800,10 @@ export default function FinditHubPage() {
           </div>
         )}
       </main>
+
+      {customerLookupOpen ? (
+        <HubCustomerLookup onClose={() => setCustomerLookupOpen(false)} />
+      ) : null}
 
       {settingsOpen ? (
         <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/70 p-6 md:items-center">

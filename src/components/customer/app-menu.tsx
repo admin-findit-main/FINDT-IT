@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { Bell, MapPin, Menu, PackageSearch, Search, Sparkles, X } from "lucide-react";
+import { Bell, Gift, MapPin, Menu, PackageSearch, Search, Sparkles, X } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   accountContactLabel,
@@ -20,6 +20,7 @@ const ITEMS = [
   { href: "/home", label: "Find", icon: Search },
   { href: "/requests", label: "Requests", icon: PackageSearch },
   { href: "/notifications", label: "Alerts", icon: Bell },
+  { href: "/rewards", label: "Rewards", icon: Gift },
   { href: "/plan", label: "Plan", icon: Sparkles },
 ] as const;
 

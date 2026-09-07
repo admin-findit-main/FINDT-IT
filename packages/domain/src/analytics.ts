@@ -39,6 +39,9 @@ export const ANALYTICS_EVENTS = [
   "reward_created",
   "reward_reversed",
   "billing_dispute_created",
+  "customer_lookup",
+  "purchase_confirmed",
+  "points_awarded",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];

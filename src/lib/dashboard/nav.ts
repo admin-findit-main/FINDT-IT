@@ -26,6 +26,8 @@ export type DashItem = {
 export const ownerDashItems: DashItem[] = [
   { href: "/store", label: "Overview", icon: "overview" },
   { href: "/store/requests", label: "Requests", icon: "requests" },
+  { href: "/store/customers", label: "Customers", icon: "users" },
+  { href: "/store/rewards", label: "Rewards", icon: "plan" },
   { href: "/store/responses", label: "Responses", icon: "responses" },
   { href: "/store/demand", label: "Demand", icon: "demand" },
   { href: "/store/shifts", label: "Shifts", icon: "shifts" },
@@ -82,6 +84,8 @@ export function dashTitle(pathname: string): { title: string; subtitle: string }
   const map: Record<string, { title: string; subtitle: string }> = {
     "/store": { title: "Overview", subtitle: "Today at this location" },
     "/store/requests": { title: "Requests", subtitle: "Answer nearby asks" },
+    "/store/customers": { title: "Customers", subtitle: "People connected to this store" },
+    "/store/rewards": { title: "Rewards", subtitle: "Store-funded points and value" },
     "/store/responses": { title: "Responses", subtitle: "What your team already answered" },
     "/store/demand": { title: "Demand", subtitle: "What people nearby keep asking for" },
     "/store/shifts": { title: "Shifts", subtitle: "Hours, PINs, and who is on the Hub" },
