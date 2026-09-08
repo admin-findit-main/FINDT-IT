@@ -8,6 +8,7 @@ import {
   formatShortPlace,
   isRequestExpired,
   mapsDirectionsUrl,
+  sortCustomerResponsesByDistance,
   WAITING_FOR_REPLY_HINT,
 } from "@findit/domain";
 import { spacing, typography } from "@findit/theme";
@@ -88,14 +89,18 @@ export default function RequestDetailScreen() {
   const expired = isRequestExpired(detail.expires_at, detail.status);
   const closed =
     expired || detail.status === "cancelled" || detail.status === "fulfilled";
-  const responses = [...(detail.responses || [])].sort((a, b) => {
-    const order: Record<string, number> = {
-      in_stock: 0,
-      can_order: 1,
-      out_of_stock: 2,
-    };
-    return (order[a.response_type] ?? 9) - (order[b.response_type] ?? 9);
-  });
+  const rawResponses = (detail.responses || []).filter(
+    (response: { response_type: string }) =>
+      response.response_type !== "not_relevant"
+  );
+  const responses = sortCustomerResponsesByDistance<
+    (typeof rawResponses)[number]
+  >(
+    rawResponses,
+    detail.postal_code,
+    detail.city,
+    { latitude: detail.latitude, longitude: detail.longitude }
+  );
   const visibleResponses = responses.slice(0, visibleStoreCount);
   const hiddenStoreCount = Math.max(0, responses.length - visibleStoreCount);
 

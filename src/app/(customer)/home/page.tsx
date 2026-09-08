@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Camera, ChevronLeft, MapPin } from "lucide-react";
+import { Camera, ChevronDown, ChevronLeft, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/primitives";
@@ -14,7 +14,10 @@ import { useCustomerProfile } from "@/components/customer/session";
 import { PlaceFields } from "@/components/customer/place-fields";
 import { LocateMeButton } from "@/components/customer/locate-me-button";
 import { ShopperInstallHint } from "@/components/customer/install-hint";
-import { geolocateUsPlace } from "@/lib/customer/geolocate";
+import {
+  geolocateUsPlace,
+  reverseGeocodeWithBudget,
+} from "@/lib/customer/geolocate";
 import { marketingHomeHref } from "@/lib/config/product-hosts";
 import {
   AGE_RESTRICTED_FIND_HINT,
@@ -22,7 +25,6 @@ import {
   AGE_RESTRICTED_ID_CONFIRM,
   AGE_RESTRICTED_ID_TITLE,
   CUSTOMER_PLANS,
-  PRODUCT_CATEGORIES,
   findPlaceholderForCategory,
   getConsumerEntitlements,
   isAgeRestrictedCategory,
@@ -53,12 +55,12 @@ import {
   formatShortPlace,
   isCompleteShortPlace,
   lookupUsZip,
-  reverseGeocodeUs,
   shortPlaceFromProfile,
   type ShortPlace,
   classifyRequest,
   classificationLabel,
   classificationHint,
+  type RoutableCategoryCount,
 } from "@findit/domain";
 
 type Step = "query" | "radius";
@@ -77,6 +79,12 @@ export default function CustomerHomePage() {
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [editPlace, setEditPlace] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [searchOptionsOpen, setSearchOptionsOpen] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<
+    RoutableCategoryCount[]
+  >([]);
+  const [categoryAvailabilityError, setCategoryAvailabilityError] =
+    useState(false);
   const [ageGateOpen, setAgeGateOpen] = useState(false);
   const [pendingCategory, setPendingCategory] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -118,6 +126,41 @@ export default function CustomerHomePage() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const response = await fetch("/api/customer/routable-categories");
+        if (!response.ok) throw new Error("unavailable");
+        const body = (await response.json()) as {
+          categories?: RoutableCategoryCount[];
+        };
+        if (active) {
+          const categories = body.categories || [];
+          setAvailableCategories(categories);
+          setCategory((current) =>
+            current && !categories.some((item) => item.label === current)
+              ? ""
+              : current
+          );
+          setCategoryAvailabilityError(false);
+        }
+      } catch {
+        if (active) {
+          setAvailableCategories([]);
+          setCategory("");
+          setCategoryAvailabilityError(true);
+        }
+      }
+    };
+    void load();
+    window.addEventListener("focus", load);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", load);
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       document.body.style.removeProperty("pointer-events");
     };
@@ -143,8 +186,14 @@ export default function CustomerHomePage() {
     category,
     confirmed: categoryConfirmed || Boolean(category),
   });
+  const guessedCategoryAvailable = availableCategories.some(
+    (item) => item.label === guessed.productCategory
+  );
   const needsCategoryConfirm =
-    guessed.status === "needs_confirm" && !categoryConfirmed && !category;
+    guessed.status === "needs_confirm" &&
+    guessedCategoryAvailable &&
+    !categoryConfirmed &&
+    !category;
   // Narrowed here rather than at the call site: the confirm handler closes
   // over it, and a property access does not stay narrowed inside a closure.
   const guessedCategory = guessed.productCategory;
@@ -310,7 +359,7 @@ export default function CustomerHomePage() {
       }
     }
     if (!isCompleteShortPlace(nextPlace) && coords) {
-      const fromGps = await reverseGeocodeUs(coords.lat, coords.lng);
+      const fromGps = await reverseGeocodeWithBudget(coords.lat, coords.lng);
       if (fromGps) {
         nextPlace = {
           city: nextPlace.city || fromGps.city,
@@ -547,12 +596,34 @@ export default function CustomerHomePage() {
               </p>
             ) : null}
 
-            <h2 className="mt-8 text-2xl font-bold tracking-tight text-ink">
-              Category
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-              Optional. Helps us ask the right stores. Tobacco and vape asks for ID first.
-            </p>
+            <button
+              type="button"
+              aria-expanded={searchOptionsOpen}
+              onClick={() => setSearchOptionsOpen((open) => !open)}
+              className="mt-8 flex min-h-16 w-full items-center justify-between gap-4 rounded-2xl border border-hairline-strong bg-white px-5 py-3 text-left"
+            >
+              <span>
+                <span className="block font-semibold text-ink">Search options</span>
+                <span className="mt-1 block text-xs text-ink-muted">
+                  {category || "Automatic category"} · {radiusMiles} miles
+                </span>
+              </span>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 shrink-0 text-ink-muted transition-transform",
+                  searchOptionsOpen && "rotate-180"
+                )}
+              />
+            </button>
+            {searchOptionsOpen ? (
+              <div className="mt-5">
+                <h2 className="text-xl font-bold tracking-tight text-ink">
+                  Category
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+                  Optional. Only categories with stores accepting Finds are shown.
+                  Tobacco, vape, and dispensary Finds ask for ID first.
+                </p>
             {needsCategoryConfirm ? (
               <div className="mt-4 rounded-2xl border border-hairline-strong bg-white p-4">
                 <p className="text-sm font-semibold text-ink">
@@ -595,18 +666,25 @@ export default function CustomerHomePage() {
               </p>
             ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
-              {PRODUCT_CATEGORIES.map((item) => (
+              {availableCategories.map((item) => (
                 <GlassChip
-                  key={item}
-                  selected={category === item}
-                  onClick={() => chooseCategory(item)}
+                  key={item.label}
+                  selected={category === item.label}
+                  onClick={() => chooseCategory(item.label)}
                 >
-                  {item}
+                  {item.label} ({item.count})
                 </GlassChip>
               ))}
             </div>
+            {availableCategories.length === 0 ? (
+              <p className="mt-3 text-sm text-ink-muted">
+                {categoryAvailabilityError
+                  ? "Categories are unavailable right now. You can still type your Find."
+                  : "No pilot categories have an accepting store right now. You can still type your Find."}
+              </p>
+            ) : null}
 
-            <h2 className="mt-8 text-2xl font-bold tracking-tight text-ink">
+            <h2 className="mt-8 text-xl font-bold tracking-tight text-ink">
               How far should we look?
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-ink-muted">
@@ -648,6 +726,8 @@ export default function CustomerHomePage() {
               <p className="mt-2 px-1 text-xs text-ink-subtle">
                 FINDIT+ searches up to {plus.maxRadiusMiles} miles.
               </p>
+            ) : null}
+              </div>
             ) : null}
 
             <h2 className="mt-8 text-2xl font-bold tracking-tight text-ink">Near</h2>

@@ -62,6 +62,7 @@ import type {
   StoreMemberRole,
   StoreMetrics,
   StoreResponse,
+  RespondToStoreRequestRpcRow,
 } from "@/types/database";
 import { CUSTOMER_PLANS, STORE_PLANS } from "@/lib/config/constants";
 import { bypassConsumerPlanLimits, bypassPlanLimits, isPilotMode } from "@/lib/config/env";
@@ -78,9 +79,11 @@ import {
   planLimitReachedMessage,
   radiusExceedsPlan,
   radiusLimitMessage,
+  resolveOwnedRequestImageInput,
   MAX_CUSTOMER_RADIUS_MILES,
   RADIUS_OPTIONS,
   normalizeStoreLocation,
+  ROUTABLE_CATEGORY_ALLOWLIST,
   boundUuid,
   boundSlug,
   signupSchema,
@@ -103,10 +106,7 @@ import { toPublicError } from "@/lib/security/public-error";
 import { selectEligibleStores } from "@/lib/services/routing";
 import { resolvePoint, resolvePointsByZip } from "@/lib/services/zip-centroids";
 import {
-  canRebroadcastStillLooking,
-  deriveRequestStatus,
   isNearDuplicateRequest,
-  responseTimeSeconds,
   average,
   median,
 } from "@/lib/services/request-lifecycle";
@@ -115,13 +115,19 @@ import { trackEvent } from "@/lib/services/analytics";
 import { getHubDeviceSession } from "@/lib/hub/session";
 import { notifySupportInbox } from "@/lib/services/support-inbox";
 
-async function signRequestImageUrl(value: string | null | undefined) {
+async function signRequestImageUrl(
+  value: string | null | undefined,
+  customerId: string
+) {
   const imageSigning = await import("@/lib/services/request-images-server");
-  return imageSigning.signRequestImageUrl(value);
+  return imageSigning.signRequestImageUrl(value, customerId);
 }
 
 async function signRequestImageUrls(
-  values: (string | null | undefined)[]
+  values: {
+    value: string | null | undefined;
+    customerId: string;
+  }[]
 ) {
   const imageSigning = await import("@/lib/services/request-images-server");
   return imageSigning.signRequestImageUrls(values);
@@ -265,6 +271,21 @@ async function getStoreActor(storeId: string): Promise<StoreActor | null> {
     };
   }
   return null;
+}
+
+export async function authorizeHubInboxStoreAction(
+  storeId: string
+): Promise<"authorized" | "unauthorized" | "forbidden"> {
+  const id = boundUuid(storeId);
+  if (!id) return "forbidden";
+  const device = await getHubDeviceSession();
+  if (isDemoMode()) {
+    if (!(await getCurrentProfile()) && !device) return "unauthorized";
+  } else {
+    const { user } = await getSupabaseUser();
+    if (!user && !device) return "unauthorized";
+  }
+  return (await getStoreActor(id)) ? "authorized" : "forbidden";
 }
 
 function storeFacingRequest(
@@ -953,6 +974,10 @@ export async function createCustomerRequestAction(raw: unknown) {
   });
   if (
     classified.status === "needs_confirm" &&
+    classified.productCategory &&
+    ROUTABLE_CATEGORY_ALLOWLIST.includes(
+      classified.productCategory as (typeof ROUTABLE_CATEGORY_ALLOWLIST)[number]
+    ) &&
     !parsed.data.categoryConfirmed &&
     !parsed.data.category
   ) {
@@ -1109,13 +1134,13 @@ export async function createCustomerRequestAction(raw: unknown) {
     }
   }
 
-  // Reject raw base64 in production — require Storage URL/path
-  const imageUrl = parsed.data.imageUrl || null;
-  if (imageUrl && imageUrl.startsWith("data:")) {
-    return {
-      error: "Please upload the photo again (image storage required).",
-    };
-  }
+  const ownedImage = resolveOwnedRequestImageInput({
+    imageUrl: parsed.data.imageUrl,
+    imageStoragePath: parsed.data.imageStoragePath,
+    customerId: user.id,
+  });
+  if ("error" in ownedImage) return { error: ownedImage.error };
+  const imagePath = ownedImage.path;
 
   const expiresAt = new Date(
     Date.now() + parsed.data.expirationHours * 60 * 60 * 1000
@@ -1138,8 +1163,8 @@ export async function createCustomerRequestAction(raw: unknown) {
       radius_miles: parsed.data.radiusMiles,
       status: "active",
       expires_at: expiresAt,
-      image_url: imageUrl,
-      image_storage_path: parsed.data.imageStoragePath || null,
+      image_url: imagePath,
+      image_storage_path: imagePath,
       latitude: point.latitude,
       longitude: point.longitude,
       detected_business_type: classified.businessTypeId,
@@ -1252,7 +1277,7 @@ async function routeRequestToStores(requestId: string): Promise<number> {
     .single();
   if (!request) return 0;
 
-  let storeQuery = admin
+  const storeQuery = admin
     .from("stores")
     .select("id, is_active, is_suspended, is_verified, postal_code, city, service_radius_miles, subscription_plan, business_type, accepting_requests, latitude, longitude")
     .eq("is_active", true)
@@ -1260,12 +1285,6 @@ async function routeRequestToStores(requestId: string): Promise<number> {
     .eq("accepting_requests", true);
   const reqLat = Number(request.latitude);
   const reqLng = Number(request.longitude);
-  if (Number.isFinite(reqLat) && Number.isFinite(reqLng)) {
-    const pad = (Number(request.radius_miles) + 12) / 69;
-    storeQuery = storeQuery.or(
-      `and(latitude.gte.${reqLat - pad},latitude.lte.${reqLat + pad},longitude.gte.${reqLng - pad},longitude.lte.${reqLng + pad}),latitude.is.null`
-    );
-  }
   const { data: stores } = await storeQuery;
 
   if (!stores?.length) return 0;
@@ -1469,7 +1488,8 @@ export async function getCustomerRequestAction(requestId: string) {
   ]);
   if (!request) return null;
   const signedImageUrl = await signRequestImageUrl(
-    request.image_storage_path || request.image_url
+    request.image_storage_path || request.image_url,
+    request.customer_id
   );
   return {
     ...(request as CustomerRequest),
@@ -1519,10 +1539,15 @@ export async function getCustomerRequestsAction(tab: "active" | "past" | "saved"
       .filter(Boolean) as CustomerRequest[];
   }
   let query = supabase.from("customer_requests").select("*").eq("customer_id", user.id);
+  const now = new Date().toISOString();
   if (tab === "active") {
-    query = query.in("status", ["active", "partially_answered", "answered", "draft"]);
+    query = query
+      .in("status", ["active", "partially_answered", "answered", "draft"])
+      .gt("expires_at", now);
   } else {
-    query = query.in("status", ["expired", "cancelled", "fulfilled"]);
+    query = query.or(
+      `status.in.(expired,cancelled,fulfilled),and(status.in.(active,partially_answered,answered,draft),expires_at.lte.${now})`
+    );
   }
   const { data } = await query.order("created_at", { ascending: false }).limit(40);
   return (data || []) as CustomerRequest[];
@@ -1547,12 +1572,10 @@ export async function cancelRequestAction(requestId: string) {
 
   const { supabase, user } = await getSupabaseUser();
   if (!user) return { error: "Unauthorized" };
-  const { error } = await supabase
-    .from("customer_requests")
-    .update({ status: "cancelled" })
-    .eq("id", id)
-    .eq("customer_id", user.id);
-  if (error) return { error: error.message };
+  const { error } = await supabase.rpc("cancel_customer_request", {
+    p_request_id: id,
+  });
+  if (error) return { error: "Couldn't cancel this request." };
   return { ok: true };
 }
 
@@ -1586,111 +1609,45 @@ export async function respondToRequestAction(input: {
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
 
-  const [{ data: target }, { data: requestRow }, { data: existing }] = await Promise.all([
-    admin
-      .from("request_targets")
-      .select("*")
-      .eq("request_id", input.requestId)
-      .eq("store_id", input.storeId)
-      .maybeSingle(),
-    admin
-      .from("customer_requests")
-      .select("id, status, expires_at, customer_id, product_name, stores_targeted")
-      .eq("id", input.requestId)
-      .single(),
-    admin
-      .from("store_responses")
-      .select("id")
-      .eq("request_id", input.requestId)
-      .eq("store_id", input.storeId)
-      .maybeSingle(),
-  ]);
-  if (!target) return { error: "Request was not sent to this store" };
-  if (!requestRow) return { error: "Request not found" };
-  if (requestRow.status === "cancelled" || requestRow.status === "fulfilled") {
-    return { error: "This request is no longer accepting responses" };
-  }
-  if (
-    requestRow.status === "expired" ||
-    new Date(requestRow.expires_at).getTime() < Date.now()
-  ) {
-    return { error: "This request has expired" };
-  }
-
-  const respondedAt = new Date().toISOString();
-  const payload = {
-    request_id: input.requestId,
-    store_id: input.storeId,
-    responded_by: actor.userId,
-    response_type: input.responseType,
-    price: input.price ?? null,
-    quantity: input.quantity ?? null,
-    note: input.note || null,
-    hold_minutes: input.holdMinutes ?? null,
-    estimated_availability_label: input.estimatedAvailabilityLabel || null,
-    availability_amount: input.availabilityAmount ?? null,
-    track_demand: input.trackDemand ?? false,
-    updated_at: respondedAt,
-  };
-
-  const { data, error } = await admin
-    .from("store_responses")
-    .upsert(payload, { onConflict: "request_id,store_id" })
-    .select("*")
-    .single();
-
-  if (error) {
-    if (error.code === "23505") {
-      const { data: row } = await admin
-        .from("store_responses")
-        .select("*")
-        .eq("request_id", input.requestId)
-        .eq("store_id", input.storeId)
-        .maybeSingle();
-      if (row) return { response: row as StoreResponse };
-    }
+  const { data, error } = await admin.rpc("respond_to_store_request", {
+    p_request_id: input.requestId,
+    p_store_id: input.storeId,
+    p_response_type: input.responseType,
+    p_employee_user_id: actor.kind === "member" ? actor.userId : null,
+    p_shift_employee_id: null,
+    p_hub_device_id: actor.kind === "device" ? actor.deviceId : null,
+    p_price: input.price ?? null,
+    p_quantity: input.quantity ?? null,
+    p_note: input.note || null,
+    p_hold_minutes: input.holdMinutes ?? null,
+    p_estimated_available_at: null,
+    p_estimated_availability_label:
+      input.estimatedAvailabilityLabel || null,
+    p_availability_amount: input.availabilityAmount ?? null,
+    p_track_demand: input.trackDemand ?? false,
+  });
+  const rpcRow = (Array.isArray(data) ? data[0] : data) as
+    | RespondToStoreRequestRpcRow
+    | null;
+  if (error || !rpcRow) {
     return { error: "Couldn't save your response. Please try again." };
   }
 
-  const secs = responseTimeSeconds(target.route_sent_at || target.created_at, respondedAt);
-  const notifyCustomer =
-    input.responseType === "in_stock" || input.responseType === "can_order";
-  const [, countResult, storeResult, customerResult] = await Promise.all([
-    admin
-      .from("request_targets")
-      .update({
-        responded_at: respondedAt,
-        response_time_seconds: secs,
-        opened_at: target.opened_at || respondedAt,
-        viewed_at: target.viewed_at || respondedAt,
-        relevant: input.responseType === "not_relevant" ? false : true,
-      })
-      .eq("id", target.id),
-    admin
-      .from("store_responses")
-      .select("*", { count: "exact", head: true })
-      .eq("request_id", input.requestId),
-    notifyCustomer
-      ? admin.from("stores").select("name").eq("id", input.storeId).single()
-      : Promise.resolve({ data: null as { name?: string } | null }),
-    notifyCustomer
-      ? admin
-          .from("profiles")
-          .select("notify_in_stock, notify_can_order")
-          .eq("id", requestRow.customer_id)
-          .maybeSingle()
-      : Promise.resolve({
-          data: null as { notify_in_stock?: boolean; notify_can_order?: boolean } | null,
-        }),
-  ]);
-
-  const status = deriveRequestStatus({
-    responseCount: countResult.count || 0,
-    targetCount: requestRow.stores_targeted || 0,
-  });
-  await admin.from("customer_requests").update({ status }).eq("id", input.requestId);
-
-  if (notifyCustomer) {
+  if (rpcRow.notify_customer) {
+    const [{ data: requestRow }, storeResult] = await Promise.all([
+      admin
+        .from("customer_requests")
+        .select("customer_id, product_name")
+        .eq("id", input.requestId)
+        .single(),
+      admin.from("stores").select("name").eq("id", input.storeId).single(),
+    ]);
+    if (requestRow) {
+      const customerResult = await admin
+        .from("profiles")
+        .select("notify_in_stock, notify_can_order")
+        .eq("id", requestRow.customer_id)
+        .maybeSingle();
     const store = storeResult.data;
     const customer = customerResult.data;
     const copy = customerReplyAlertCopy({
@@ -1732,16 +1689,24 @@ export async function respondToRequestAction(input: {
         console.error("[FINDIT] customer reply notify failed", err);
       });
     }
+    }
   }
 
-  void trackEvent("store_response_created", {
-    userId: actor.userId,
-    storeId: input.storeId,
-    requestId: input.requestId,
-    metadata: { responseType: input.responseType, responseTimeSeconds: secs },
-  });
+  if (rpcRow.created_new) {
+    void trackEvent("store_response_created", {
+      userId: actor.userId,
+      storeId: input.storeId,
+      requestId: input.requestId,
+      metadata: { responseType: input.responseType },
+    });
+  }
 
-  return { response: data as StoreResponse };
+  const { response_id, created_new, notify_customer, final_request_status, ...response } =
+    rpcRow;
+  void created_new;
+  void notify_customer;
+  void final_request_status;
+  return { response: { ...response, id: response_id } as StoreResponse };
 }
 
 export async function getStoreIncomingRequestsAction(
@@ -1788,7 +1753,19 @@ export async function getStoreIncomingRequestsAction(
       .filter(Boolean)
       .filter((item) => {
         if (!item) return false;
-        if (filter === "unanswered") return !item.response;
+        if (filter === "unanswered") {
+          return (
+            !item.response &&
+            isWaitingHubRequest({
+              respondedAt: item.target.responded_at,
+              deliveryStatus: item.target.delivery_status,
+              relevant: item.target.relevant,
+              requestStatus: item.status,
+              expiresAt: item.expires_at,
+              nowMs: Date.now(),
+            })
+          );
+        }
         if (filter === "in_stock") return item.response?.response_type === "in_stock";
         if (filter === "out_of_stock") return item.response?.response_type === "out_of_stock";
         if (filter === "can_order") return item.response?.response_type === "can_order";
@@ -1820,13 +1797,18 @@ export async function getStoreIncomingRequestsAction(
   // both in one select (PGRST200). Load replies in a second query.
   let inboxQuery = supabase
     .from("request_targets")
-    .select("*, request:customer_requests(*)")
+    .select("*, request:customer_requests!inner(*)")
     .eq("store_id", id)
     .gte("created_at", start.toISOString())
     .order("created_at", { ascending: false })
     .limit(100);
   if (filter === "unanswered") {
-    inboxQuery = inboxQuery.is("responded_at", null);
+    inboxQuery = inboxQuery
+      .is("responded_at", null)
+      .in("delivery_status", ["sent", "delivered"])
+      .or("relevant.is.null,relevant.eq.true")
+      .in("request.status", ["active", "partially_answered", "answered"])
+      .gt("request.expires_at", new Date().toISOString());
   }
   const { data, error } = await inboxQuery;
 
@@ -1844,7 +1826,7 @@ export async function getStoreIncomingRequestsAction(
     .filter((id): id is string => Boolean(id));
 
   const { data: responses } =
-    requestIds.length && filter !== "unanswered"
+    requestIds.length
       ? await supabase
           .from("store_responses")
           .select("*")
@@ -1858,7 +1840,10 @@ export async function getStoreIncomingRequestsAction(
   const imageValues = rows.map(
     (row: { request?: CustomerRequest | CustomerRequest[] | null }) => {
       const request = Array.isArray(row.request) ? row.request[0] : row.request;
-      return request?.image_storage_path || request?.image_url || null;
+      return {
+        value: request?.image_storage_path || request?.image_url || null,
+        customerId: request?.customer_id || "",
+      };
     }
   );
   const signedImages = await signRequestImageUrls(imageValues);
@@ -1867,6 +1852,25 @@ export async function getStoreIncomingRequestsAction(
     .map((row: { id: string; request?: CustomerRequest | CustomerRequest[] | null }) => {
       const request = Array.isArray(row.request) ? row.request[0] : row.request;
       if (!request) return null;
+      const target = row as typeof row & {
+        responded_at?: string | null;
+        delivery_status: string;
+        relevant?: boolean | null;
+      };
+      if (
+        filter === "unanswered" &&
+        (!isWaitingHubRequest({
+          respondedAt: target.responded_at,
+          deliveryStatus: target.delivery_status,
+          relevant: target.relevant,
+          requestStatus: request.status,
+          expiresAt: request.expires_at,
+          nowMs: Date.now(),
+        }) ||
+          responseByRequest.has(request.id))
+      ) {
+        return null;
+      }
       const imageValue = request.image_storage_path || request.image_url;
       return {
         ...storeFacingRequest(
@@ -1934,21 +1938,20 @@ export async function getStoreWaitingRequestCountAction(
     }).length;
   }
 
-  // Authorization is established above, then this server-only client performs
-  // one store-indexed HEAD count. No request rows or customer data are loaded.
+  // Authorization is established above. Count the same canonical predicate as
+  // the inbox list, including the absence of a store_responses row.
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  const { count, error } = await admin
+  const { data: targets, error } = await admin
     .from("request_targets")
-    .select("request:customer_requests!inner(id)", {
-      count: "exact",
-      head: true,
-    })
+    .select(
+      "request_id, responded_at, delivery_status, relevant, request:customer_requests!inner(status, expires_at)"
+    )
     .eq("store_id", id)
     .is("responded_at", null)
-    .eq("delivery_status", "sent")
+    .in("delivery_status", ["sent", "delivered"])
     .or("relevant.is.null,relevant.eq.true")
-    .in("request.status", ["active", "partially_answered"])
+    .in("request.status", ["active", "partially_answered", "answered"])
     .gt("request.expires_at", now.toISOString());
 
   if (error) {
@@ -1958,7 +1961,38 @@ export async function getStoreWaitingRequestCountAction(
     });
     return 0;
   }
-  return count || 0;
+  const candidateIds = (targets || []).map((target) => target.request_id);
+  if (!candidateIds.length) return 0;
+  const { data: responses, error: responseError } = await admin
+    .from("store_responses")
+    .select("request_id")
+    .eq("store_id", id)
+    .in("request_id", candidateIds);
+  if (responseError) {
+    console.error("[FINDIT] waiting response count failed", {
+      storeId: id,
+      code: responseError.code,
+    });
+    return 0;
+  }
+  const responded = new Set((responses || []).map((row) => row.request_id));
+  return (targets || []).filter((target) => {
+    const request = Array.isArray(target.request)
+      ? target.request[0]
+      : target.request;
+    return Boolean(
+      request &&
+        !responded.has(target.request_id) &&
+        isWaitingHubRequest({
+          respondedAt: target.responded_at,
+          deliveryStatus: target.delivery_status,
+          relevant: target.relevant,
+          requestStatus: request.status,
+          expiresAt: request.expires_at,
+          nowMs: now.getTime(),
+        })
+    );
+  }).length;
 }
 
 export const getUserStoresAction = cache(async (): Promise<(Store & { role: string })[]> => {
@@ -2982,19 +3016,19 @@ export async function fulfillRequestAction(input: {
   const { supabase, user } = await getSupabaseUser();
   if (!user) return { error: "Please sign in" };
 
-  const { data, error } = await supabase
+  const { error } = await supabase.rpc("fulfill_customer_request", {
+    p_request_id: input.requestId,
+    p_store_id: input.storeId || null,
+    p_found_with_findit: input.foundWithFindit ?? null,
+  });
+  if (error) return { error: "Couldn't update this request." };
+  const { data } = await supabase
     .from("customer_requests")
-    .update({
-      status: "fulfilled",
-      fulfilled_at: new Date().toISOString(),
-      fulfilled_store_id: input.storeId || null,
-      found_with_findit: input.foundWithFindit ?? null,
-    })
+    .select("*")
     .eq("id", input.requestId)
     .eq("customer_id", user.id)
-    .select("*")
     .single();
-  if (error) return { error: "Couldn't update this request." };
+  if (!data) return { error: "Couldn't load this request." };
 
   if (input.storeId) {
     const { data: members } = await supabase
@@ -3064,32 +3098,16 @@ export async function stillLookingAction(requestId: string) {
   if (!user) return { error: "Please sign in" };
   const { data: request } = await supabase
     .from("customer_requests")
-    .select("*")
+    .select("id, product_name")
     .eq("id", requestId)
     .eq("customer_id", user.id)
     .single();
   if (!request) return { error: "Request not found" };
 
-  const check = canRebroadcastStillLooking({
-    status: request.status,
-    expiresAt: request.expires_at,
-    stillLookingCount: request.still_looking_count || 0,
-    lastRebroadcastAt: request.last_rebroadcast_at || null,
+  const { error } = await supabase.rpc("rebroadcast_customer_request", {
+    p_request_id: requestId,
   });
-  if (!check.ok) return { error: check.reason };
-
-  const extended = new Date(
-    Math.max(new Date(request.expires_at).getTime(), Date.now()) + 12 * 3600_000
-  ).toISOString();
-
-  await supabase
-    .from("customer_requests")
-    .update({
-      still_looking_count: (request.still_looking_count || 0) + 1,
-      last_rebroadcast_at: new Date().toISOString(),
-      expires_at: extended,
-    })
-    .eq("id", requestId);
+  if (error) return { error: "Couldn't rebroadcast this request." };
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();

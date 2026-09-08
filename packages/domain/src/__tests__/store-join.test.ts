@@ -46,4 +46,17 @@ describe("store join application", () => {
     const parsed = storeJoinApplicationSchema.safeParse({ ...base, ein: "12-345" });
     expect(parsed.success).toBe(false);
   });
+
+  it("requires dispensaries to confirm customer ID checks", () => {
+    const parsed = storeJoinApplicationSchema.safeParse({
+      ...base,
+      businessType: "Dispensary",
+      requestCategories: ["Dispensary"],
+      requiresCustomerId: false,
+    });
+    expect(parsed.success).toBe(false);
+    expect(
+      parsed.error?.issues.some((issue) => issue.path[0] === "requiresCustomerId")
+    ).toBe(true);
+  });
 });

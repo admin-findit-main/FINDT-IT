@@ -5,7 +5,11 @@ import {
   storeCategoriesForRequestCategory,
 } from "@/lib/services/category-routing";
 import { slugify } from "@/lib/utils";
-import { defaultCategoryIdsForType, normalizePhoneToE164 } from "@findit/domain";
+import {
+  catalogTypeByStoreCategory,
+  defaultCategoryIdsForType,
+  normalizePhoneToE164,
+} from "@findit/domain";
 import { coordsFromZip } from "@/lib/services/zip-centroids";
 import type { DemandItem, Store, StoreMetrics } from "@/types/database";
 
@@ -128,19 +132,7 @@ export async function provisionStoreFromApplication(applicationId: string, revie
       latitude: zipPoint?.latitude ?? null,
       longitude: zipPoint?.longitude ?? null,
       business_type:
-        application.business_type === "Smoke Shop"
-          ? "smoke_shop"
-          : application.business_type === "Coffee Shop"
-            ? "coffee_shop"
-            : application.business_type === "Auto Parts"
-              ? "auto_parts"
-              : application.business_type === "Nail Salon"
-                ? "nail_salon"
-                : application.business_type === "Grocery"
-                  ? "grocery"
-                  : application.business_type === "Convenience"
-                    ? "convenience"
-                    : "other",
+        catalogTypeByStoreCategory(application.business_type)?.id || "other",
     })
     .select("*")
     .single();

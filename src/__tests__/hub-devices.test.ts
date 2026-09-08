@@ -25,6 +25,7 @@ import {
   hubRelinkMessage,
   parseHubRelinkReason,
 } from "@/lib/hub/relink";
+import { boundUuid } from "@findit/domain";
 
 beforeEach(() => {
   resetDemoState();
@@ -32,6 +33,12 @@ beforeEach(() => {
 });
 
 describe("hub pairing codes", () => {
+  it("uses API-valid UUIDs for every demo store", () => {
+    expect(getDemoState().stores.every((store) => boundUuid(store.id))).toBe(
+      true
+    );
+  });
+
   it("formats and normalizes 6-digit codes", () => {
     expect(normalizePairingCode("482 731")).toBe("482731");
     expect(normalizePairingCode("12")).toBeNull();

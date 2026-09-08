@@ -2,7 +2,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   Image,
@@ -24,7 +24,7 @@ import {
   AGE_RESTRICTED_ID_CONFIRM,
   AGE_RESTRICTED_ID_TITLE,
   CUSTOMER_PLANS,
-  PRODUCT_CATEGORIES,
+  classifyRequest,
   createRequestSchema,
   digitsPostalCode,
   findPlaceholderForCategory,
@@ -36,12 +36,12 @@ import {
   isMonthlyFindCapError,
   lookupUsZip,
   normalizeStateCode,
-  reverseGeocodeUs,
   planLimitReachedMessage,
-  RADIUS_OPTIONS,
+  radiusOptionsForPlan,
   REQUEST_IMAGES_BUCKET,
   shortPlaceFromProfile,
   type ShortPlace,
+  type RoutableCategoryCount,
 } from "@findit/domain";
 import { radius, shadow, spacing, typography } from "@findit/theme";
 import {
@@ -54,7 +54,13 @@ import {
 } from "@findit/theme/native";
 import { AppChrome } from "@/components/app-menu";
 import { PlaceFields } from "@/components/place-fields";
-import { createAndRouteRequest, fetchPlanUsage, updateMyPlace } from "@/lib/api";
+import {
+  createAndRouteRequest,
+  fetchPlanUsage,
+  fetchRoutableCategories,
+  reverseGeocodeFromWeb,
+  updateMyPlace,
+} from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { captureException } from "@/lib/monitoring";
 import { supabase } from "@/lib/supabase";
@@ -72,7 +78,9 @@ export default function HomeFindItScreen() {
   const { profile, refreshProfile } = useAuth();
   const router = useRouter();
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
-  const radiusChoices = RADIUS_OPTIONS;
+  const radiusChoices = radiusOptionsForPlan(
+    entitlements.maxSearchRadiusMiles
+  );
   const [step, setStep] = useState<Step>("query");
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
@@ -91,9 +99,18 @@ export default function HomeFindItScreen() {
   const [used, setUsed] = useState(0);
   const [limit, setLimit] = useState(entitlements.monthlyRequestLimit);
   const [showDetails, setShowDetails] = useState(false);
+  const [searchOptionsOpen, setSearchOptionsOpen] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<
+    RoutableCategoryCount[]
+  >([]);
+  const [categoryAvailabilityError, setCategoryAvailabilityError] =
+    useState(false);
   const [editPlace, setEditPlace] = useState(false);
   const [pendingCategory, setPendingCategory] = useState("");
   const pendingSubmit = useRef(false);
+  const submissionRef = useRef<{ fingerprint: string; key: string } | null>(
+    null
+  );
   const [locating, setLocating] = useState(false);
 
   const loadUsage = useCallback(async () => {
@@ -107,11 +124,27 @@ export default function HomeFindItScreen() {
     if (usage.remaining === 0) setStep("query");
   }, []);
 
+  const loadCategories = useCallback(async () => {
+    const categories = await fetchRoutableCategories();
+    setAvailableCategories(categories || []);
+    setCategoryAvailabilityError(categories === null);
+    if (!categories) {
+      setCategory("");
+      return;
+    }
+    setCategory((current) =>
+      current && !categories.some((item) => item.label === current)
+        ? ""
+        : current
+    );
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       loadUsage();
+      loadCategories();
       setPlace(shortPlaceFromProfile(profile));
-    }, [loadUsage, profile?.default_city, profile?.default_state, profile?.default_postal_code])
+    }, [loadCategories, loadUsage, profile])
   );
 
   const attachPhoto = () => {
@@ -156,7 +189,22 @@ export default function HomeFindItScreen() {
         setEditPlace(true);
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({});
+      const current = Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const loc = await Promise.race([
+        current,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("location-timeout")), 12_000)
+        ),
+      ]).catch(async () => {
+        const last = await Location.getLastKnownPositionAsync({
+          maxAge: 15 * 60_000,
+          requiredAccuracy: 5_000,
+        });
+        if (!last) throw new Error("location-unavailable");
+        return last;
+      });
       setCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
       const places = await Location.reverseGeocodeAsync(loc.coords);
       const p = places[0];
@@ -166,7 +214,10 @@ export default function HomeFindItScreen() {
         postalCode: digitsPostalCode(p?.postalCode || ""),
       };
       if (!isCompleteShortPlace(next)) {
-        const found = await reverseGeocodeUs(loc.coords.latitude, loc.coords.longitude);
+        const found = await reverseGeocodeFromWeb(
+          loc.coords.latitude,
+          loc.coords.longitude
+        );
         if (found) next = found;
       } else if (next.postalCode) {
         const zip = await lookupUsZip(next.postalCode);
@@ -281,6 +332,42 @@ export default function HomeFindItScreen() {
     setBusy(true);
     setError(null);
     try {
+      const classified = classifyRequest({
+        productName,
+        description,
+        category,
+        confirmed: Boolean(category),
+      });
+      const needsAvailableCategoryConfirmation =
+        !category &&
+        classified.status === "needs_confirm" &&
+        availableCategories.some(
+          (item) => item.label === classified.productCategory
+        );
+      if (needsAvailableCategoryConfirmation) {
+        setSearchOptionsOpen(true);
+        setError("Confirm the category so we send this to the right stores.");
+        return;
+      }
+      const resolvedCategory =
+        category ||
+        (classified.status === "confident"
+          ? classified.productCategory || ""
+          : "");
+      const fingerprint = JSON.stringify({
+        productName,
+        description,
+        category: resolvedCategory,
+        imageUri,
+        place,
+        radiusMiles,
+      });
+      if (submissionRef.current?.fingerprint !== fingerprint) {
+        submissionRef.current = {
+          fingerprint,
+          key: globalThis.crypto.randomUUID(),
+        };
+      }
       let nextPlace = place;
       if (!nextPlace.city.trim() && nextPlace.postalCode.trim()) {
         const found = await lookupUsZip(nextPlace.postalCode);
@@ -314,7 +401,9 @@ export default function HomeFindItScreen() {
       const parsed = createRequestSchema.safeParse({
         productName: productName.trim() || "Item in photo",
         description,
-        category,
+        category: resolvedCategory,
+        categoryConfirmed:
+          Boolean(category) || classified.status === "confident",
         city: nextPlace.city,
         state: nextPlace.state || profile?.default_state || "VA",
         postalCode: nextPlace.postalCode,
@@ -327,6 +416,7 @@ export default function HomeFindItScreen() {
         ageRestrictedConfirmed:
           !isAgeRestrictedFind({ category, productName, description }) ||
           ageOk,
+        clientRequestKey: submissionRef.current.key,
       });
       if (!parsed.success) {
         setError(parsed.error.issues[0]?.message || "Check your form");
@@ -345,6 +435,7 @@ export default function HomeFindItScreen() {
         return;
       }
       router.push(`/(app)/request/${result.request.id}`);
+      submissionRef.current = null;
       setProductName("");
       setDescription("");
       setCategory("");
@@ -519,20 +610,47 @@ export default function HomeFindItScreen() {
                 </Text>
               ) : null}
 
-              <Text style={[styles.sectionTitle, { color: theme.ink }]}>
-                Category
-              </Text>
-              <Text style={[styles.sectionSub, { color: theme.inkMuted }]}>
-                Optional — helps us ask the right stores. Tobacco & vape asks for ID first.
-              </Text>
-              <View style={styles.chips}>
-                {PRODUCT_CATEGORIES.map((item) => {
-                  const selected = category === item;
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: searchOptionsOpen }}
+                onPress={() => setSearchOptionsOpen((open) => !open)}
+                style={[
+                  styles.optionsToggle,
+                  { backgroundColor: theme.solid1, borderColor: theme.hairlineStrong },
+                ]}
+              >
+                <View style={styles.fill}>
+                  <Text style={[styles.placeValue, { color: theme.ink }]}>
+                    Search options
+                  </Text>
+                  <Text style={[styles.placeMeta, { color: theme.inkSubtle }]}>
+                    {category || "Automatic category"} · {radiusMiles} miles
+                  </Text>
+                </View>
+                <FontAwesome
+                  name={searchOptionsOpen ? "chevron-up" : "chevron-down"}
+                  size={14}
+                  color={theme.inkMuted}
+                />
+              </Pressable>
+
+              {searchOptionsOpen ? (
+                <View style={styles.optionsBody}>
+                  <Text style={[styles.sectionTitle, { color: theme.ink }]}>
+                    Category
+                  </Text>
+                  <Text style={[styles.sectionSub, { color: theme.inkMuted }]}>
+                    Only categories with stores accepting Finds are shown. Tobacco,
+                    vape, and dispensary Finds ask for ID first.
+                  </Text>
+                  <View style={styles.chips}>
+                {availableCategories.map((item) => {
+                  const selected = category === item.label;
                   return (
                     <Pressable
-                      key={item}
+                      key={item.label}
                       onPress={() => {
-                        const next = category === item ? "" : item;
+                        const next = category === item.label ? "" : item.label;
                         if (isAgeRestrictedCategory(next) && !idConfirmed) {
                           promptAgeGate(next);
                           return;
@@ -556,18 +674,26 @@ export default function HomeFindItScreen() {
                             : typography.weight.medium,
                         }}
                       >
-                        {item}
+                        {item.label} ({item.count})
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
+              {availableCategories.length === 0 ? (
+                <Text style={[styles.sectionSub, { color: theme.inkMuted }]}>
+                  {categoryAvailabilityError
+                    ? "Categories are unavailable right now. You can still type your Find."
+                    : "No pilot categories have an accepting store right now. You can still type your Find."}
+                </Text>
+              ) : null}
 
               <Text style={[styles.sectionTitle, { color: theme.ink }]}>
                 How far should we look?
               </Text>
               <Text style={[styles.sectionSub, { color: theme.inkMuted }]}>
-                We’ll look this far from your location — up to 40 miles.
+                We’ll look this far from your location — up to{" "}
+                {entitlements.maxSearchRadiusMiles} miles.
               </Text>
 
               <GlassCard padded={false} style={styles.radiusCard}>
@@ -608,6 +734,8 @@ export default function HomeFindItScreen() {
                   FINDIT+ searches up to {plus.maxRadiusMiles} miles.
                 </Text>
               ) : null}
+                </View>
+              ) : null}
 
               <Text style={[styles.sectionTitle, { color: theme.ink }]}>Near</Text>
               <GlassCard padded={false}>
@@ -631,16 +759,16 @@ export default function HomeFindItScreen() {
                     {editPlace ? "Done" : "Change"}
                   </Text>
                 </Pressable>
-                {editPlace ? (
-                  <View style={[styles.placeEdit, { borderTopColor: theme.hairlineStrong }]}>
+                <View style={[styles.placeEdit, { borderTopColor: theme.hairlineStrong }]}>
+                  {editPlace ? (
                     <PlaceFields value={place} onChange={setPlace} />
+                  ) : null}
                     <Pressable onPress={useLocation} style={styles.linkPress}>
                       <Text style={[styles.link, { color: theme.inkMuted }]}>
                         {locating ? "Finding your place…" : "Use my location"}
                       </Text>
                     </Pressable>
-                  </View>
-                ) : null}
+                </View>
               </GlassCard>
 
               <Pressable
@@ -801,6 +929,18 @@ const styles = StyleSheet.create({
     fontSize: typography.size.footnote,
     fontWeight: typography.weight.semibold,
   },
+  optionsToggle: {
+    minHeight: 64,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  optionsBody: { marginBottom: spacing.lg },
   sectionTitle: {
     fontSize: typography.size.title3,
     fontWeight: typography.weight.bold,

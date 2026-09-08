@@ -15,6 +15,7 @@ export const PRODUCT_CATEGORIES = [
   "Collectibles",
   "Hardware",
   "Tobacco & Vape",
+  "Dispensary",
   "Coffee",
   "Nails",
   "Specialty",
@@ -32,6 +33,86 @@ export function normalizeProductName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
+export function normalizeOwnedRequestImagePath(
+  value: string | null | undefined,
+  customerId: string
+): string | null {
+  if (
+    !value ||
+    !customerId ||
+    /^https?:\/\//i.test(value) ||
+    value.startsWith("data:")
+  ) {
+    return null;
+  }
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+  const path = decoded.replace(/^\/+/, "");
+  const parts = path.split("/");
+  if (
+    parts.length < 2 ||
+    parts.some((part) => !part || part === "." || part === "..") ||
+    path.includes("\\") ||
+    parts[0] !== customerId
+  ) {
+    return null;
+  }
+  return parts.join("/");
+}
+
+export function resolveOwnedRequestImageInput(input: {
+  imageUrl?: string | null;
+  imageStoragePath?: string | null;
+  customerId: string;
+}): { path: string | null } | { error: string } {
+  const supplied = [input.imageStoragePath, input.imageUrl].filter(
+    (value): value is string => Boolean(value)
+  );
+  if (!supplied.length) return { path: null };
+  const normalized = supplied.map((value) =>
+    normalizeOwnedRequestImagePath(value, input.customerId)
+  );
+  if (normalized.some((value) => !value) || new Set(normalized).size !== 1) {
+    return { error: "Please upload the photo again." };
+  }
+  return { path: normalized[0] };
+}
+
+export function inferPilotProductCategory(input: {
+  productName?: string | null;
+  description?: string | null;
+}): string | null {
+  const text = normalizeProductName(
+    `${input.productName || ""} ${input.description || ""}`
+  );
+  if (
+    /\b(dispensary|cannabis|marijuana|weed|edible|edibles|thc|preroll)\b/.test(
+      text
+    ) ||
+    /\b(gummy|gummies|flower|concentrate|dab|wax|grinder)\b/.test(text) &&
+      /\b(cannabis|marijuana|weed|thc|dispensary)\b/.test(text) ||
+    text.includes("pre-roll") ||
+    text.includes("pre roll")
+  ) {
+    return "Dispensary";
+  }
+  if (
+    /\b(vape|vapes|vaping|tobacco|cigarette|cigarettes|cigar|cigars|nicotine|hookah|shisha|zyn)\b/.test(
+      text
+    ) ||
+    ["elf bar", "geek bar", "lost mary", "juicy bar"].some((brand) =>
+      text.includes(brand)
+    )
+  ) {
+    return "Tobacco & Vape";
+  }
+  return null;
+}
+
 export function storeCategoriesForRequestCategory(
   requestCategory: string | null | undefined
 ): string[] | null {
@@ -47,6 +128,7 @@ export function storeCategoriesForRequestCategory(
     collectibles: ["Collectibles"],
     hardware: ["Hardware"],
     "tobacco & vape": ["Smoke Shop", "Convenience", "Tobacco & Vape"],
+    dispensary: ["Dispensary"],
     coffee: ["Coffee Shop"],
     nails: ["Nail Salon", "Beauty"],
     specialty: ["Specialty Retail", "Other", "Specialty"],
@@ -56,7 +138,7 @@ export function storeCategoriesForRequestCategory(
 }
 
 export const AGE_RESTRICTED_ID_REQUIRED =
-  "Confirm you are 21 or older before asking stores for tobacco or vape products.";
+  "Confirm you are 21 or older before asking stores for tobacco, vape, or cannabis products.";
 
 export function isAgeRestrictedFind(input: {
   category?: string | null;
@@ -64,7 +146,11 @@ export function isAgeRestrictedFind(input: {
   description?: string | null;
 }): boolean {
   const category = (input.category || "").trim().toLowerCase();
-  if (category === "tobacco & vape" || category === "smoke shop") return true;
+  if (
+    category === "tobacco & vape" ||
+    category === "smoke shop" ||
+    category === "dispensary"
+  ) return true;
   const text = [input.category, input.productName, input.description]
     .map((part) => (part || "").trim().toLowerCase())
     .filter(Boolean)
@@ -81,9 +167,13 @@ export function isAgeRestrictedFind(input: {
     "salt nic",
     "nicotine pouch",
     "disposable vape",
+    "cannabis flower",
+    "cannabis vape",
+    "pre-roll",
+    "pre roll",
   ];
   if (phrases.some((term) => text.includes(term))) return true;
-  return /\b(vape|vapes|vaping|tobacco|cigarette|cigarettes|cigar|cigars|nicotine|hookah|shisha|zyn)\b/i.test(
+  return /\b(vape|vapes|vaping|tobacco|cigarette|cigarettes|cigar|cigars|nicotine|hookah|shisha|zyn|dispensary|cannabis|marijuana|weed|edible|edibles)\b/i.test(
     text
   );
 }
@@ -239,6 +329,7 @@ function requestHaystack(request: {
 
 const PRODUCT_CATEGORY_TO_TYPE: Record<string, string> = {
   "tobacco & vape": "smoke_shop",
+  dispensary: "dispensary",
   grocery: "grocery",
   beauty: "beauty",
   electronics: "electronics",
@@ -350,7 +441,7 @@ export function selectEligibleStores(input: {
       allowedCategories,
       input.request.category
     );
-    if (hasCatalog && (input.request.productName || input.request.category)) {
+    if (hasCatalog && input.request.category) {
       if (!matchKind) continue;
     } else if (allowedCategories && store.categories.length > 0) {
       if (!categoriesOverlap(store.categories, allowedCategories)) continue;
@@ -404,6 +495,13 @@ export function selectEligibleStores(input: {
       routingReason: input.request.category || undefined,
     });
   }
+
+  eligible.sort((a, b) => {
+    if (a.estimatedMiles !== b.estimatedMiles) {
+      return a.estimatedMiles - b.estimatedMiles;
+    }
+    return a.storeId.localeCompare(b.storeId);
+  });
 
   return { eligible };
 }

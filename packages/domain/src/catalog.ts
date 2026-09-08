@@ -48,6 +48,74 @@ function k(
 
 export const FINDIT_CATALOG: CatalogBusinessType[] = [
   {
+    id: "dispensary",
+    name: "Dispensary",
+    productCategory: "Dispensary",
+    storeCategory: "Dispensary",
+    ageRestricted: true,
+    categories: [
+      {
+        id: "dispensary_flower",
+        name: "Flower",
+        keywords: [
+          k("cannabis_flower", "cannabis flower", "phrase"),
+          k("marijuana", "marijuana", "word"),
+          k("weed", "weed", "word"),
+        ],
+        subcategories: [],
+      },
+      {
+        id: "dispensary_edibles",
+        name: "Edibles",
+        keywords: [
+          k("cannabis_edible", "cannabis edible", "phrase"),
+          k("edibles", "edibles", "word"),
+          k("gummies", "gummies", "word", ["thc", "cannabis", "weed"]),
+        ],
+        subcategories: [],
+      },
+      {
+        id: "dispensary_concentrates",
+        name: "Concentrates",
+        keywords: [
+          k("concentrate", "concentrate", "word", ["cannabis", "thc"]),
+          k("dab", "dab", "word", ["cannabis", "thc"]),
+          k("wax", "wax", "word", ["cannabis", "thc"]),
+        ],
+        subcategories: [],
+      },
+      {
+        id: "dispensary_vapes",
+        name: "Cannabis Vapes",
+        keywords: [
+          k("cannabis_vape", "cannabis vape", "phrase"),
+          k("thc_cart", "thc cart", "phrase"),
+          k("thc_cartridge", "thc cartridge", "phrase"),
+        ],
+        subcategories: [],
+      },
+      {
+        id: "dispensary_prerolls",
+        name: "Pre-rolls",
+        keywords: [
+          k("pre_roll", "pre-roll", "phrase"),
+          k("pre_roll_plain", "pre roll", "phrase"),
+          k("preroll", "preroll", "word"),
+        ],
+        subcategories: [],
+      },
+      {
+        id: "dispensary_accessories",
+        name: "Accessories",
+        keywords: [
+          k("dispensary_grinder", "grinder", "word", ["cannabis", "weed"]),
+          k("rolling_papers", "rolling papers", "phrase"),
+        ],
+        subcategories: [],
+      },
+    ],
+  },
+  {
     id: "smoke_shop",
     name: "Smoke Shop",
     productCategory: "Tobacco & Vape",

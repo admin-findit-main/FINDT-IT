@@ -1,9 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.112.2";
 import {
   corsHeaders,
-  deriveRequestStatus,
   jsonResponse,
-  responseTimeSeconds,
 } from "../_shared/domain.ts";
 import { customerReplyPushCopy, notifyCustomerPush } from "../_shared/push.ts";
 
@@ -108,40 +106,29 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "This request has expired" }, 400, origin);
   }
 
-  const { data: existing } = await admin
-    .from("store_responses")
-    .select("id")
-    .eq("request_id", requestId)
-    .eq("store_id", storeId)
-    .maybeSingle();
-
-  const respondedAt = new Date().toISOString();
-  const payload = {
-    request_id: requestId,
-    store_id: storeId,
-    responded_by: user.id,
-    response_type: responseType,
-    price: body.price != null ? Number(body.price) : null,
-    quantity: body.quantity != null ? Number(body.quantity) : null,
-    note: body.note ? String(body.note) : null,
-    hold_minutes: body.holdMinutes != null ? Number(body.holdMinutes) : null,
-    estimated_availability_label: body.estimatedAvailabilityLabel
-      ? String(body.estimatedAvailabilityLabel)
-      : null,
-    availability_amount: body.availabilityAmount ?? null,
-    track_demand: Boolean(body.trackDemand),
-    updated_at: respondedAt,
-  };
-
   const { data, error } = await admin
-    .from("store_responses")
-    .upsert(existing?.id ? { ...payload, id: existing.id } : payload, {
-      onConflict: "request_id,store_id",
-    })
-    .select("*")
-    .single();
+    .rpc("respond_to_store_request", {
+      p_request_id: requestId,
+      p_store_id: storeId,
+      p_response_type: responseType,
+      p_employee_user_id: user.id,
+      p_shift_employee_id: null,
+      p_hub_device_id: null,
+      p_price: body.price != null ? Number(body.price) : null,
+      p_quantity: body.quantity != null ? Number(body.quantity) : null,
+      p_note: body.note ? String(body.note) : null,
+      p_hold_minutes:
+        body.holdMinutes != null ? Number(body.holdMinutes) : null,
+      p_estimated_available_at: null,
+      p_estimated_availability_label: body.estimatedAvailabilityLabel
+        ? String(body.estimatedAvailabilityLabel)
+        : null,
+      p_availability_amount: body.availabilityAmount ?? null,
+      p_track_demand: Boolean(body.trackDemand),
+    });
+  const rpcRow = Array.isArray(data) ? data[0] : data;
 
-  if (error || !data) {
+  if (error || !rpcRow) {
     return jsonResponse(
       { error: "Couldn't save your response. Please try again." },
       500,
@@ -149,32 +136,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  const secs = responseTimeSeconds(
-    target.route_sent_at || target.created_at,
-    respondedAt
-  );
-  await admin
-    .from("request_targets")
-    .update({
-      responded_at: respondedAt,
-      response_time_seconds: secs,
-      opened_at: target.opened_at || respondedAt,
-      viewed_at: target.viewed_at || respondedAt,
-    })
-    .eq("id", target.id);
-
-  const { count } = await admin
-    .from("store_responses")
-    .select("*", { count: "exact", head: true })
-    .eq("request_id", requestId);
-
-  const status = deriveRequestStatus({
-    responseCount: count || 0,
-    targetCount: requestRow.stores_targeted || 0,
-  });
-  await admin.from("customer_requests").update({ status }).eq("id", requestId);
-
-  if (responseType === "in_stock" || responseType === "can_order") {
+  if (rpcRow.notify_customer) {
     const { data: store } = await admin
       .from("stores")
       .select("name")
@@ -240,20 +202,30 @@ Deno.serve(async (req) => {
     }
   }
 
-  const analyticsTask = admin.from("analytics_events").insert({
-    event_name: "store_response_created",
-    user_id: user.id,
-    store_id: storeId,
-    request_id: requestId,
-    metadata: { responseType, responseTimeSeconds: secs },
-  });
-  const runtime = (
-    globalThis as {
-      EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void };
-    }
-  ).EdgeRuntime;
-  if (runtime?.waitUntil) runtime.waitUntil(analyticsTask);
-  else await analyticsTask;
+  if (rpcRow.created_new) {
+    const analyticsTask = admin.from("analytics_events").insert({
+      event_name: "store_response_created",
+      user_id: user.id,
+      store_id: storeId,
+      request_id: requestId,
+      metadata: { responseType },
+    });
+    const runtime = (
+      globalThis as {
+        EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void };
+      }
+    ).EdgeRuntime;
+    if (runtime?.waitUntil) runtime.waitUntil(analyticsTask);
+    else await analyticsTask;
+  }
 
-  return jsonResponse({ response: data }, 200, origin);
+  const response: Record<string, unknown> = {
+    ...rpcRow,
+    id: rpcRow.response_id,
+  };
+  delete response.response_id;
+  delete response.created_new;
+  delete response.notify_customer;
+  delete response.final_request_status;
+  return jsonResponse({ response }, 200, origin);
 });

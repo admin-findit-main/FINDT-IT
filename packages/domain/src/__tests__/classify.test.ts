@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { classifyRequest, matchKindForStore } from "../classify";
 
 describe("classifyRequest", () => {
+  it("classifies dispensary products independently from smoke shops", () => {
+    const result = classifyRequest({ productName: "THC cart" });
+    expect(result.businessTypeId).toBe("dispensary");
+    expect(result.productCategory).toBe("Dispensary");
+    expect(result.status).toBe("confident");
+  });
   it("routes Geek Bar to smoke shop vapes with high confidence", () => {
     const result = classifyRequest({ productName: "Need Geek Bar Miami Mint" });
     expect(result.status).toBe("confident");

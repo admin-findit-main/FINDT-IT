@@ -39,6 +39,15 @@ describe("age-restricted Finds", () => {
     expect(isAgeRestrictedFind({ productName: "orange juice" })).toBe(false);
   });
 
+  it("gates dispensary and cannabis Finds", () => {
+    expect(isAgeRestrictedFind({ category: "Dispensary" })).toBe(true);
+    expect(isAgeRestrictedFind({ productName: "cannabis flower" })).toBe(true);
+    expect(isAgeRestrictedFind({ productName: "THC pre-roll" })).toBe(true);
+    expect(
+      storeCategoriesForRequestCategory("Dispensary")
+    ).toEqual(["Dispensary"]);
+  });
+
   it("asks smoke shops whether they check ID", () => {
     expect(
       storeSelectionSuggestsCustomerId({ businessType: "Smoke Shop" })

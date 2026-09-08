@@ -55,6 +55,9 @@ describe("Edge domain constants stay aligned with @findit/domain", () => {
     expect(edge).toContain("estimateRoutingDistanceMiles");
     expect(edge).toContain("UNKNOWN_ZIP_DISTANCE_MILES");
     expect(edge).toContain('"Tobacco & Vape"');
+    expect(edge).toContain('"Dispensary"');
+    expect(edge).toContain('dispensary: "dispensary"');
+    expect(edge).toContain("a.estimatedMiles - b.estimatedMiles");
     expect(edge).toContain('isAgeRestrictedFind');
   });
 

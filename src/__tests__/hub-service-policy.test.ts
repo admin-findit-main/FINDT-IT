@@ -32,9 +32,15 @@ describe("Hub service privacy policy", () => {
     };
 
     expect(isWaitingHubRequest(base)).toBe(true);
+    expect(
+      isWaitingHubRequest({ ...base, deliveryStatus: "delivered" })
+    ).toBe(true);
+    expect(
+      isWaitingHubRequest({ ...base, requestStatus: "answered" })
+    ).toBe(true);
     expect(isWaitingHubRequest({ ...base, respondedAt: base.expiresAt })).toBe(false);
     expect(isWaitingHubRequest({ ...base, relevant: false })).toBe(false);
-    expect(isWaitingHubRequest({ ...base, requestStatus: "answered" })).toBe(false);
+    expect(isWaitingHubRequest({ ...base, deliveryStatus: "pending" })).toBe(false);
     expect(
       isWaitingHubRequest({
         ...base,

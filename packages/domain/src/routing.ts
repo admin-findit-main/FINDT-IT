@@ -206,6 +206,7 @@ export function formatEstimatedDistanceMiles(miles: number): string {
 }
 
 export type DistanceSortableResponse = {
+  id?: string;
   response_type: string;
   store?: {
     postal_code?: string | null;
@@ -247,10 +248,11 @@ export function sortCustomerResponsesByDistance<T extends DistanceSortableRespon
       storeLongitude: b.store?.longitude,
     });
     if (da !== db) return da - db;
-    return (
+    const responseRank =
       (RESPONSE_TYPE_SORT_ORDER[a.response_type] ?? 9) -
-      (RESPONSE_TYPE_SORT_ORDER[b.response_type] ?? 9)
-    );
+      (RESPONSE_TYPE_SORT_ORDER[b.response_type] ?? 9);
+    if (responseRank !== 0) return responseRank;
+    return (a.id || "").localeCompare(b.id || "");
   });
 }
 
@@ -298,13 +300,6 @@ export function selectEligibleStores(input: {
   );
   const eligible: RoutingDecision[] = [];
   const excluded: RoutingExclusion[] = [];
-  const MATCH_RANK: Record<MatchKind, number> = {
-    keyword: 0,
-    subcategory: 1,
-    category: 2,
-    business_type: 3,
-  };
-
   for (const store of input.stores) {
     if (already.has(store.id)) {
       excluded.push({ storeId: store.id, reason: "already_targeted" });
@@ -400,10 +395,10 @@ export function selectEligibleStores(input: {
   }
 
   eligible.sort((a, b) => {
-    const ra = MATCH_RANK[a.matchKind || "business_type"];
-    const rb = MATCH_RANK[b.matchKind || "business_type"];
-    if (ra !== rb) return ra - rb;
-    return a.estimatedMiles - b.estimatedMiles;
+    if (a.estimatedMiles !== b.estimatedMiles) {
+      return a.estimatedMiles - b.estimatedMiles;
+    }
+    return a.storeId.localeCompare(b.storeId);
   });
 
   return { eligible, excluded };

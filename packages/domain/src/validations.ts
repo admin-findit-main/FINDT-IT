@@ -11,6 +11,7 @@ import { normalizeEin } from "./business";
 import { passwordRejectReason } from "./password";
 import { sanitizeMultiline, sanitizeText } from "./sanitize";
 import { MAX_CUSTOMER_RADIUS_MILES } from "./routing";
+import { storeSelectionSuggestsCustomerId } from "./age-restricted";
 
 const nameField = (max: number, message: string) =>
   z
@@ -110,6 +111,22 @@ export const storeOnboardingSchema = z.object({
   serviceZips: z.array(z.string().regex(/^\d{5}(-\d{4})?$/)).min(1),
   requestCategories: z.array(z.string()).min(1),
   ageRestricted: z.boolean().default(false),
+}).superRefine((value, ctx) => {
+  if (
+    storeSelectionSuggestsCustomerId({
+      businessType: value.categories.find((category) =>
+        category === "Smoke Shop" || category === "Dispensary"
+      ),
+      requestCategories: value.requestCategories,
+    }) &&
+    !value.ageRestricted
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["ageRestricted"],
+      message: "Age-restricted stores must confirm customer ID checks.",
+    });
+  }
 });
 
 export const storeJoinApplicationSchema = z.object({
@@ -152,6 +169,20 @@ export const storeJoinApplicationSchema = z.object({
   confirmedLegitimate: z.boolean().refine((v) => v === true, {
     message: "Confirm you are a legitimate business",
   }),
+}).superRefine((value, ctx) => {
+  if (
+    storeSelectionSuggestsCustomerId({
+      businessType: value.businessType,
+      requestCategories: value.requestCategories,
+    }) &&
+    !value.requiresCustomerId
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["requiresCustomerId"],
+      message: "Age-restricted stores must confirm customer ID checks.",
+    });
+  }
 });
 
 export const inviteEmployeeSchema = z.object({

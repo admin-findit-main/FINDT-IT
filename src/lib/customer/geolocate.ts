@@ -1,6 +1,6 @@
 "use client";
 
-import { reverseGeocodeUs, type ShortPlace } from "@findit/domain";
+import { type ShortPlace } from "@findit/domain";
 
 export type GeolocateOk = {
   ok: true;
@@ -11,12 +11,17 @@ export type GeolocateOk = {
 export type GeolocateFail = { ok: false; error: string };
 
 const POSITION_OPTIONS: PositionOptions = {
-  enableHighAccuracy: true,
-  timeout: 20_000,
-  maximumAge: 60_000,
+  enableHighAccuracy: false,
+  timeout: 12_000,
+  maximumAge: 5 * 60_000,
 };
 
 const GEOCODE_BUDGET_MS = 8_000;
+const LAST_KNOWN_OPTIONS: PositionOptions = {
+  enableHighAccuracy: false,
+  timeout: 3_000,
+  maximumAge: Infinity,
+};
 
 export function geolocationErrorMessage(err: unknown): string {
   const code =
@@ -35,19 +40,29 @@ export function geolocationErrorMessage(err: unknown): string {
   return "Couldn’t get location. Type your city instead.";
 }
 
-function readPosition(): Promise<GeolocationPosition> {
+function readPosition(
+  options: PositionOptions = POSITION_OPTIONS
+): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, POSITION_OPTIONS);
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
   });
 }
 
-async function reverseGeocodeWithBudget(
+export async function reverseGeocodeWithBudget(
   lat: number,
   lng: number
 ): Promise<ShortPlace | null> {
   try {
     return await Promise.race([
-      reverseGeocodeUs(lat, lng),
+      fetch("/api/location/reverse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ latitude: lat, longitude: lng }),
+      }).then(async (response) => {
+        if (!response.ok) return null;
+        const body = (await response.json()) as { place?: ShortPlace };
+        return body.place || null;
+      }),
       new Promise<null>((resolve) => {
         window.setTimeout(() => resolve(null), GEOCODE_BUDGET_MS);
       }),
@@ -66,7 +81,17 @@ export async function geolocateUsPlace(): Promise<GeolocateOk | GeolocateFail> {
   }
 
   try {
-    const pos = await readPosition();
+    let pos: GeolocationPosition;
+    try {
+      pos = await readPosition();
+    } catch (error) {
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? Number((error as { code: number }).code)
+          : NaN;
+      if (code === 1) throw error;
+      pos = await readPosition(LAST_KNOWN_OPTIONS);
+    }
     const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
     const place = await reverseGeocodeWithBudget(coords.lat, coords.lng);
     return {

@@ -6,24 +6,28 @@ export const AGE_RESTRICTED_PRODUCT_CATEGORY = "Tobacco & Vape" satisfies
 export const AGE_RESTRICTED_STORE_CATEGORY = "Smoke Shop" satisfies
   (typeof STORE_CATEGORIES)[number];
 
+export const DISPENSARY_PRODUCT_CATEGORY = "Dispensary" satisfies
+  (typeof PRODUCT_CATEGORIES)[number];
+
 /** US tobacco / nicotine purchase age. Stores still check ID in person. */
 export const AGE_RESTRICTED_MINIMUM_AGE = 21;
 
 export const AGE_RESTRICTED_ID_TITLE = "This product needs an ID";
 
 export const AGE_RESTRICTED_ID_BODY =
-  "Tobacco and vape Finds are for people 21 or older. Nearby stores will check a government ID when you pick it up. FINDIT never collects a photo of your ID.";
+  "Tobacco, vape, and dispensary/cannabis Finds are for people 21 or older. Nearby stores will check a government ID when you pick it up. FINDIT never collects a photo of your ID.";
 
 export const AGE_RESTRICTED_ID_CONFIRM =
   "I’m 21 or older and will show ID at the store";
 
 export const AGE_RESTRICTED_ID_REQUIRED =
-  "Confirm you are 21 or older before asking stores for tobacco or vape products.";
+  "Confirm you are 21 or older before asking stores for tobacco, vape, or cannabis products.";
 
 export const AGE_RESTRICTED_FIND_HINT =
-  "Name the brand, flavor, nicotine, and size. Stores cannot guess — example: Elf Bar BC5000 Blue Razz Ice 5%.";
+  "Include the brand, product type, strength, and size. Example: Elf Bar BC5000 Blue Razz Ice 5%, or a named cannabis product and package size.";
 
 export const AGE_RESTRICTED_FIND_PLACEHOLDER = "Elf Bar BC5000 Blue Razz Ice 5%";
+export const DISPENSARY_FIND_PLACEHOLDER = "Blue Dream flower 3.5g";
 
 const PHRASE_TERMS = [
   "tobacco & vape",
@@ -39,6 +43,10 @@ const PHRASE_TERMS = [
   "salt nic",
   "nicotine pouch",
   "disposable vape",
+  "cannabis flower",
+  "cannabis vape",
+  "pre-roll",
+  "pre roll",
 ] as const;
 
 const WORD_TERMS = [
@@ -55,6 +63,12 @@ const WORD_TERMS = [
   "hookah",
   "shisha",
   "zyn",
+  "dispensary",
+  "cannabis",
+  "marijuana",
+  "weed",
+  "edible",
+  "edibles",
 ] as const;
 
 function haystack(parts: Array<string | null | undefined>): string {
@@ -70,7 +84,8 @@ export function isAgeRestrictedCategory(
   const value = (category || "").trim().toLowerCase();
   return (
     value === AGE_RESTRICTED_PRODUCT_CATEGORY.toLowerCase() ||
-    value === AGE_RESTRICTED_STORE_CATEGORY.toLowerCase()
+    value === AGE_RESTRICTED_STORE_CATEGORY.toLowerCase() ||
+    value === DISPENSARY_PRODUCT_CATEGORY.toLowerCase()
   );
 }
 
@@ -90,6 +105,9 @@ export function isAgeRestrictedFind(input: {
 export function findPlaceholderForCategory(
   category: string | null | undefined
 ): string {
+  if ((category || "").trim().toLowerCase() === "dispensary") {
+    return DISPENSARY_FIND_PLACEHOLDER;
+  }
   return isAgeRestrictedCategory(category)
     ? AGE_RESTRICTED_FIND_PLACEHOLDER
     : "Cherry Coke Zero 12-pack";

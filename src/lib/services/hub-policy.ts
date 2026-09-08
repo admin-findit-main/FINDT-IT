@@ -14,10 +14,12 @@ export function isWaitingHubRequest(input: {
 }): boolean {
   return (
     !input.respondedAt &&
-    input.deliveryStatus === "sent" &&
+    (input.deliveryStatus === "sent" ||
+      input.deliveryStatus === "delivered") &&
     input.relevant !== false &&
     (input.requestStatus === "active" ||
-      input.requestStatus === "partially_answered") &&
+      input.requestStatus === "partially_answered" ||
+      input.requestStatus === "answered") &&
     new Date(input.expiresAt).getTime() > input.nowMs
   );
 }

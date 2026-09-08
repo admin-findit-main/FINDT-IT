@@ -243,7 +243,7 @@ function seedState(): DemoState {
   ];
 
   const stores: Store[] = storeDefs.map((s, i) => ({
-    id: `store-0000-0000-0000-00000000000${i + 1}`,
+    id: `50000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
     owner_id: ownerId,
     name: s.name,
     slug: s.slug,

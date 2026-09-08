@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Delete, UserRoundSearch } from "lucide-react";
 import { formatUsNationalInput } from "@findit/domain";
 import {
@@ -31,6 +31,43 @@ type Stage =
 
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 const PRIVATE_STATE_TIMEOUT_MS = 45_000;
+
+function KeypadKey({
+  children,
+  label,
+  disabled,
+  onPress,
+  tone = "number",
+  className = "",
+}: {
+  children: ReactNode;
+  label?: string;
+  disabled?: boolean;
+  onPress: () => void;
+  tone?: "number" | "utility" | "primary";
+  className?: string;
+}) {
+  const toneClasses = {
+    number:
+      "border-white/10 bg-[#2A2528] text-white hover:bg-[#363034] active:border-white/25 active:bg-[#1D1A1C]",
+    utility:
+      "border-white/10 bg-[#211D1F] text-white/75 hover:bg-[#302A2D] hover:text-white active:bg-[#171315]",
+    primary:
+      "border-[#A92B3B] bg-[#A92B3B] text-white hover:bg-[#912332] active:border-[#741824] active:bg-[#741824]",
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onPress}
+      className={`grid min-h-11 place-items-center border text-xl font-bold tabular-nums transition-[background-color,border-color,color,transform] duration-100 focus-visible:z-10 focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#F2A1AB] active:translate-y-px disabled:pointer-events-none disabled:border-white/5 disabled:bg-[#262123] disabled:text-white/25 sm:min-h-12 md:min-h-14 md:text-2xl ${toneClasses[tone]} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export function HubCustomerWorkspace({
   onPurchaseConfirmed,
@@ -291,92 +328,96 @@ export function HubCustomerWorkspace({
       customer.rewardsEnabled ? customer.pointsPerDollar : 0
     );
     return (
-      <section className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden px-4 py-3 sm:px-6 md:px-8 md:py-5">
-        <div className="flex shrink-0 items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#7A1D28]">
-              Purchase amount
-            </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#171315] md:text-3xl">
-              Enter the total
-            </h1>
+      <section className="mx-auto grid h-full w-full max-w-6xl grid-rows-[minmax(0,1fr)] overflow-hidden p-3 sm:grid-cols-[minmax(0,1fr)_20rem] sm:gap-4 sm:p-4 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-6 md:p-6">
+        <div className="flex min-h-0 flex-col justify-center border-b border-[#DED9DB] px-2 pb-3 sm:border-b-0 sm:border-r sm:px-3 sm:pb-0 sm:pr-6 md:pr-10">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8E1F2D] md:text-sm">
+                Purchase amount
+              </p>
+              <h1 className="mt-1 text-xl font-bold tracking-tight text-[#171315] md:text-3xl">
+                Enter the total
+              </h1>
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setStage("found")}
+              className="min-h-11 shrink-0 px-3 text-sm font-semibold text-[#5F585B] transition-colors hover:text-[#171315] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#8E1F2D] disabled:opacity-35"
+            >
+              ← Back
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setStage("found")}
-            className="min-h-11 rounded-xl px-4 text-sm font-semibold text-[#6D6669]"
-          >
-            Back
-          </button>
-        </div>
-
-        <div className="mt-3 grid min-h-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_18rem] sm:items-center sm:gap-4 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-6">
-          <div className="rounded-2xl border border-[#DED9DB] bg-white p-4 text-center md:p-7">
+          <div className="mt-3 border-l-4 border-[#8E1F2D] bg-white px-4 py-3 md:mt-6 md:px-6 md:py-5">
             <p className="truncate text-sm font-semibold text-[#6D6669]">
               {customer.displayName}
             </p>
             <p
               aria-label="Purchase amount"
               aria-live="polite"
-              className="mt-2 text-4xl font-bold tabular-nums tracking-tight text-[#171315] md:text-6xl"
+              className="mt-1 truncate text-4xl font-black tabular-nums tracking-[-0.04em] text-[#171315] md:mt-2 md:text-6xl"
             >
               {formatHubAmount(amountCents)}
             </p>
-            <p className="mt-2 text-sm font-semibold text-[#8E1F2D] md:text-base">
-              Estimated {estimatedPoints} point
-              {estimatedPoints === 1 ? "" : "s"}
-            </p>
-            <p className="mt-1 text-xs text-[#81797C]">
-              Final points are calculated when the purchase is confirmed.
-            </p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-2 text-sm md:mt-3 md:text-base">
+              <span className="font-bold text-[#8E1F2D]">
+                {estimatedPoints} estimated point
+                {estimatedPoints === 1 ? "" : "s"}
+              </span>
+              <span className="text-xs text-[#81797C]">
+                Calculated at confirmation
+              </span>
+            </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-3 gap-2 md:gap-3">
+        <div className="flex min-h-0 flex-col justify-center bg-[#171315] p-2 sm:p-3 md:p-4">
+          <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45">
+            Amount keypad · cents enter automatically
+          </p>
+          <div className="grid grid-cols-3 gap-1.5 md:gap-2">
             {DIGITS.map((digit) => (
-              <button
+              <KeypadKey
                 key={digit}
-                type="button"
-                disabled={busy}
-                onClick={() => addAmountDigit(digit)}
-                className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-xl font-semibold text-[#171315] active:bg-[#EEE9EB] md:min-h-14 md:text-2xl"
+                disabled={busy || amountCents === MAX_HUB_AMOUNT_CENTS}
+                onPress={() => addAmountDigit(digit)}
               >
                 {digit}
-              </button>
+              </KeypadKey>
             ))}
-            <button
-              type="button"
+            <KeypadKey
               disabled={busy || amountCents === 0}
-              onClick={() => setAmountCents(0)}
-              className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-sm font-semibold text-[#413B3E] disabled:opacity-35 md:min-h-14"
+              onPress={() => setAmountCents(0)}
+              tone="utility"
+              className="text-xs md:text-sm"
             >
-              Clear
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => addAmountDigit("0")}
-              className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-xl font-semibold text-[#171315] md:min-h-14 md:text-2xl"
+              CLEAR
+            </KeypadKey>
+            <KeypadKey
+              disabled={busy || amountCents === MAX_HUB_AMOUNT_CENTS}
+              onPress={() => addAmountDigit("0")}
             >
               0
-            </button>
-            <button
-              type="button"
+            </KeypadKey>
+            <KeypadKey
+              label="Delete last amount digit"
               disabled={busy || amountCents === 0}
-              aria-label="Delete last amount digit"
-              onClick={() => setAmountCents((value) => Math.floor(value / 10))}
-              className="grid min-h-11 place-items-center rounded-xl border border-[#D8D1D4] bg-white text-[#413B3E] disabled:opacity-35 md:min-h-14"
+              onPress={() =>
+                setAmountCents((value) => Math.floor(value / 10))
+              }
+              tone="utility"
             >
               <Delete className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              disabled={amountCents === 0}
-              onClick={() => setStage("confirm")}
-              className="col-span-3 min-h-11 rounded-xl bg-[#8E1F2D] px-5 text-sm font-bold text-white disabled:bg-[#C7BFC2] md:min-h-14"
-            >
-              REVIEW PURCHASE
-            </button>
+            </KeypadKey>
           </div>
+          <KeypadKey
+            disabled={busy || amountCents === 0}
+            onPress={() => setStage("confirm")}
+            tone="primary"
+            className="mt-2 px-4 text-sm tracking-[0.04em] md:text-base"
+          >
+            REVIEW PURCHASE
+          </KeypadKey>
         </div>
       </section>
     );
@@ -477,88 +518,104 @@ export function HubCustomerWorkspace({
   }
 
   return (
-    <section className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center overflow-hidden px-4 py-3 sm:px-6 md:py-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#7A1D28]">
-            Find Customer
-          </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#171315] md:text-3xl">
-            Enter customer&apos;s phone number
-          </h1>
-        </div>
-        <div className="flex shrink-0 gap-1">
+    <section className="mx-auto grid h-full w-full max-w-5xl grid-rows-[minmax(0,1fr)] overflow-hidden p-3 sm:grid-cols-[minmax(0,1fr)_20rem] sm:gap-4 sm:p-4 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-6 md:p-6">
+      <div className="flex min-h-0 flex-col justify-center border-b border-[#DED9DB] px-2 pb-3 sm:border-b-0 sm:border-r sm:px-3 sm:pb-0 sm:pr-6 md:pr-10">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8E1F2D] md:text-sm">
+              Find customer
+            </p>
+            <h1 className="mt-1 text-xl font-bold tracking-tight text-[#171315] md:text-3xl">
+              Phone lookup
+            </h1>
+          </div>
           <button
             type="button"
-            disabled={busy || digits.length === 0}
-            onClick={() => {
-              setDigits("");
-              setError(null);
-            }}
-            className="min-h-12 rounded-xl px-3 text-sm font-semibold text-[#6D6669] disabled:opacity-35"
-          >
-            Clear
-          </button>
-          <button
-            type="button"
+            disabled={busy}
             onClick={reset}
-            className="min-h-12 rounded-xl px-3 text-sm font-semibold text-[#6D6669]"
+            className="min-h-11 shrink-0 px-3 text-sm font-semibold text-[#5F585B] transition-colors hover:text-[#171315] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#8E1F2D] disabled:opacity-35"
           >
             Cancel
           </button>
         </div>
-      </div>
 
-      <div
-        aria-label="Customer phone number"
-        className="mt-3 flex min-h-14 items-center justify-center rounded-2xl border border-[#CEC7CA] bg-white px-6 text-center text-2xl font-semibold tracking-[0.08em] text-[#171315] md:min-h-16 md:text-3xl"
-      >
-        {digits ? formatUsNationalInput(digits) : "(___) ___-____"}
-      </div>
-
-      {error ? (
-        <p className="mt-4 rounded-xl bg-[#FFF0F1] px-4 py-3 text-sm text-[#8E1F2D]">
-          {error}
-        </p>
-      ) : null}
-
-      <div className="mt-3 grid grid-cols-3 gap-2 md:gap-3">
-        {DIGITS.map((digit) => (
-          <button
-            key={digit}
-            type="button"
-            disabled={busy}
-            onClick={() => addDigit(digit)}
-            className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-xl font-semibold text-[#171315] active:bg-[#EEE9EB] md:min-h-12 md:text-2xl"
+        <div className="mt-3 border-l-4 border-[#8E1F2D] bg-white px-4 py-3 md:mt-6 md:px-6 md:py-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#81797C]">
+            Customer phone number
+          </p>
+          <div
+            aria-label="Customer phone number"
+            aria-live="polite"
+            className="mt-1 truncate text-3xl font-black tabular-nums tracking-[0.04em] text-[#171315] md:mt-2 md:text-5xl"
           >
-            {digit}
-          </button>
-        ))}
-        <button
-          type="button"
-          disabled={busy || digits.length === 0}
-          aria-label="Delete last digit"
-          onClick={() => setDigits((value) => value.slice(0, -1))}
-          className="grid min-h-11 place-items-center rounded-xl border border-[#D8D1D4] bg-white text-[#413B3E] disabled:opacity-35 md:min-h-12"
-        >
-          <Delete className="h-6 w-6" />
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => addDigit("0")}
-          className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-xl font-semibold text-[#171315] md:min-h-12 md:text-2xl"
-        >
-          0
-        </button>
-        <button
-          type="button"
-          disabled={busy || digits.length !== 10}
-          onClick={() => void search()}
-          className="min-h-11 rounded-xl bg-[#8E1F2D] px-3 text-sm font-bold text-white disabled:bg-[#C7BFC2] md:min-h-12"
-        >
-          {busy ? "SEARCHING…" : "SEARCH"}
-        </button>
+            {digits ? formatUsNationalInput(digits) : "(•••) •••-••••"}
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-xs font-medium text-[#81797C]">
+              {digits.length} of 10 digits
+            </p>
+            <button
+              type="button"
+              disabled={busy || digits.length === 0}
+              onClick={() => {
+                setDigits("");
+                setError(null);
+              }}
+              className="min-h-11 px-2 text-xs font-bold tracking-[0.04em] text-[#6D6669] transition-colors hover:text-[#8E1F2D] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#8E1F2D] disabled:opacity-30"
+            >
+              CLEAR NUMBER
+            </button>
+          </div>
+        </div>
+
+        {error ? (
+          <p
+            role="alert"
+            className="mt-3 border-l-4 border-[#B42332] bg-[#FFF0F1] px-3 py-2 text-sm font-medium text-[#8E1F2D]"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex min-h-0 flex-col justify-center bg-[#171315] p-2 sm:p-3 md:p-4">
+        <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45">
+          Customer keypad
+        </p>
+        <div className="grid grid-cols-3 gap-1.5 md:gap-2">
+          {DIGITS.map((digit) => (
+            <KeypadKey
+              key={digit}
+              disabled={busy || digits.length === 10}
+              onPress={() => addDigit(digit)}
+            >
+              {digit}
+            </KeypadKey>
+          ))}
+          <KeypadKey
+            label="Delete last digit"
+            disabled={busy || digits.length === 0}
+            onPress={() => setDigits((value) => value.slice(0, -1))}
+            tone="utility"
+          >
+            <Delete className="h-5 w-5 md:h-6 md:w-6" />
+          </KeypadKey>
+          <KeypadKey
+            disabled={busy || digits.length === 10}
+            onPress={() => addDigit("0")}
+          >
+            0
+          </KeypadKey>
+          <KeypadKey
+            label="Search for customer"
+            disabled={busy || digits.length !== 10}
+            onPress={() => void search()}
+            tone="primary"
+            className="px-2 text-xs tracking-[0.04em] md:text-sm"
+          >
+            {busy ? "WAIT…" : "SEARCH"}
+          </KeypadKey>
+        </div>
       </div>
     </section>
   );

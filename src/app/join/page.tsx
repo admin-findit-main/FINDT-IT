@@ -114,9 +114,11 @@ export default function JoinAsStorePage() {
 
   function setType(next: string) {
     setBusinessType(next);
-    if (next === "Smoke Shop") {
+    if (next === "Smoke Shop" || next === "Dispensary") {
+      const requestCategory =
+        next === "Dispensary" ? "Dispensary" : "Tobacco & Vape";
       setRequestCategories((prev) =>
-        prev.includes("Tobacco & Vape") ? prev : [...prev, "Tobacco & Vape"]
+        prev.includes(requestCategory) ? prev : [...prev, requestCategory]
       );
       if (requiresCustomerId == null) setRequiresCustomerId(true);
     }
@@ -136,7 +138,11 @@ export default function JoinAsStorePage() {
   function toggleCategory(c: string) {
     setRequestCategories((prev) => {
       const next = prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c];
-      if (c === "Tobacco & Vape" && !prev.includes(c) && requiresCustomerId == null) {
+      if (
+        (c === "Tobacco & Vape" || c === "Dispensary") &&
+        !prev.includes(c) &&
+        requiresCustomerId == null
+      ) {
         setRequiresCustomerId(true);
       }
       return next;
@@ -682,7 +688,8 @@ export default function JoinAsStorePage() {
                     requestCategories,
                   }) ? (
                     <p className="mt-1 text-xs font-medium text-ink">
-                      Smoke shops and Tobacco & Vape requests almost always need this.
+                      Smoke shops, dispensaries, tobacco, vape, and cannabis requests
+                      almost always need this.
                     </p>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-2">

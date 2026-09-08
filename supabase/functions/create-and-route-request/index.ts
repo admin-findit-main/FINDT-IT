@@ -5,6 +5,7 @@ import {
   isStoreOpenAt,
   jsonResponse,
   normalizeProductName,
+  inferPilotProductCategory,
   PRODUCT_CATEGORIES,
   isAgeRestrictedFind,
   AGE_RESTRICTED_ID_REQUIRED,
@@ -14,6 +15,7 @@ import {
   FREE_MONTHLY_REQUEST_LIMIT,
   PLUS_MONTHLY_REQUEST_LIMIT,
   MAX_CUSTOMER_RADIUS_MILES,
+  resolveOwnedRequestImageInput,
 } from "../_shared/domain.ts";
 import { sendExpoPush, deliverStorePush } from "../_shared/push.ts";
 
@@ -71,6 +73,9 @@ Deno.serve(async (req) => {
   const imageStoragePath = body.imageStoragePath
     ? String(body.imageStoragePath)
     : null;
+  const clientRequestKey = body.clientRequestKey
+    ? String(body.clientRequestKey)
+    : null;
   const latitude =
     body.latitude != null && body.latitude !== ""
       ? Number(body.latitude)
@@ -109,13 +114,29 @@ Deno.serve(async (req) => {
       origin
     );
   }
-  if (imageUrl && imageUrl.startsWith("data:")) {
+  if (
+    clientRequestKey &&
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      clientRequestKey
+    )
+  ) {
+    return jsonResponse({ error: "Invalid request key." }, 400, origin);
+  }
+  const ownedImage = resolveOwnedRequestImageInput({
+    imageUrl,
+    imageStoragePath,
+    customerId: user.id,
+  });
+  if ("error" in ownedImage) {
     return jsonResponse(
-      { error: "Please upload the photo again (image storage required)." },
+      { error: ownedImage.error },
       400,
       origin
     );
   }
+  const ownedImagePath = ownedImage.path;
+  const resolvedCategory =
+    categoryRaw || inferPilotProductCategory({ productName, description }) || "";
 
   const { data: profile } = await admin
     .from("profiles")
@@ -125,6 +146,26 @@ Deno.serve(async (req) => {
 
   if (!profile || profile.is_suspended) {
     return jsonResponse({ error: "Account unavailable" }, 403, origin);
+  }
+
+  if (clientRequestKey) {
+    const { data: existing } = await admin
+      .from("customer_requests")
+      .select("*")
+      .eq("customer_id", user.id)
+      .eq("client_request_key", clientRequestKey)
+      .maybeSingle();
+    if (existing) {
+      return jsonResponse(
+        {
+          request: existing,
+          storesTargeted: existing.stores_targeted || 0,
+          noStores: (existing.stores_targeted || 0) === 0,
+        },
+        200,
+        origin
+      );
+    }
   }
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -155,8 +196,8 @@ Deno.serve(async (req) => {
     const dup = (existingActive || []).find(
       (r) =>
         r.normalized_product_name === normalized &&
-        ((!r.category && !categoryRaw) ||
-          (r.category || "").toLowerCase() === categoryRaw.toLowerCase()) &&
+        ((!r.category && !resolvedCategory) ||
+          (r.category || "").toLowerCase() === resolvedCategory.toLowerCase()) &&
         Date.now() - new Date(r.created_at).getTime() <= windowMs
     );
     if (dup) {
@@ -243,15 +284,16 @@ Deno.serve(async (req) => {
       product_name: productName,
       normalized_product_name: normalized,
       description: description || null,
-      category: categoryRaw || null,
+      category: resolvedCategory || null,
       city,
       state,
       postal_code: postalCode,
       radius_miles: radiusMiles,
       status: "active",
       expires_at: expiresAt,
-      image_url: imageUrl,
-      image_storage_path: imageStoragePath,
+      image_url: ownedImagePath,
+      image_storage_path: ownedImagePath,
+      client_request_key: clientRequestKey,
       latitude: requestLat,
       longitude: requestLng,
     })
@@ -259,6 +301,25 @@ Deno.serve(async (req) => {
     .single();
 
   if (error || !request) {
+    if (error?.code === "23505" && clientRequestKey) {
+      const { data: existing } = await admin
+        .from("customer_requests")
+        .select("*")
+        .eq("customer_id", user.id)
+        .eq("client_request_key", clientRequestKey)
+        .maybeSingle();
+      if (existing) {
+        return jsonResponse(
+          {
+            request: existing,
+            storesTargeted: existing.stores_targeted || 0,
+            noStores: (existing.stores_targeted || 0) === 0,
+          },
+          200,
+          origin
+        );
+      }
+    }
     const capHit = /Finds this month/i.test(error?.message || "");
     if (capHit) {
       const isPlus = profile.subscription_plan === "plus";

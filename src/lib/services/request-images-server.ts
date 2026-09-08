@@ -1,16 +1,21 @@
 import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/admin";
+import { normalizeOwnedRequestImagePath } from "@findit/domain";
 
 type StoredImage = {
   bucket: "request-images" | "product-images";
   path: string;
 };
 
-function storedImage(value: string | null | undefined): StoredImage | null {
+function storedImage(
+  value: string | null | undefined,
+  customerId: string
+): StoredImage | null {
   if (!value) return null;
   if (!/^https?:\/\//i.test(value)) {
-    return { bucket: "request-images", path: value.replace(/^\/+/, "") };
+    const path = normalizeOwnedRequestImagePath(value, customerId);
+    return path ? { bucket: "request-images", path } : null;
   }
   try {
     const pathname = decodeURIComponent(new URL(value).pathname);
@@ -18,9 +23,14 @@ function storedImage(value: string | null | undefined): StoredImage | null {
       const marker = `/${bucket}/`;
       const index = pathname.indexOf(marker);
       if (index >= 0) {
+        const path = normalizeOwnedRequestImagePath(
+          pathname.slice(index + marker.length),
+          customerId
+        );
+        if (!path) return null;
         return {
           bucket,
-          path: pathname.slice(index + marker.length).replace(/^\/+/, ""),
+          path,
         };
       }
     }
@@ -31,18 +41,25 @@ function storedImage(value: string | null | undefined): StoredImage | null {
 }
 
 export function requestImageStoragePath(
-  value: string | null | undefined
+  value: string | null | undefined,
+  customerId: string
 ): string | null {
-  return storedImage(value)?.path || null;
+  return storedImage(value, customerId)?.path || null;
 }
 
 /** Short-lived URLs keep private request photos out of public storage. */
 export async function signRequestImageUrls(
-  values: (string | null | undefined)[],
+  values: {
+    value: string | null | undefined;
+    customerId: string;
+  }[],
   expiresInSeconds = 15 * 60
 ): Promise<Map<string, string>> {
   const parsed = values
-    .map((value) => ({ value, stored: storedImage(value) }))
+    .map(({ value, customerId }) => ({
+      value,
+      stored: storedImage(value, customerId),
+    }))
     .filter(
       (
         item
@@ -77,9 +94,13 @@ export async function signRequestImageUrls(
 
 export async function signRequestImageUrl(
   value: string | null | undefined,
+  customerId: string,
   expiresInSeconds = 15 * 60
 ): Promise<string | null> {
   if (!value) return null;
-  const signed = await signRequestImageUrls([value], expiresInSeconds);
+  const signed = await signRequestImageUrls(
+    [{ value, customerId }],
+    expiresInSeconds
+  );
   return signed.get(value) || null;
 }

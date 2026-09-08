@@ -1,15 +1,57 @@
 import { invokeCreateAndRouteRequest } from "@findit/supabase-client";
 import {
-  canRebroadcastStillLooking,
   getConsumerEntitlements,
   monthlyFindWindowStart,
   type CreateRequestInput,
+  type RoutableCategoryCount,
+  type ShortPlace,
 } from "@findit/domain";
 import type { CustomerRequest } from "@findit/types";
 import { supabase } from "./supabase";
 
 export async function createAndRouteRequest(input: CreateRequestInput) {
   return invokeCreateAndRouteRequest(supabase, input);
+}
+
+function customerWebOrigin() {
+  return (
+    process.env.EXPO_PUBLIC_APP_URL || "https://dashboard.askfindit.com"
+  ).replace(/\/$/, "");
+}
+
+export async function fetchRoutableCategories(): Promise<
+  RoutableCategoryCount[] | null
+> {
+  try {
+    const response = await fetch(
+      `${customerWebOrigin()}/api/customer/routable-categories`
+    );
+    if (!response.ok) return null;
+    const body = (await response.json()) as {
+      categories?: RoutableCategoryCount[];
+    };
+    return body.categories || [];
+  } catch {
+    return null;
+  }
+}
+
+export async function reverseGeocodeFromWeb(
+  latitude: number,
+  longitude: number
+): Promise<ShortPlace | null> {
+  try {
+    const response = await fetch(`${customerWebOrigin()}/api/location/reverse`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ latitude, longitude }),
+    });
+    if (!response.ok) return null;
+    const body = (await response.json()) as { place?: ShortPlace };
+    return body.place || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchMyRequests(tab: "active" | "past" | "saved") {
@@ -29,10 +71,15 @@ export async function fetchMyRequests(tab: "active" | "past" | "saved") {
       .filter(Boolean) as CustomerRequest[]);
   }
   let query = supabase.from("customer_requests").select("*").eq("customer_id", user.id);
+  const now = new Date().toISOString();
   if (tab === "active") {
-    query = query.in("status", ["active", "partially_answered", "answered", "draft"]);
+    query = query
+      .in("status", ["active", "partially_answered", "answered", "draft"])
+      .gt("expires_at", now);
   } else {
-    query = query.in("status", ["expired", "cancelled", "fulfilled"]);
+    query = query.or(
+      `status.in.(expired,cancelled,fulfilled),and(status.in.(active,partially_answered,answered,draft),expires_at.lte.${now})`
+    );
   }
   const { data } = await query.order("created_at", { ascending: false });
   return (data || []) as CustomerRequest[];
@@ -106,16 +153,11 @@ export async function fulfillRequest(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Please sign in" };
-  const { error } = await supabase
-    .from("customer_requests")
-    .update({
-      status: "fulfilled",
-      fulfilled_at: new Date().toISOString(),
-      fulfilled_store_id: input.storeId || null,
-      found_with_findit: input.foundWithFindit ?? null,
-    })
-    .eq("id", input.requestId)
-    .eq("customer_id", user.id);
+  const { error } = await supabase.rpc("fulfill_customer_request", {
+    p_request_id: input.requestId,
+    p_store_id: input.storeId || null,
+    p_found_with_findit: input.foundWithFindit ?? null,
+  });
   if (error) return { error: "Couldn't update this request." };
   return { ok: true as const };
 }
@@ -125,32 +167,9 @@ export async function stillLooking(requestId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Please sign in" };
-  const { data: request } = await supabase
-    .from("customer_requests")
-    .select("*")
-    .eq("id", requestId)
-    .eq("customer_id", user.id)
-    .single();
-  if (!request) return { error: "Request not found" };
-  const check = canRebroadcastStillLooking({
-    status: request.status,
-    expiresAt: request.expires_at,
-    stillLookingCount: request.still_looking_count || 0,
-    lastRebroadcastAt: request.last_rebroadcast_at || null,
+  const { error } = await supabase.rpc("rebroadcast_customer_request", {
+    p_request_id: requestId,
   });
-  if (!check.ok) return { error: check.reason };
-  const extended = new Date(
-    Math.max(new Date(request.expires_at).getTime(), Date.now()) + 12 * 3600_000
-  ).toISOString();
-  const { error } = await supabase
-    .from("customer_requests")
-    .update({
-      still_looking_count: (request.still_looking_count || 0) + 1,
-      last_rebroadcast_at: new Date().toISOString(),
-      expires_at: extended,
-    })
-    .eq("id", requestId)
-    .eq("customer_id", user.id);
   if (error) return { error: "Couldn't update this request." };
   return { ok: true as const };
 }
@@ -160,12 +179,10 @@ export async function cancelRequest(requestId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Please sign in" };
-  const { error } = await supabase
-    .from("customer_requests")
-    .update({ status: "cancelled" })
-    .eq("id", requestId)
-    .eq("customer_id", user.id);
-  if (error) return { error: error.message };
+  const { error } = await supabase.rpc("cancel_customer_request", {
+    p_request_id: requestId,
+  });
+  if (error) return { error: "Couldn't cancel this request." };
   return { ok: true as const };
 }
 

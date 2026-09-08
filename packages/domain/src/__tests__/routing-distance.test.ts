@@ -251,3 +251,54 @@ describe("sortCustomerResponsesByDistance", () => {
     ]);
   });
 });
+
+describe("nearest-first target ordering", () => {
+  it("sorts eligible targets by distance and store id without reducing fanout", () => {
+    const { eligible } = selectEligibleStores({
+      request: {
+        id: "nearest",
+        postal_code: "22044",
+        city: "Falls Church",
+        category: null,
+        radius_miles: 10,
+      },
+      stores: [
+        {
+          id: "far",
+          is_active: true,
+          is_suspended: false,
+          postal_code: "22046",
+          city: "Falls Church",
+          service_radius_miles: 10,
+          categories: [],
+          service_zips: ["22046"],
+        },
+        {
+          id: "near-b",
+          is_active: true,
+          is_suspended: false,
+          postal_code: "22044",
+          city: "Falls Church",
+          service_radius_miles: 10,
+          categories: [],
+          service_zips: ["22044"],
+        },
+        {
+          id: "near-a",
+          is_active: true,
+          is_suspended: false,
+          postal_code: "22044",
+          city: "Falls Church",
+          service_radius_miles: 10,
+          categories: [],
+          service_zips: ["22044"],
+        },
+      ],
+    });
+    expect(eligible.map((row) => row.storeId)).toEqual([
+      "near-a",
+      "near-b",
+      "far",
+    ]);
+  });
+});

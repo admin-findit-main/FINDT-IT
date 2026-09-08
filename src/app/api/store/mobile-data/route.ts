@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         admin
           .from("customer_requests")
           .select(
-            "id, product_name, description, image_url, image_storage_path, category, city, state, postal_code, status, expires_at, created_at"
+            "id, customer_id, product_name, description, image_url, image_storage_path, category, city, state, postal_code, status, expires_at, created_at"
           )
           .eq("id", requestId)
           .maybeSingle(),
@@ -146,7 +146,10 @@ export async function POST(request: Request) {
     }
     const imageValue =
       requestRow.image_storage_path || requestRow.image_url || null;
-    const imageUrl = await signRequestImageUrl(imageValue);
+    const imageUrl = await signRequestImageUrl(
+      imageValue,
+      requestRow.customer_id
+    );
     const now = new Date().toISOString();
     await admin
       .from("request_targets")
@@ -171,7 +174,7 @@ export async function POST(request: Request) {
     admin
       .from("request_targets")
       .select(
-        "id, request_id, store_id, delivery_status, viewed_at, opened_at, responded_at, created_at, request:customer_requests(id, product_name, description, image_url, image_storage_path, category, city, state, postal_code, status, expires_at, created_at)"
+        "id, request_id, store_id, delivery_status, viewed_at, opened_at, responded_at, created_at, request:customer_requests(id, customer_id, product_name, description, image_url, image_storage_path, category, city, state, postal_code, status, expires_at, created_at)"
       )
       .eq("store_id", storeId)
       .gte("created_at", start.toISOString())
@@ -193,7 +196,10 @@ export async function POST(request: Request) {
     const requestRow = Array.isArray(target.request)
       ? target.request[0]
       : target.request;
-    return requestRow?.image_storage_path || requestRow?.image_url || null;
+    return {
+      value: requestRow?.image_storage_path || requestRow?.image_url || null,
+      customerId: requestRow?.customer_id || "",
+    };
   });
   const signedImages = await signRequestImageUrls(imageValues);
   const rows = (targets || [])

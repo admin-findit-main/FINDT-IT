@@ -226,6 +226,20 @@ export interface StoreResponse {
   updated_at: string;
 }
 
+export interface RespondToStoreRequestRpcRow extends Omit<StoreResponse, "id"> {
+  response_id: string;
+  created_new: boolean;
+  notify_customer: boolean;
+  final_request_status: RequestStatus;
+}
+
+export interface CustomerRequestLifecycleRpcRow {
+  success: boolean;
+  request_id: string;
+  status: RequestStatus;
+  updated_at: string;
+}
+
 export interface AdminPushBroadcast {
   id: string;
   sent_by: string;
