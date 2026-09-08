@@ -4,13 +4,18 @@ import { useEffect, useState } from "react";
 import { Delete, UserRoundSearch } from "lucide-react";
 import { formatUsNationalInput } from "@findit/domain";
 import {
+  confirmPendingPurchaseAction,
   confirmLookupPurchaseAction,
+  createPendingStoreCustomerAction,
+  issuePendingConnectionCodeAction,
   lookupHubCustomerAction,
   type CustomerLookupResult,
 } from "@/lib/services/loyalty";
-import { productUrl } from "@/lib/config/product-hosts";
 
-type FoundCustomer = Extract<CustomerLookupResult, { status: "found" }>;
+type FoundCustomer = Extract<
+  CustomerLookupResult,
+  { status: "found" | "pending" }
+>;
 type Stage = "home" | "keypad" | "found" | "confirm" | "success" | "not-found";
 
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
@@ -31,6 +36,7 @@ export function HubCustomerWorkspace({
     pointsBalance: number;
   } | null>(null);
   const [operationId, setOperationId] = useState("");
+  const [claimCode, setClaimCode] = useState<string | null>(null);
 
   function reset() {
     setStage("home");
@@ -39,13 +45,18 @@ export function HubCustomerWorkspace({
     setError(null);
     setSuccess(null);
     setOperationId("");
+    setClaimCode(null);
   }
 
   useEffect(() => {
-    if (!["found", "confirm", "success"].includes(stage)) return;
+    if (
+      !["keypad", "found", "confirm", "success", "not-found"].includes(stage)
+    ) {
+      return;
+    }
     const timer = window.setTimeout(reset, PRIVATE_STATE_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, [stage]);
+  }, [stage, digits, claimCode]);
 
   function addDigit(digit: string) {
     if (busy || digits.length >= 10) return;
@@ -57,6 +68,7 @@ export function HubCustomerWorkspace({
     if (busy || digits.length !== 10) return;
     setBusy(true);
     setError(null);
+    setClaimCode(null);
     let result: CustomerLookupResult;
     try {
       result = await lookupHubCustomerAction(digits);
@@ -81,16 +93,71 @@ export function HubCustomerWorkspace({
     setStage("found");
   }
 
+  async function createPendingCustomer() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const createOperationId = crypto.randomUUID();
+    try {
+      const result = await createPendingStoreCustomerAction({
+        phone: digits,
+        operationId: createOperationId,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setCustomer(result.customer);
+      setClaimCode(result.claimCode);
+      setOperationId(crypto.randomUUID());
+      setStage("found");
+    } catch (createError) {
+      console.error("[FINDIT Hub] pending rewards creation failed", createError);
+      setError("We couldn’t connect. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function issueNewCode() {
+    if (busy || customer?.status !== "pending") return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await issuePendingConnectionCodeAction({
+        phone: digits,
+        operationId: crypto.randomUUID(),
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setCustomer(result.customer);
+      setClaimCode(result.claimCode);
+    } catch (issueError) {
+      console.error("[FINDIT Hub] connection code issue failed", issueError);
+      setError("We couldn’t connect. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function confirmPurchase() {
     if (busy || !customer) return;
     setBusy(true);
     setError(null);
-    let result: Awaited<ReturnType<typeof confirmLookupPurchaseAction>>;
+    let result:
+      | Awaited<ReturnType<typeof confirmLookupPurchaseAction>>
+      | Awaited<ReturnType<typeof confirmPendingPurchaseAction>>;
     try {
-      result = await confirmLookupPurchaseAction({
+      const input = {
         phone: digits,
         operationId: operationId || crypto.randomUUID(),
-      });
+      };
+      result =
+        customer.status === "pending"
+          ? await confirmPendingPurchaseAction(input)
+          : await confirmLookupPurchaseAction(input);
     } catch (purchaseError) {
       console.error("[FINDIT Hub] purchase confirmation failed", purchaseError);
       setBusy(false);
@@ -149,6 +216,19 @@ export function HubCustomerWorkspace({
         <p className="mt-2 text-lg text-[#6D6669]">
           {success.pointsBalance} total points
         </p>
+        {claimCode ? (
+          <div className="mt-7 w-full rounded-2xl border border-[#DED9DB] bg-white p-6">
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#81797C]">
+              Connection code
+            </p>
+            <p className="mt-3 font-mono text-3xl font-bold tracking-[0.08em] text-[#171315]">
+              {claimCode}
+            </p>
+            <p className="mt-4 text-base text-[#6D6669]">
+              Open FINDIT → Rewards → Connect store rewards
+            </p>
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={reset}
@@ -174,9 +254,15 @@ export function HubCustomerWorkspace({
           <p className="break-words text-3xl font-bold tracking-tight text-[#171315]">
             {customer.displayName}
           </p>
-          <p className="mt-3 text-base text-[#6D6669]">
-            {customer.maskedEmail || "Email on file"}
-          </p>
+          {customer.status === "found" ? (
+            <p className="mt-3 text-base text-[#6D6669]">
+              {customer.maskedEmail || "Email on file"}
+            </p>
+          ) : (
+            <p className="mt-3 text-base font-semibold text-[#8E1F2D]">
+              Rewards for this store only · Not a verified FINDIT account
+            </p>
+          )}
           <p className="mt-1 text-base text-[#6D6669]">{customer.maskedPhone}</p>
           <div className="mt-7 border-t border-[#E7E2E4] pt-7">
             <p className="text-3xl font-bold text-[#8E1F2D]">
@@ -188,6 +274,20 @@ export function HubCustomerWorkspace({
               </p>
             ) : null}
           </div>
+          {claimCode ? (
+            <div className="mt-7 rounded-2xl border border-[#DED9DB] bg-[#FAF8F9] p-5 text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#81797C]">
+                Connection code
+              </p>
+              <p className="mt-3 font-mono text-3xl font-bold tracking-[0.08em] text-[#171315]">
+                {claimCode}
+              </p>
+              <p className="mt-3 text-sm text-[#6D6669]">
+                Give this code to the customer. They can enter it in FINDIT →
+                Rewards → Connect store rewards.
+              </p>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => setStage("confirm")}
@@ -195,6 +295,21 @@ export function HubCustomerWorkspace({
           >
             CONTINUE
           </button>
+          {customer.status === "pending" ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void issueNewCode()}
+              className="mt-3 min-h-12 w-full rounded-xl border border-[#CEC7CA] px-5 text-sm font-semibold text-[#413B3E] disabled:opacity-50"
+            >
+              {busy ? "ISSUING…" : "ISSUE NEW CONNECTION CODE"}
+            </button>
+          ) : null}
+          {error ? (
+            <p className="mt-4 rounded-xl bg-[#FFF0F1] px-4 py-3 text-sm text-[#8E1F2D]">
+              {error}
+            </p>
+          ) : null}
         </div>
       </section>
     );
@@ -211,7 +326,9 @@ export function HubCustomerWorkspace({
             Confirm purchase for {customer.displayName}?
           </h1>
           <p className="mt-3 text-base text-[#6D6669]">
-            Points will be awarded to this customer account.
+            {customer.status === "pending"
+              ? "Points will be saved in rewards for this store only."
+              : "Points will be awarded to this customer account."}
           </p>
           {error ? (
             <p className="mt-5 rounded-xl bg-[#FFF0F1] px-4 py-3 text-sm text-[#8E1F2D]">
@@ -249,14 +366,23 @@ export function HubCustomerWorkspace({
           <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-[#6D6669]">
             This phone number isn&apos;t connected to a FINDIT account yet.
           </p>
-          <a
-            href={productUrl("dashboard", "/signup")}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-8 inline-flex min-h-14 w-full items-center justify-center rounded-xl bg-[#8E1F2D] px-6 text-base font-bold text-white"
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#81797C]">
+            Create rewards for this store only. This does not create or verify a
+            FINDIT account.
+          </p>
+          {error ? (
+            <p className="mt-5 rounded-xl bg-[#FFF0F1] px-4 py-3 text-sm text-[#8E1F2D]">
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void createPendingCustomer()}
+            className="mt-8 min-h-14 w-full rounded-xl bg-[#8E1F2D] px-6 text-base font-bold text-white disabled:opacity-50"
           >
-            CUSTOMER SIGN-UP
-          </a>
+            {busy ? "CREATING…" : "CREATE STORE REWARDS ACCOUNT"}
+          </button>
           <button
             type="button"
             onClick={() => {

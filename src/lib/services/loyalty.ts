@@ -6,12 +6,18 @@ import {
   normalizePhoneToE164,
 } from "@findit/domain";
 import { isDemoMode } from "@/lib/config/env";
+import {
+  formatRewardsClaimCode,
+  generateRewardsClaimCode,
+  hashRewardsClaimCode,
+} from "@/lib/loyalty/claim-code";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { logSecurityEvent } from "@/lib/security/audit";
 import { toPublicError } from "@/lib/security/public-error";
 import { getCurrentProfile, getStoreWorkspaceAction } from "@/lib/services/actions";
 import { resolveHubTerminalAction } from "@/lib/services/hub-devices";
 import { hasVerifiedEmailIdentity } from "@/lib/services/hub-policy";
+import { claimPendingStoreRewards } from "@/lib/services/rewards-claim";
 import { getHubClockStateAction } from "@/lib/services/shifts";
 import { trackEvent } from "@/lib/services/analytics";
 
@@ -27,6 +33,14 @@ export type CustomerLookupResult =
       pointsBalance: number;
       memberSince: string | null;
     }
+  | {
+      status: "pending";
+      maskedPhone: string;
+      displayName: "Store rewards customer";
+      pointsBalance: number;
+      memberSince: string | null;
+      storeOnly: true;
+    }
   | { status: "error"; error: string };
 
 type PurchaseResult =
@@ -35,6 +49,14 @@ type PurchaseResult =
       pointsAwarded: number;
       pointsBalance: number;
       alreadyConfirmed: boolean;
+    }
+  | { ok: false; error: string };
+
+type PendingCustomerResult =
+  | {
+      ok: true;
+      customer: Extract<CustomerLookupResult, { status: "pending" }>;
+      claimCode: string | null;
     }
   | { ok: false; error: string };
 
@@ -255,6 +277,66 @@ async function lookupCustomerByPhone(rawPhone: string): Promise<
   };
 }
 
+type PendingRelationshipRow = {
+  points_balance: number;
+  first_seen_at: string | null;
+};
+
+function pendingCustomer(
+  maskedPhone: string,
+  row: PendingRelationshipRow
+): Extract<CustomerLookupResult, { status: "pending" }> {
+  return {
+    status: "pending",
+    maskedPhone,
+    displayName: "Store rewards customer",
+    pointsBalance: row.points_balance || 0,
+    memberSince: row.first_seen_at || null,
+    storeOnly: true,
+  };
+}
+
+async function lookupPendingCustomer(input: {
+  storeId: string;
+  phoneE164: string;
+  maskedPhone: string;
+}): Promise<
+  | {
+      customer: Extract<CustomerLookupResult, { status: "pending" }> | null;
+      relationshipId: string | null;
+      claimCodeHash: string | null;
+    }
+  | { error: string }
+> {
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data: claim, error: claimError } = await admin
+    .from("store_customer_claims")
+    .select("store_customer_id, claim_code_hash")
+    .eq("store_id", input.storeId)
+    .eq("phone_e164", input.phoneE164)
+    .is("claimed_at", null)
+    .maybeSingle();
+  if (claimError) return { error: "Could not look up that customer." };
+  if (!claim) {
+    return { customer: null, relationshipId: null, claimCodeHash: null };
+  }
+  const { data: row, error: relationshipError } = await admin
+    .from("store_customers")
+    .select("points_balance, first_seen_at")
+    .eq("id", claim.store_customer_id)
+    .eq("store_id", input.storeId)
+    .is("customer_id", null)
+    .is("removed_at", null)
+    .maybeSingle();
+  if (relationshipError) return { error: "Could not look up that customer." };
+  return {
+    customer: row ? pendingCustomer(input.maskedPhone, row) : null,
+    relationshipId: row ? claim.store_customer_id : null,
+    claimCodeHash: row ? claim.claim_code_hash : null,
+  };
+}
+
 export async function lookupHubCustomerAction(
   rawPhone: string
 ): Promise<CustomerLookupResult> {
@@ -286,7 +368,19 @@ export async function lookupHubCustomerAction(
     metadata: { found: Boolean(profile) },
   });
 
-  if (!profile) return { status: "not_found", maskedPhone };
+  if (!profile) {
+    const parsed = normalizePhoneToE164(rawPhone);
+    if (!parsed.ok) return { status: "error", error: parsed.error };
+    const pending = await lookupPendingCustomer({
+      storeId: operator.actor.storeId,
+      phoneE164: parsed.e164,
+      maskedPhone,
+    });
+    if ("error" in pending) {
+      return { status: "error", error: pending.error };
+    }
+    return pending.customer || { status: "not_found", maskedPhone };
+  }
 
   const { data: relationship, error: relationshipError } = await admin
     .from("store_customers")
@@ -305,6 +399,192 @@ export async function lookupHubCustomerAction(
     displayName: safeCustomerName(profile),
     pointsBalance: relationship?.points_balance || 0,
     memberSince: relationship?.first_seen_at || null,
+  };
+}
+
+function pendingOperationId(value: string) {
+  const operationId = boundUuid(value);
+  return operationId ? `pending:${operationId}` : null;
+}
+
+function claimCodeMaterial(phoneE164: string) {
+  const code = generateRewardsClaimCode();
+  return {
+    code,
+    hash: hashRewardsClaimCode(phoneE164, code),
+  };
+}
+
+export async function createPendingStoreCustomerAction(input: {
+  phone: string;
+  operationId: string;
+}): Promise<PendingCustomerResult> {
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return { ok: false, error: operator.error };
+  const operationId = pendingOperationId(input.operationId);
+  if (!operationId) return { ok: false, error: "Refresh and try again." };
+
+  const parsed = normalizePhoneToE164(input.phone);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+  const limited = await consumeRateLimit({
+    bucket: "customer-lookup",
+    limit: 10,
+    windowMs: 10 * 60_000,
+    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
+  });
+  if (!limited.ok) return { ok: false, error: limited.error };
+
+  const registered = await lookupCustomerByPhone(parsed.e164);
+  if ("error" in registered) return { ok: false, error: registered.error };
+  if (registered.customer) {
+    return {
+      ok: false,
+      error: "A FINDIT account is already connected to this phone number.",
+    };
+  }
+
+  const material = claimCodeMaterial(parsed.e164);
+  if (isDemoMode()) {
+    return {
+      ok: true,
+      customer: pendingCustomer(maskPhoneE164(parsed.e164), {
+        points_balance: 0,
+        first_seen_at: new Date().toISOString(),
+      }),
+      claimCode: formatRewardsClaimCode(material.code),
+    };
+  }
+
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data, error } = await admin.rpc(
+    "create_or_get_pending_store_customer",
+    {
+      p_store_id: operator.actor.storeId,
+      p_phone_e164: parsed.e164,
+      p_claim_code_hash: material.hash,
+      p_create_idempotency_key: operationId,
+      p_employee_user_id: operator.actor.employeeUserId,
+      p_shift_employee_id: operator.actor.shiftEmployeeId,
+      p_hub_device_id: operator.actor.hubDeviceId,
+    }
+  );
+  const row = data?.[0] as
+    | {
+        pending_store_customer_id: string;
+        created: boolean;
+      }
+    | undefined;
+  if (error || !row) {
+    return { ok: false, error: "Could not create store rewards. Try again." };
+  }
+  const { data: relationship, error: relationshipError } = await admin
+    .from("store_customers")
+    .select("points_balance, first_seen_at")
+    .eq("id", row.pending_store_customer_id)
+    .eq("store_id", operator.actor.storeId)
+    .is("customer_id", null)
+    .is("removed_at", null)
+    .maybeSingle();
+  if (relationshipError || !relationship) {
+    return { ok: false, error: "Could not create store rewards. Try again." };
+  }
+
+  void logSecurityEvent({
+    actorId: operator.actor.employeeUserId,
+    action: "pending_store_customer_created",
+    resource: operator.actor.storeId,
+    metadata: {
+      storeId: operator.actor.storeId,
+      codeIssued: row.created,
+      shiftEmployeeId: operator.actor.shiftEmployeeId,
+      hubDeviceId: operator.actor.hubDeviceId,
+    },
+  });
+  return {
+    ok: true,
+    customer: pendingCustomer(maskPhoneE164(parsed.e164), relationship),
+    claimCode: row.created ? formatRewardsClaimCode(material.code) : null,
+  };
+}
+
+export async function issuePendingConnectionCodeAction(input: {
+  phone: string;
+  operationId: string;
+}): Promise<PendingCustomerResult> {
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return { ok: false, error: operator.error };
+  const operationId = pendingOperationId(input.operationId);
+  if (!operationId) return { ok: false, error: "Refresh and try again." };
+  const parsed = normalizePhoneToE164(input.phone);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+  const limited = await consumeRateLimit({
+    bucket: "loyalty-claim",
+    limit: 5,
+    windowMs: 10 * 60_000,
+    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
+  });
+  if (!limited.ok) return { ok: false, error: limited.error };
+
+  const material = claimCodeMaterial(parsed.e164);
+  if (isDemoMode()) {
+    return {
+      ok: true,
+      customer: pendingCustomer(maskPhoneE164(parsed.e164), {
+        points_balance: 0,
+        first_seen_at: new Date().toISOString(),
+      }),
+      claimCode: formatRewardsClaimCode(material.code),
+    };
+  }
+
+  const pending = await lookupPendingCustomer({
+    storeId: operator.actor.storeId,
+    phoneE164: parsed.e164,
+    maskedPhone: maskPhoneE164(parsed.e164),
+  });
+  if ("error" in pending) return { ok: false, error: pending.error };
+  if (
+    !pending.customer ||
+    !pending.relationshipId ||
+    !pending.claimCodeHash
+  ) {
+    return { ok: false, error: "Store rewards were not found." };
+  }
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data, error } = await admin.rpc(
+    "issue_pending_store_customer_code",
+    {
+      p_store_id: operator.actor.storeId,
+      p_store_customer_id: pending.relationshipId,
+      p_expected_claim_code_hash: pending.claimCodeHash,
+      p_claim_code_hash: material.hash,
+      p_issue_idempotency_key: operationId,
+      p_employee_user_id: operator.actor.employeeUserId,
+      p_shift_employee_id: operator.actor.shiftEmployeeId,
+      p_hub_device_id: operator.actor.hubDeviceId,
+    }
+  );
+  const row = data?.[0] as { already_issued: boolean } | undefined;
+  if (error || !row) {
+    return { ok: false, error: "Could not issue a new connection code." };
+  }
+  void logSecurityEvent({
+    actorId: operator.actor.employeeUserId,
+    action: "pending_store_customer_code_issued",
+    resource: operator.actor.storeId,
+    metadata: {
+      storeId: operator.actor.storeId,
+      newlyIssued: !row.already_issued,
+      shiftEmployeeId: operator.actor.shiftEmployeeId,
+      hubDeviceId: operator.actor.hubDeviceId,
+    },
+  });
+  return {
+    ok: true,
+    customer: pending.customer,
+    claimCode: row.already_issued ? null : formatRewardsClaimCode(material.code),
   };
 }
 
@@ -442,6 +722,81 @@ export async function confirmLookupPurchaseAction(input: {
   });
 }
 
+export async function confirmPendingPurchaseAction(input: {
+  phone: string;
+  operationId: string;
+}): Promise<PurchaseResult> {
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return { ok: false, error: operator.error };
+  const operationId = boundUuid(input.operationId);
+  if (!operationId) return { ok: false, error: "Refresh and try again." };
+  const parsed = normalizePhoneToE164(input.phone);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+  const limited = await consumeRateLimit({
+    bucket: "confirm-purchase",
+    limit: 30,
+    windowMs: 10 * 60_000,
+    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
+  });
+  if (!limited.ok) return { ok: false, error: limited.error };
+
+  if (isDemoMode()) {
+    return {
+      ok: true,
+      pointsAwarded: 0,
+      pointsBalance: 0,
+      alreadyConfirmed: false,
+    };
+  }
+  const pending = await lookupPendingCustomer({
+    storeId: operator.actor.storeId,
+    phoneE164: parsed.e164,
+    maskedPhone: maskPhoneE164(parsed.e164),
+  });
+  if ("error" in pending) return { ok: false, error: pending.error };
+  if (!pending.relationshipId) {
+    return { ok: false, error: "Store rewards were not found." };
+  }
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data, error } = await admin.rpc("confirm_pending_store_purchase", {
+    p_store_id: operator.actor.storeId,
+    p_store_customer_id: pending.relationshipId,
+    p_employee_user_id: operator.actor.employeeUserId,
+    p_shift_employee_id: operator.actor.shiftEmployeeId,
+    p_hub_device_id: operator.actor.hubDeviceId,
+    p_idempotency_key: `phone:${operationId}`,
+  });
+  const row = data?.[0] as
+    | {
+        purchase_id: string;
+        points_awarded: number;
+        points_balance: number;
+        already_confirmed: boolean;
+      }
+    | undefined;
+  if (error || !row) {
+    return { ok: false, error: "Could not confirm this purchase. Try again." };
+  }
+  void logSecurityEvent({
+    actorId: operator.actor.employeeUserId,
+    action: "pending_purchase_confirmed",
+    resource: row.purchase_id,
+    metadata: {
+      storeId: operator.actor.storeId,
+      points: row.points_awarded,
+      shiftEmployeeId: operator.actor.shiftEmployeeId,
+      hubDeviceId: operator.actor.hubDeviceId,
+    },
+  });
+  return {
+    ok: true,
+    pointsAwarded: row.points_awarded,
+    pointsBalance: row.points_balance,
+    alreadyConfirmed: row.already_confirmed,
+  };
+}
+
 export async function confirmRequestPurchaseAction(input: {
   requestId: string;
   operationId: string;
@@ -488,7 +843,7 @@ export type HubHistoryItem =
       responseType: null;
       timestamp: string;
       employeeDisplayName: string | null;
-      source: "request" | "phone_lookup";
+      source: "request" | "phone_lookup" | "hub_phone_pending";
       status: "confirmed" | "reversed";
     }
   | {
@@ -902,4 +1257,19 @@ export async function getMyStoreRewardsAction() {
     .order("last_seen_at", { ascending: false })
     .limit(50);
   return data || [];
+}
+
+export async function connectMyStoreRewardsAction(input: {
+  phone: string;
+  code: string;
+}) {
+  const profile = await getCurrentProfile();
+  if (!profile || profile.account_type !== "customer") {
+    return { ok: false as const, error: "Please sign in as a shopper." };
+  }
+  return claimPendingStoreRewards({
+    customerId: profile.id,
+    phone: input.phone,
+    code: input.code,
+  });
 }

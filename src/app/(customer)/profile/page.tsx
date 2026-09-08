@@ -82,11 +82,9 @@ export default function ProfilePage() {
             placeholder="(571) 259-9714"
           />
           <p className="mt-1 text-xs text-ink-muted">
-            {profile.phone_verified
-              ? "Verified. Stores can use this number to find your rewards."
-              : profile.phone_e164
-                ? "Not verified yet. Stores cannot find this account until verification is available."
-                : "Email remains your login. This number is only for store lookup and rewards."}
+            This number is self-reported and remains unverified. For convenience,
+            stores can find an email-confirmed account by an exact phone match.
+            A connection code—not the phone—is proof for pending rewards.
           </p>
         </div>
         <div>

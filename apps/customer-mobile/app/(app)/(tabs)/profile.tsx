@@ -50,17 +50,7 @@ export default function ProfileScreen() {
     setNotifyCanOrder(profile?.notify_can_order ?? true);
     setNotifyExpired(profile?.notify_request_expired ?? true);
     setNotifyPromotions(profile?.notify_store_promotions ?? false);
-  }, [
-    profile?.first_name,
-    profile?.phone_e164,
-    profile?.default_city,
-    profile?.default_state,
-    profile?.default_postal_code,
-    profile?.notify_in_stock,
-    profile?.notify_can_order,
-    profile?.notify_request_expired,
-    profile?.notify_store_promotions,
-  ]);
+  }, [profile]);
 
   return (
     <AppChrome title="Profile">
@@ -113,9 +103,9 @@ export default function ProfileScreen() {
             containerStyle={{ marginBottom: 0 }}
           />
           <Text style={[styles.hint, { color: theme.inkMuted }]}>
-            {profile?.phone_verified
-              ? "Verified for store lookup."
-              : "Email remains your login. Unverified numbers cannot be found by stores."}
+            Self-reported and unverified. An exact phone match can help stores
+            find an email-confirmed account; a connection code proves pending
+            rewards are yours.
           </Text>
         </GlassCard>
 

@@ -15,6 +15,7 @@ const FAIL_CLOSED_BUCKETS = new Set([
   "profile-phone",
   "customer-lookup",
   "confirm-purchase",
+  "loyalty-claim",
   "store-mobile-read",
   "account-delete",
 ]);

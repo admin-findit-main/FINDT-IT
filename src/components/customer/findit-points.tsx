@@ -4,13 +4,23 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/primitives";
 import { getShopperPointsAction } from "@/lib/visits/engine";
 
+type PointsStats = { points: number; visits: number };
+let inFlightPoints: Promise<PointsStats> | null = null;
+
+function loadShopperPoints() {
+  if (!inFlightPoints) {
+    inFlightPoints = getShopperPointsAction().finally(() => {
+      inFlightPoints = null;
+    });
+  }
+  return inFlightPoints;
+}
+
 export function ShopperFinditPoints() {
-  const [stats, setStats] = useState<{ points: number; visits: number } | null>(
-    null
-  );
+  const [stats, setStats] = useState<PointsStats | null>(null);
 
   useEffect(() => {
-    getShopperPointsAction().then(setStats);
+    void loadShopperPoints().then(setStats);
   }, []);
 
   if (!stats) return null;
