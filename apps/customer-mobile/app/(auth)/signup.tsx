@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
-import { OTP_RESEND_SECONDS, maskEmail } from "@findit/domain";
+import {
+  OTP_RESEND_SECONDS,
+  formatUsNationalInput,
+  maskEmail,
+  normalizeCustomerSignupIdentity,
+} from "@findit/domain";
 import { spacing, typography } from "@findit/theme";
 import {
   GlassButton,
@@ -16,6 +21,8 @@ import { useAuth } from "@/lib/auth";
 export default function SignupScreen() {
   const theme = useAppTheme();
   const { sendEmailOtp, verifyEmailOtp } = useAuth();
+  const [firstName, setFirstName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [sentEmail, setSentEmail] = useState("");
   const [masked, setMasked] = useState("");
@@ -32,9 +39,18 @@ export default function SignupScreen() {
   }, [seconds]);
 
   const sendCode = async () => {
+    const identity = normalizeCustomerSignupIdentity(firstName, phone);
+    if (!identity.ok) {
+      setError(identity.error);
+      return;
+    }
     setBusy(true);
     setError(null);
-    const res = await sendEmailOtp({ email, createIfMissing: true });
+    const res = await sendEmailOtp({
+      email,
+      createIfMissing: true,
+      signupIdentity: identity.identity,
+    });
     setBusy(false);
     if (res.error) {
       setError(res.error);
@@ -65,6 +81,26 @@ export default function SignupScreen() {
       <GlassCard>
         {step === "contact" ? (
           <>
+            <GlassInput
+              inset
+              placeholder="First name"
+              textContentType="givenName"
+              autoComplete="name-given"
+              autoCapitalize="words"
+              value={firstName}
+              onChangeText={setFirstName}
+              maxLength={60}
+            />
+            <GlassInput
+              inset
+              keyboardType="phone-pad"
+              placeholder="Phone"
+              textContentType="telephoneNumber"
+              autoComplete="tel"
+              value={phone}
+              onChangeText={(value) => setPhone(formatUsNationalInput(value))}
+              maxLength={14}
+            />
             <GlassInput
               inset
               last

@@ -10,11 +10,9 @@ import {
 } from "@findit/domain";
 import { isDemoMode } from "@/lib/config/env";
 import { isSoloAdmin } from "@/lib/auth/admin";
-import { resolveHubTerminalAction } from "@/lib/services/hub-devices";
 import { getCurrentProfile, getStoreWorkspaceAction } from "@/lib/services/actions";
 import { trackEvent } from "@/lib/services/analytics";
 import { loadUsagePricing } from "@/lib/billing/usage-config";
-import { getHubClockStateAction } from "@/lib/services/shifts";
 import { visitsMemory } from "@/lib/visits/memory";
 
 function isTrialStore(trialEndsAt: string | null | undefined, now = new Date()): boolean {
@@ -402,111 +400,6 @@ export async function getShopperPointsAction() {
     .eq("shopper_id", profile.id)
     .eq("status", "verified");
   return { points, visits: count || 0 };
-}
-
-export async function getEmployeeRewardsAction() {
-  const profile = await getCurrentProfile();
-  if (!profile) return null;
-  const workspace = await getStoreWorkspaceAction();
-  const storeId = workspace?.store?.id;
-  if (!storeId) return null;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const week = new Date(start);
-  week.setDate(week.getDate() - ((week.getDay() + 6) % 7));
-  if (isDemoMode()) {
-    return {
-      answeredToday: 0,
-      arrivedToday: 0,
-      helpedWeek: 0,
-      points: 0,
-    };
-  }
-  const admin = await adminClient();
-  const [{ count: answeredToday }, { count: arrivedToday }, { count: helpedWeek }, { data: rewards }] =
-    await Promise.all([
-      admin
-        .from("store_responses")
-        .select("*", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("responded_by", profile.id)
-        .gte("created_at", start.toISOString()),
-      admin
-        .from("verified_visits")
-        .select("*", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("employee_user_id", profile.id)
-        .gte("verified_at", start.toISOString()),
-      admin
-        .from("verified_visits")
-        .select("*", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("employee_user_id", profile.id)
-        .gte("verified_at", week.toISOString()),
-      admin
-        .from("reward_ledger")
-        .select("points")
-        .eq("user_id", profile.id)
-        .eq("audience", "employee")
-        // The employee incentive is a FINDIT program; store loyalty points
-        // belong to shoppers and must not appear in an employee's total.
-        .eq("program", "findit")
-        .eq("status", "confirmed"),
-    ]);
-  return {
-    answeredToday: answeredToday || 0,
-    arrivedToday: arrivedToday || 0,
-    helpedWeek: helpedWeek || 0,
-    points: (rewards || []).reduce((sum, row) => sum + Number(row.points || 0), 0),
-  };
-}
-
-export async function getHubEmployeeRewardsAction() {
-  const fromAccount = await getEmployeeRewardsAction();
-  if (fromAccount) return fromAccount;
-  const linked = await resolveHubTerminalAction();
-  if (!linked.ok) return null;
-  const clock = await getHubClockStateAction();
-  if (!clock.required || !clock.clockedIn) return null;
-  const storeId = linked.runtime.store.id;
-  const employeeId = clock.clockedIn.employeeId;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const week = new Date(start);
-  week.setDate(week.getDate() - ((week.getDay() + 6) % 7));
-  const pricing = await loadUsagePricing();
-  if (isDemoMode()) {
-    return { answeredToday: 0, arrivedToday: 0, helpedWeek: 0, points: 0 };
-  }
-  const admin = await adminClient();
-  const [{ count: answeredToday }, { count: arrivedToday }, { count: helpedWeek }] =
-    await Promise.all([
-      admin
-        .from("store_responses")
-        .select("*", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .gte("created_at", clock.clockedIn.since),
-      admin
-        .from("verified_visits")
-        .select("*", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("shift_employee_id", employeeId)
-        .eq("status", "verified")
-        .gte("verified_at", start.toISOString()),
-      admin
-        .from("verified_visits")
-        .select("*", { count: "exact", head: true })
-        .eq("store_id", storeId)
-        .eq("shift_employee_id", employeeId)
-        .eq("status", "verified")
-        .gte("verified_at", week.toISOString()),
-    ]);
-  return {
-    answeredToday: answeredToday || 0,
-    arrivedToday: arrivedToday || 0,
-    helpedWeek: helpedWeek || 0,
-    points: (arrivedToday || 0) * pricing.employeePointsPerVisit,
-  };
 }
 
 export async function getAdminBillingConfigAction() {

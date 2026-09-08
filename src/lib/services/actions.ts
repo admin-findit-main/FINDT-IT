@@ -40,6 +40,7 @@ import {
 import { createRequestSchema, storeJoinApplicationSchema } from "@/lib/validations";
 import { normalizeProductName } from "@/lib/utils";
 import { notifyCustomerDevices, notifyEmployeeDevices } from "@/lib/services/expo-push";
+import { isWaitingHubRequest } from "@/lib/services/hub-policy";
 import {
   authEmailConfirmationUrl,
   authEmailCopy,
@@ -1893,6 +1894,71 @@ export async function getStoreIncomingRequestsAction(
     response: StoreResponse | null;
   })[];
   });
+}
+
+export async function getStoreWaitingRequestCountAction(
+  storeId: string
+): Promise<number> {
+  const id = boundUuid(storeId);
+  if (!id) return 0;
+  const actor = await getStoreActor(id);
+  if (!actor) return 0;
+  const now = new Date();
+
+  if (isDemoMode()) {
+    const state = getDemoState();
+    return state.targets.filter((target) => {
+      if (
+        target.store_id !== id ||
+        state.responses.some(
+          (response) =>
+            response.store_id === id && response.request_id === target.request_id
+        )
+      ) {
+        return false;
+      }
+      const request = state.requests.find(
+        (candidate) => candidate.id === target.request_id
+      );
+      return Boolean(
+        request &&
+          isWaitingHubRequest({
+            respondedAt: target.responded_at,
+            deliveryStatus: target.delivery_status,
+            relevant: target.relevant,
+            requestStatus: request.status,
+            expiresAt: request.expires_at,
+            nowMs: now.getTime(),
+          })
+      );
+    }).length;
+  }
+
+  // Authorization is established above, then this server-only client performs
+  // one store-indexed HEAD count. No request rows or customer data are loaded.
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { count, error } = await admin
+    .from("request_targets")
+    .select("request:customer_requests!inner(id)", {
+      count: "exact",
+      head: true,
+    })
+    .eq("store_id", id)
+    .is("responded_at", null)
+    .eq("delivery_status", "sent")
+    .or("relevant.is.null,relevant.eq.true")
+    .in("request.status", ["active", "partially_answered"])
+    .gt("request.expires_at", now.toISOString());
+
+  if (error) {
+    console.error("[FINDIT] waiting request count failed", {
+      storeId: id,
+      code: error.code,
+    });
+    return 0;
+  }
+  return count || 0;
 }
 
 export const getUserStoresAction = cache(async (): Promise<(Store & { role: string })[]> => {

@@ -119,6 +119,7 @@ function SignupForm() {
       <EmailOtpForm
         createIfMissing
         audience="shopper"
+        signupIdentityRequired
         continueLabel="Email me a code"
         onFinished={({ homePath, needsName }) => {
           router.push(destinationAfterAuth({ homePath, next, needsName }));

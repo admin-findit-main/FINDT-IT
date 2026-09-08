@@ -11,6 +11,16 @@ export type PhoneNormalizeResult =
   | { ok: true; e164: string }
   | { ok: false; error: string };
 
+export type CustomerSignupIdentity = {
+  firstName: string;
+  displayName: string;
+  phoneE164: string;
+};
+
+export type CustomerSignupIdentityResult =
+  | { ok: true; identity: CustomerSignupIdentity }
+  | { ok: false; error: string };
+
 /** Normalize a US-first phone string to E.164. Accepts +E.164 for other countries. */
 export function normalizePhoneToE164(input: string): PhoneNormalizeResult {
   const raw = input.trim();
@@ -37,6 +47,41 @@ export function normalizePhoneToE164(input: string): PhoneNormalizeResult {
     return { ok: false, error: "Enter a valid phone number" };
   }
   return { ok: true, e164 };
+}
+
+export function normalizeCustomerSignupIdentity(
+  firstNameInput: string,
+  phoneInput: string
+): CustomerSignupIdentityResult {
+  const firstName = firstNameInput.trim();
+  if (!firstName) return { ok: false, error: "Enter your first name." };
+  if (firstName.length > 60) {
+    return { ok: false, error: "Use a shorter first name." };
+  }
+  const phone = normalizePhoneToE164(phoneInput);
+  if (!phone.ok) return phone;
+  return {
+    ok: true,
+    identity: {
+      firstName,
+      displayName: firstName,
+      phoneE164: phone.e164,
+    },
+  };
+}
+
+export const CUSTOMER_SIGNUP_PHONE_CONFLICT_MESSAGE =
+  "We couldn’t create that account. Sign in if this email or phone already has FINDIT, or use another phone number.";
+
+export function isCustomerSignupPhoneConflict(
+  message: string | null | undefined
+): boolean {
+  const text = (message || "").toLowerCase();
+  return (
+    ((text.includes("duplicate") || text.includes("unique")) &&
+      (text.includes("phone") || text.includes("profiles_phone_e164_key"))) ||
+    text.includes("database error saving new user")
+  );
 }
 
 /** +17035551234 → +1••••1234 */

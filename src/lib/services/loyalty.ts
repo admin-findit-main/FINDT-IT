@@ -11,6 +11,7 @@ import { logSecurityEvent } from "@/lib/security/audit";
 import { toPublicError } from "@/lib/security/public-error";
 import { getCurrentProfile, getStoreWorkspaceAction } from "@/lib/services/actions";
 import { resolveHubTerminalAction } from "@/lib/services/hub-devices";
+import { hasVerifiedEmailIdentity } from "@/lib/services/hub-policy";
 import { getHubClockStateAction } from "@/lib/services/shifts";
 import { trackEvent } from "@/lib/services/analytics";
 
@@ -21,23 +22,16 @@ export type CustomerLookupResult =
   | {
       status: "found";
       maskedPhone: string;
+      maskedEmail: string;
       displayName: string;
-      relationshipId: string | null;
-      isStoreCustomer: boolean;
       pointsBalance: number;
-      confirmedPurchases: number;
-      recentRequest: {
-        id: string;
-        productName: string;
-        createdAt: string;
-      } | null;
+      memberSince: string | null;
     }
   | { status: "error"; error: string };
 
 type PurchaseResult =
   | {
       ok: true;
-      purchaseId: string;
       pointsAwarded: number;
       pointsBalance: number;
       alreadyConfirmed: boolean;
@@ -83,11 +77,39 @@ async function requireStoreOperator(): Promise<
     return { ok: false, error: "Clock in before confirming a purchase." };
   }
 
+  let employeeUserId: string | null = null;
+  if (profile) {
+    if (profile.id === linked.runtime.store.owner_id) {
+      employeeUserId = profile.id;
+    } else if (isDemoMode()) {
+      const { getDemoState } = await import("@/lib/demo/store");
+      employeeUserId = getDemoState().storeMembers.some(
+        (member) =>
+          member.store_id === linked.runtime.store.id &&
+          member.user_id === profile.id &&
+          member.status === "active"
+      )
+        ? profile.id
+        : null;
+    } else {
+      const { createServiceClient } = await import("@/lib/supabase/admin");
+      const admin = createServiceClient();
+      const { data: membership } = await admin
+        .from("store_members")
+        .select("id")
+        .eq("store_id", linked.runtime.store.id)
+        .eq("user_id", profile.id)
+        .eq("status", "active")
+        .maybeSingle();
+      employeeUserId = membership ? profile.id : null;
+    }
+  }
+
   return {
     ok: true,
     actor: {
       storeId: linked.runtime.store.id,
-      employeeUserId: profile?.id || null,
+      employeeUserId,
       shiftEmployeeId:
         clock.required && clock.clockedIn ? clock.clockedIn.employeeId : null,
       hubDeviceId: linked.runtime.deviceId,
@@ -190,51 +212,46 @@ export async function saveShopperPhoneAction(
   };
 }
 
-async function lookupCustomerIdentifier(rawIdentifier: string): Promise<
+async function lookupCustomerByPhone(rawPhone: string): Promise<
   | {
       customer: {
         id: string;
         first_name: string | null;
         display_name: string | null;
+        email: string | null;
+        phone_e164: string;
       } | null;
-      contactLabel: string;
+      maskedPhone: string;
     }
   | { error: string }
 > {
-  const identifier = rawIdentifier.trim();
+  const parsed = normalizePhoneToE164(rawPhone);
+  if (!parsed.ok) return { error: parsed.error };
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  if (identifier.includes("@")) {
-    const email = identifier.toLowerCase();
-    if (
-      email.length > 254 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-    ) {
-      return { error: "Enter a valid customer email." };
-    }
-    const { data } = await admin
-      .from("profiles")
-      .select("id, first_name, display_name")
-      .eq("email", email)
-      .eq("account_type", "customer")
-      .eq("is_suspended", false)
-      .maybeSingle();
-    return { customer: data, contactLabel: maskEmail(email) };
-  }
-
-  const parsed = normalizePhoneToE164(identifier);
-  if (!parsed.ok) return { error: parsed.error };
-  const { data } = await admin
+  const { data, error } = await admin
     .from("profiles")
-    .select("id, first_name, display_name")
+    .select("id, first_name, display_name, email, phone_e164")
     .eq("phone_e164", parsed.e164)
-    .eq("phone_verified", true)
     .eq("account_type", "customer")
     .eq("is_suspended", false)
     .maybeSingle();
+  if (error) return { error: "Could not look up that customer." };
+
+  // A self-reported phone is allowed as an exact lookup identifier only after
+  // the account's email identity has been verified. It is never treated as
+  // phone ownership, authentication, recovery, or other security proof.
+  let customer = data?.phone_e164 ? data : null;
+  if (customer) {
+    const { data: authData, error: authError } =
+      await admin.auth.admin.getUserById(customer.id);
+    if (authError) return { error: "Could not look up that customer." };
+    if (!hasVerifiedEmailIdentity(authData.user)) customer = null;
+  }
+
   return {
-    customer: data,
-    contactLabel: maskPhoneE164(parsed.e164),
+    customer,
+    maskedPhone: maskPhoneE164(parsed.e164),
   };
 }
 
@@ -258,10 +275,10 @@ export async function lookupHubCustomerAction(
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  const lookup = await lookupCustomerIdentifier(rawPhone);
+  const lookup = await lookupCustomerByPhone(rawPhone);
   if ("error" in lookup) return { status: "error", error: lookup.error };
   const profile = lookup.customer;
-  const maskedPhone = lookup.contactLabel;
+  const maskedPhone = lookup.maskedPhone;
 
   void trackEvent("customer_lookup", {
     userId: operator.actor.employeeUserId,
@@ -271,252 +288,24 @@ export async function lookupHubCustomerAction(
 
   if (!profile) return { status: "not_found", maskedPhone };
 
-  const since = new Date(Date.now() - 30 * 24 * 60 * 60_000).toISOString();
-  const [{ data: relationship }, { data: recent }] = await Promise.all([
-    admin
-      .from("store_customers")
-      .select("id, points_balance, confirmed_purchases, removed_at")
-      .eq("store_id", operator.actor.storeId)
-      .eq("customer_id", profile.id)
-      .maybeSingle(),
-    admin
-      .from("customer_requests")
-      .select("id, product_name, created_at")
-      .eq("customer_id", profile.id)
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
-      .limit(10),
-  ]);
-
-  const requestIds = (recent || []).map((row) => row.id);
-  let recentRequest: {
-    id: string;
-    productName: string;
-    createdAt: string;
-  } | null = null;
-
-  if (requestIds.length) {
-    const { data: responses } = await admin
-      .from("store_responses")
-      .select("request_id")
-      .eq("store_id", operator.actor.storeId)
-      .in("request_id", requestIds)
-      .in("response_type", ["in_stock", "can_order"]);
-    const eligible = new Set((responses || []).map((row) => row.request_id));
-    const request = (recent || []).find((row) => eligible.has(row.id));
-    if (request) {
-      recentRequest = {
-        id: request.id,
-        productName: request.product_name,
-        createdAt: request.created_at,
-      };
-    }
+  const { data: relationship, error: relationshipError } = await admin
+    .from("store_customers")
+    .select("points_balance, first_seen_at")
+    .eq("store_id", operator.actor.storeId)
+    .eq("customer_id", profile.id)
+    .maybeSingle();
+  if (relationshipError) {
+    return { status: "error", error: "Could not look up that customer." };
   }
 
   return {
     status: "found",
     maskedPhone,
+    maskedEmail: maskEmail(profile.email),
     displayName: safeCustomerName(profile),
-    relationshipId: relationship?.id || null,
-    isStoreCustomer: Boolean(relationship && !relationship.removed_at),
     pointsBalance: relationship?.points_balance || 0,
-    confirmedPurchases: relationship?.confirmed_purchases || 0,
-    recentRequest,
+    memberSince: relationship?.first_seen_at || null,
   };
-}
-
-export async function getHubCustomersAction() {
-  const operator = await requireStoreOperator();
-  if (!operator.ok) return { error: operator.error, rows: [] };
-  if (isDemoMode()) return { rows: [] };
-
-  const { createServiceClient } = await import("@/lib/supabase/admin");
-  const admin = createServiceClient();
-  const { data, error } = await admin
-    .from("store_customers")
-    .select(
-      "id, points_balance, confirmed_purchases, last_seen_at, customer:profiles(first_name, display_name, email, phone_e164, phone_verified)"
-    )
-    .eq("store_id", operator.actor.storeId)
-    .is("removed_at", null)
-    .not("customer_id", "is", null)
-    .order("last_seen_at", { ascending: false })
-    .limit(100);
-  if (error) return { error: "Could not load customers.", rows: [] };
-
-  return {
-    rows: (data || []).map((row) => {
-      const customer = Array.isArray(row.customer)
-        ? row.customer[0]
-        : row.customer;
-      return {
-        id: row.id,
-        displayName: safeCustomerName(customer || {}),
-        maskedPhone:
-          customer?.phone_verified && customer.phone_e164
-            ? maskPhoneE164(customer.phone_e164)
-            : maskEmail(customer?.email),
-        pointsBalance: row.points_balance,
-        confirmedPurchases: row.confirmed_purchases,
-        lastSeenAt: row.last_seen_at,
-      };
-    }),
-  };
-}
-
-export async function addHubCustomerAction(rawPhone: string) {
-  const operator = await requireStoreOperator();
-  if (!operator.ok) return { ok: false as const, error: operator.error };
-  const limited = await consumeRateLimit({
-    bucket: "customer-relationship",
-    limit: 30,
-    windowMs: 10 * 60_000,
-    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
-  });
-  if (!limited.ok) return { ok: false as const, error: limited.error };
-  if (isDemoMode()) return { ok: false as const, error: "No verified demo customer found." };
-
-  const lookup = await lookupCustomerIdentifier(rawPhone);
-  if ("error" in lookup) return { ok: false as const, error: lookup.error };
-  const customer = lookup.customer;
-  if (!customer) {
-    return { ok: false as const, error: "No FINDIT customer found." };
-  }
-  const { createServiceClient } = await import("@/lib/supabase/admin");
-  const admin = createServiceClient();
-  const now = new Date().toISOString();
-  const { data: existing } = await admin
-    .from("store_customers")
-    .select("id, points_balance")
-    .eq("store_id", operator.actor.storeId)
-    .eq("customer_id", customer.id)
-    .maybeSingle();
-  let result = existing;
-  let writeError: { code?: string } | null = null;
-  if (existing) {
-    const updated = await admin
-      .from("store_customers")
-      .update({
-        removed_at: null,
-        marketing_opt_in: false,
-        last_seen_at: now,
-        updated_at: now,
-      })
-      .eq("id", existing.id)
-      .eq("store_id", operator.actor.storeId)
-      .select("id, points_balance")
-      .single();
-    result = updated.data;
-    writeError = updated.error;
-  } else {
-    const inserted = await admin
-      .from("store_customers")
-      .insert({
-        store_id: operator.actor.storeId,
-        customer_id: customer.id,
-        marketing_opt_in: false,
-        removed_at: null,
-        last_seen_at: now,
-        updated_at: now,
-      })
-      .select("id, points_balance")
-      .single();
-    result = inserted.data;
-    writeError = inserted.error;
-    if (inserted.error?.code === "23505") {
-      const retry = await admin
-        .from("store_customers")
-        .update({
-          removed_at: null,
-          marketing_opt_in: false,
-          last_seen_at: now,
-          updated_at: now,
-        })
-        .eq("store_id", operator.actor.storeId)
-        .eq("customer_id", customer.id)
-        .select("id, points_balance")
-        .single();
-      result = retry.data;
-      writeError = retry.error;
-    }
-  }
-  if (writeError || !result) {
-    return { ok: false as const, error: "Could not add this customer." };
-  }
-
-  void Promise.all([
-    trackEvent("store_customer_added", {
-      userId: operator.actor.employeeUserId,
-      storeId: operator.actor.storeId,
-    }),
-    logSecurityEvent({
-      actorId: operator.actor.employeeUserId,
-      action: "store_customer_added",
-      resource: result.id,
-      metadata: {
-        storeId: operator.actor.storeId,
-        hubDeviceId: operator.actor.hubDeviceId,
-        shiftEmployeeId: operator.actor.shiftEmployeeId,
-      },
-    }),
-  ]);
-  return {
-    ok: true as const,
-    relationshipId: result.id,
-    pointsBalance: result.points_balance,
-  };
-}
-
-export async function removeHubCustomerAction(relationshipId: string) {
-  const id = boundUuid(relationshipId);
-  if (!id) return { ok: false as const, error: "Customer not found." };
-  const operator = await requireStoreOperator();
-  if (!operator.ok) return { ok: false as const, error: operator.error };
-
-  const limited = await consumeRateLimit({
-    bucket: "customer-relationship",
-    limit: 30,
-    windowMs: 10 * 60_000,
-    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
-  });
-  if (!limited.ok) return { ok: false as const, error: limited.error };
-  if (!isDemoMode()) {
-    const { createServiceClient } = await import("@/lib/supabase/admin");
-    const admin = createServiceClient();
-    const { data, error } = await admin
-      .from("store_customers")
-      .update({
-        removed_at: new Date().toISOString(),
-        marketing_opt_in: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("store_id", operator.actor.storeId)
-      .is("removed_at", null)
-      .select("id")
-      .maybeSingle();
-    if (error || !data) {
-      return { ok: false as const, error: "Could not remove this customer." };
-    }
-  }
-
-  void Promise.all([
-    trackEvent("store_customer_removed", {
-      userId: operator.actor.employeeUserId,
-      storeId: operator.actor.storeId,
-    }),
-    logSecurityEvent({
-      actorId: operator.actor.employeeUserId,
-      action: "store_customer_removed",
-      resource: id,
-      metadata: {
-        storeId: operator.actor.storeId,
-        hubDeviceId: operator.actor.hubDeviceId,
-        shiftEmployeeId: operator.actor.shiftEmployeeId,
-      },
-    }),
-  ]);
-  return { ok: true as const };
 }
 
 async function confirmPurchase(input: {
@@ -540,7 +329,6 @@ async function confirmPurchase(input: {
   if (isDemoMode()) {
     return {
       ok: true,
-      purchaseId: operationId,
       pointsAwarded: 0,
       pointsBalance: 0,
       alreadyConfirmed: false,
@@ -627,7 +415,6 @@ async function confirmPurchase(input: {
 
   return {
     ok: true,
-    purchaseId: row.purchase_id,
     pointsAwarded: row.points_awarded,
     pointsBalance: row.points_balance,
     alreadyConfirmed: row.already_confirmed,
@@ -640,7 +427,7 @@ export async function confirmLookupPurchaseAction(input: {
 }): Promise<PurchaseResult> {
   const operator = await requireStoreOperator();
   if (!operator.ok) return { ok: false, error: operator.error };
-  const lookup = await lookupCustomerIdentifier(input.phone);
+  const lookup = await lookupCustomerByPhone(input.phone);
   if ("error" in lookup) return { ok: false, error: lookup.error };
   const customer = lookup.customer;
   if (!customer) {
@@ -690,6 +477,241 @@ export async function confirmRequestPurchaseAction(input: {
     source: "request",
     operationId: input.operationId,
   });
+}
+
+export type HubHistoryItem =
+  | {
+      kind: "purchase";
+      productName: string | null;
+      customerFirstName: string;
+      points: number;
+      responseType: null;
+      timestamp: string;
+      employeeDisplayName: string | null;
+      source: "request" | "phone_lookup";
+      status: "confirmed" | "reversed";
+    }
+  | {
+      kind: "request_answer";
+      productName: string;
+      customerFirstName: string;
+      points: null;
+      responseType: "in_stock" | "out_of_stock" | "can_order" | "not_relevant";
+      timestamp: string;
+      employeeDisplayName: string | null;
+    };
+
+type HistoryProfile = {
+  id: string;
+  first_name: string | null;
+  display_name: string | null;
+};
+
+function historyDisplayName(profile: HistoryProfile | undefined) {
+  if (!profile) return null;
+  return (
+    profile.display_name?.trim() ||
+    profile.first_name?.trim() ||
+    null
+  );
+}
+
+export async function getHubHistoryAction(): Promise<{
+  rows: HubHistoryItem[];
+  error?: string;
+}> {
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return { rows: [], error: operator.error };
+  if (isDemoMode()) return { rows: [] };
+
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const [{ data: purchases, error: purchaseError }, { data: responses, error: responseError }] =
+    await Promise.all([
+      admin
+        .from("store_purchases")
+        .select(
+          "customer_id, employee_user_id, shift_employee_id, hub_device_id, request_id, source, points_awarded, status, confirmed_at"
+        )
+        .eq("store_id", operator.actor.storeId)
+        .order("confirmed_at", { ascending: false })
+        .limit(60),
+      admin
+        .from("store_responses")
+        .select("request_id, responded_by, response_type, created_at")
+        .eq("store_id", operator.actor.storeId)
+        .order("created_at", { ascending: false })
+        .limit(60),
+    ]);
+
+  if (purchaseError || responseError) {
+    console.error("[FINDIT] Hub history query failed", {
+      storeId: operator.actor.storeId,
+      purchaseCode: purchaseError?.code,
+      responseCode: responseError?.code,
+    });
+    return { rows: [], error: "Could not load Hub history." };
+  }
+
+  const purchaseRows = purchases || [];
+  const responseRows = responses || [];
+  const requestIds = Array.from(
+    new Set(
+      [...purchaseRows, ...responseRows]
+        .map((row) => row.request_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  const profileIds = Array.from(
+    new Set(
+      [
+        ...purchaseRows.flatMap((row) => [
+          row.customer_id,
+          row.employee_user_id,
+        ]),
+        ...responseRows.map((row) => row.responded_by),
+      ].filter((id): id is string => Boolean(id))
+    )
+  );
+  const shiftIds = Array.from(
+    new Set(
+      purchaseRows
+        .map((row) => row.shift_employee_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  const deviceIds = Array.from(
+    new Set(
+      purchaseRows
+        .map((row) => row.hub_device_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  const [requestResult, profileResult, shiftResult, deviceResult] =
+    await Promise.all([
+      requestIds.length
+        ? admin
+            .from("customer_requests")
+            .select("id, customer_id, product_name")
+            .in("id", requestIds)
+        : Promise.resolve({ data: [], error: null }),
+      profileIds.length
+        ? admin
+            .from("profiles")
+            .select("id, first_name, display_name")
+            .in("id", profileIds)
+        : Promise.resolve({ data: [], error: null }),
+      shiftIds.length
+        ? admin
+            .from("store_shift_employees")
+            .select("id, display_name")
+            .eq("store_id", operator.actor.storeId)
+            .in("id", shiftIds)
+        : Promise.resolve({ data: [], error: null }),
+      deviceIds.length
+        ? admin
+            .from("store_devices")
+            .select("id, device_name")
+            .eq("store_id", operator.actor.storeId)
+            .in("id", deviceIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+  if (
+    requestResult.error ||
+    profileResult.error ||
+    shiftResult.error ||
+    deviceResult.error
+  ) {
+    return { rows: [], error: "Could not load Hub history." };
+  }
+
+  const requestById = new Map(
+    (requestResult.data || []).map((row) => [row.id, row])
+  );
+  const profileById = new Map(
+    ((profileResult.data || []) as HistoryProfile[]).map((row) => [row.id, row])
+  );
+  const missingCustomerIds = Array.from(
+    new Set(
+      (requestResult.data || [])
+        .map((row) => row.customer_id)
+        .filter((id) => id && !profileById.has(id))
+    )
+  );
+  if (missingCustomerIds.length) {
+    const { data: customerProfiles, error: customerProfileError } = await admin
+      .from("profiles")
+      .select("id, first_name, display_name")
+      .in("id", missingCustomerIds);
+    if (customerProfileError) {
+      return { rows: [], error: "Could not load Hub history." };
+    }
+    for (const profile of (customerProfiles || []) as HistoryProfile[]) {
+      profileById.set(profile.id, profile);
+    }
+  }
+  const shiftById = new Map(
+    (shiftResult.data || []).map((row) => [row.id, row.display_name])
+  );
+  const deviceById = new Map(
+    (deviceResult.data || []).map((row) => [row.id, row.device_name])
+  );
+
+  const purchaseHistory: HubHistoryItem[] = purchaseRows.map((row) => {
+    const request = row.request_id ? requestById.get(row.request_id) : undefined;
+    const customerId = row.customer_id || request?.customer_id;
+    const employeeDisplayName =
+      (row.shift_employee_id
+        ? shiftById.get(row.shift_employee_id)
+        : null) ||
+      (row.employee_user_id
+        ? historyDisplayName(profileById.get(row.employee_user_id))
+        : null) ||
+      (row.hub_device_id ? deviceById.get(row.hub_device_id) : null) ||
+      null;
+    return {
+      kind: "purchase",
+      productName: request?.product_name || null,
+      customerFirstName: safeCustomerName(
+        customerId ? profileById.get(customerId) || {} : {}
+      ),
+      points: row.points_awarded,
+      responseType: null,
+      timestamp: row.confirmed_at,
+      employeeDisplayName,
+      source: row.source,
+      status: row.status,
+    };
+  });
+
+  const responseHistory: HubHistoryItem[] = responseRows.flatMap((row) => {
+    const request = requestById.get(row.request_id);
+    if (!request) return [];
+    return [{
+      kind: "request_answer" as const,
+      productName: request.product_name,
+      customerFirstName: safeCustomerName(
+        profileById.get(request.customer_id) || {}
+      ),
+      points: null,
+      responseType: row.response_type,
+      timestamp: row.created_at,
+      employeeDisplayName: historyDisplayName(
+        profileById.get(row.responded_by)
+      ),
+    }];
+  });
+
+  return {
+    rows: [...purchaseHistory, ...responseHistory]
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      )
+      .slice(0, 60),
+  };
 }
 
 type CustomerCursor = { at: string; id: string };

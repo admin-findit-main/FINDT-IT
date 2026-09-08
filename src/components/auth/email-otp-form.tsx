@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
-import { OTP_RESEND_SECONDS, maskEmail } from "@findit/domain";
+import {
+  OTP_RESEND_SECONDS,
+  formatUsNationalInput,
+  maskEmail,
+  normalizeCustomerSignupIdentity,
+} from "@findit/domain";
 import {
   sendEmailOtpAction,
   verifyEmailOtpAction,
@@ -20,6 +25,7 @@ export function EmailOtpForm({
   continueLabel = "Email me a code",
   audience = "shopper",
   emailInputId = "signin-email",
+  signupIdentityRequired = false,
   sendDisabled = false,
   sendBlockedMessage,
   onFinished,
@@ -28,12 +34,15 @@ export function EmailOtpForm({
   continueLabel?: string;
   audience?: LoginAudience;
   emailInputId?: string;
+  signupIdentityRequired?: boolean;
   sendDisabled?: boolean;
   sendBlockedMessage?: string;
   onFinished: (result: { homePath: AppHomePath; needsName: boolean }) => void;
 }) {
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [phone, setPhone] = useState("");
   const [sentEmail, setSentEmail] = useState("");
   const [masked, setMasked] = useState("");
   const [code, setCode] = useState("");
@@ -48,11 +57,20 @@ export function EmailOtpForm({
   }, [seconds]);
 
   async function sendCode(emailValue: string) {
+    const signupIdentity = signupIdentityRequired
+      ? normalizeCustomerSignupIdentity(firstName, phone)
+      : null;
+    if (signupIdentity && !signupIdentity.ok) {
+      toast.error(signupIdentity.error);
+      return false;
+    }
     setLoading(true);
     const result = await sendEmailOtpAction({
       email: emailValue,
       createIfMissing,
       audience,
+      signupIdentity:
+        signupIdentity && signupIdentity.ok ? signupIdentity.identity : undefined,
     });
     setLoading(false);
     if (result.error) {
@@ -158,6 +176,36 @@ export function EmailOtpForm({
   return (
     <form onSubmit={onEmail} className="mt-6 space-y-4">
       {wrongSide ? <WrongLoginSideNotice requiredAudience={wrongSide} /> : null}
+      {signupIdentityRequired ? (
+        <>
+          <div>
+            <Label htmlFor={`${emailInputId}-first-name`}>First name</Label>
+            <Input
+              id={`${emailInputId}-first-name`}
+              name="firstName"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              maxLength={60}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor={`${emailInputId}-phone`}>Phone</Label>
+            <Input
+              id={`${emailInputId}-phone`}
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel-national"
+              placeholder="(703) 555-1234"
+              value={phone}
+              onChange={(e) => setPhone(formatUsNationalInput(e.target.value))}
+              required
+            />
+          </div>
+        </>
+      ) : null}
       <div>
         <Label htmlFor={emailInputId}>Email</Label>
         <Input

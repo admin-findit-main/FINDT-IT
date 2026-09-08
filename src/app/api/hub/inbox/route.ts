@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { getStoreIncomingRequestsAction } from "@/lib/services/actions";
+import {
+  getStoreIncomingRequestsAction,
+  getStoreWaitingRequestCountAction,
+} from "@/lib/services/actions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,6 +11,18 @@ export const revalidate = 0;
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const storeId = url.searchParams.get("storeId") || "";
+  const mode = url.searchParams.get("mode");
+  if (mode === "count") {
+    const count = await getStoreWaitingRequestCountAction(storeId);
+    return NextResponse.json(
+      { count },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        },
+      }
+    );
+  }
   const filter = url.searchParams.get("filter") || "unanswered";
   const range = url.searchParams.get("range") || "7d";
   const rows = await getStoreIncomingRequestsAction(storeId, filter, range);

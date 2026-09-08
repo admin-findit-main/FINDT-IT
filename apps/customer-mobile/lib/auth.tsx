@@ -3,16 +3,20 @@ import type { Session, User } from "@supabase/supabase-js";
 import type { Profile } from "@findit/types";
 import {
   coerceSoloAdminProfile,
+  CUSTOMER_SIGNUP_PHONE_CONFLICT_MESSAGE,
   customerNeedsFirstName,
+  isCustomerSignupPhoneConflict,
   isSoloAdminEmail,
   mapEmailOtpError,
   mapPhoneOtpError,
   maskEmail,
   maskPhoneE164,
   normalizeEmail,
+  normalizeCustomerSignupIdentity,
   normalizePhoneToE164,
   PHONE_OTP_DISABLED_MESSAGE,
   PHONE_OTP_ENABLED,
+  type CustomerSignupIdentity,
 } from "@findit/domain";
 import { supabase, isSupabaseConfigured } from "./supabase";
 import { captureException } from "./monitoring";
@@ -39,6 +43,7 @@ type AuthState = {
   sendEmailOtp: (input: {
     email: string;
     createIfMissing: boolean;
+    signupIdentity?: CustomerSignupIdentity;
   }) => Promise<{ error?: string; email?: string; masked?: string }>;
   verifyEmailOtp: (input: {
     email: string;
@@ -216,9 +221,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
         return { needsName: customerNeedsFirstName(coerced) };
       },
-      sendEmailOtp: async ({ email, createIfMissing }) => {
+      sendEmailOtp: async ({ email, createIfMissing, signupIdentity }) => {
         const parsed = normalizeEmail(email);
         if (!parsed.ok) return { error: parsed.error };
+        const identity = signupIdentity
+          ? normalizeCustomerSignupIdentity(
+              signupIdentity.firstName,
+              signupIdentity.phoneE164
+            )
+          : null;
+        if (identity && !identity.ok) return { error: identity.error };
         if (isSoloAdminEmail(parsed.email)) {
           return {
             error:
@@ -229,10 +241,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: parsed.email,
           options: {
             shouldCreateUser: createIfMissing,
-            data: { account_type: "customer" },
+            data: {
+              account_type: "customer",
+              ...(identity?.ok
+                ? {
+                    first_name: identity.identity.firstName,
+                    display_name: identity.identity.displayName,
+                    phone_e164: identity.identity.phoneE164,
+                  }
+                : {}),
+            },
           },
         });
-        if (error) return { error: mapEmailOtpError(error.message, "send") };
+        if (error) {
+          return {
+            error: isCustomerSignupPhoneConflict(error.message)
+              ? CUSTOMER_SIGNUP_PHONE_CONFLICT_MESSAGE
+              : mapEmailOtpError(error.message, "send"),
+          };
+        }
         return { email: parsed.email, masked: maskEmail(parsed.email) };
       },
       verifyEmailOtp: async ({ email, token }) => {

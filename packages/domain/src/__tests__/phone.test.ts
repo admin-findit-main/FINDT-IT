@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   accountContactLabel,
+  CUSTOMER_SIGNUP_PHONE_CONFLICT_MESSAGE,
   customerNeedsFirstName,
   formatUsNationalInput,
+  isCustomerSignupPhoneConflict,
   mapPhoneOtpError,
   maskPhoneE164,
+  normalizeCustomerSignupIdentity,
   normalizePhoneToE164,
 } from "../phone";
 
@@ -46,6 +49,36 @@ describe("formatUsNationalInput", () => {
     expect(formatUsNationalInput("703")).toBe("(703");
     expect(formatUsNationalInput("703555")).toBe("(703) 555");
     expect(formatUsNationalInput("7035551234")).toBe("(703) 555-1234");
+  });
+});
+
+describe("customer signup identity", () => {
+  it("trims the name and normalizes the required US phone", () => {
+    expect(normalizeCustomerSignupIdentity("  Jordan  ", "(703) 555-1234")).toEqual({
+      ok: true,
+      identity: {
+        firstName: "Jordan",
+        displayName: "Jordan",
+        phoneE164: "+17035551234",
+      },
+    });
+  });
+
+  it("rejects missing identity fields and recognizes phone collisions", () => {
+    expect(normalizeCustomerSignupIdentity("", "7035551234")).toMatchObject({
+      ok: false,
+    });
+    expect(normalizeCustomerSignupIdentity("Jordan", "555")).toMatchObject({
+      ok: false,
+    });
+    expect(
+      isCustomerSignupPhoneConflict(
+        'duplicate key value violates unique constraint "profiles_phone_e164_key"'
+      )
+    ).toBe(true);
+    expect(CUSTOMER_SIGNUP_PHONE_CONFLICT_MESSAGE).not.toMatch(
+      /connected to another|already registered/i
+    );
   });
 });
 

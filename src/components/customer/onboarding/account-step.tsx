@@ -24,6 +24,7 @@ export function AccountStep({
         <EmailOtpForm
           createIfMissing
           audience="shopper"
+          signupIdentityRequired
           continueLabel="Email me a code"
           onFinished={() => onFinished()}
         />

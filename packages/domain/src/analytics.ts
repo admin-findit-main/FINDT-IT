@@ -34,8 +34,6 @@ export const ANALYTICS_EVENTS = [
   "reward_reversed",
   "billing_dispute_created",
   "customer_lookup",
-  "store_customer_added",
-  "store_customer_removed",
   "purchase_confirmed",
   "points_awarded",
 ] as const;

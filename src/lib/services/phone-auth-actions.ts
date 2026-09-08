@@ -9,13 +9,16 @@ import {
   authEmailCopy,
   authEmailOtpCode,
   authEmailSubjectWithCode,
+  CUSTOMER_SIGNUP_PHONE_CONFLICT_MESSAGE,
   customerNeedsFirstName,
+  isCustomerSignupPhoneConflict,
   loginAudienceForAccount,
   mapEmailOtpError,
   mapPhoneOtpError,
   maskEmail,
   maskPhoneE164,
   normalizeEmail,
+  normalizeCustomerSignupIdentity,
   normalizePhoneToE164,
   PHONE_OTP_DISABLED_MESSAGE,
   PHONE_OTP_ENABLED,
@@ -23,6 +26,7 @@ import {
   renderFinditEmailText,
   wrongLoginSideMessage,
   type LoginAudience,
+  type CustomerSignupIdentity,
 } from "@findit/domain";
 import {
   demoCurrentUser,
@@ -356,7 +360,12 @@ async function sendAuthEmailOtp(input: {
   admin: ReturnType<typeof import("@/lib/supabase/admin").createServiceClient>;
   email: string;
   createIfMissing: boolean;
-  userMetadata?: { account_type: string };
+  userMetadata?: {
+    account_type: string;
+    first_name?: string;
+    display_name?: string;
+    phone_e164?: string;
+  };
 }): Promise<{ error?: string }> {
   let generated = await input.admin.auth.admin.generateLink({
     type: "magiclink",
@@ -372,6 +381,9 @@ async function sendAuthEmailOtp(input: {
       email_confirm: true,
       user_metadata: input.userMetadata,
     });
+    if (created.error && isCustomerSignupPhoneConflict(created.error.message)) {
+      return { error: CUSTOMER_SIGNUP_PHONE_CONFLICT_MESSAGE };
+    }
     if (created.error && !alreadyRegistered(created.error.message)) {
       return { error: mapEmailOtpError(created.error.message, "send") };
     }
@@ -430,6 +442,7 @@ export async function sendEmailOtpAction(input: {
   email: string;
   createIfMissing: boolean;
   audience?: LoginAudience;
+  signupIdentity?: CustomerSignupIdentity;
 }): Promise<{
   error?: string;
   code?: "wrong_side";
@@ -439,6 +452,15 @@ export async function sendEmailOtpAction(input: {
 }> {
   const parsed = normalizeEmail(input.email);
   if (!parsed.ok) return { error: parsed.error };
+  const signupIdentity = input.signupIdentity
+    ? normalizeCustomerSignupIdentity(
+        input.signupIdentity.firstName,
+        input.signupIdentity.phoneE164
+      )
+    : null;
+  if (signupIdentity && !signupIdentity.ok) {
+    return { error: signupIdentity.error };
+  }
   const audience = input.audience ?? "shopper";
   const createIfMissing = audience === "store" ? false : input.createIfMissing;
 
@@ -494,13 +516,34 @@ export async function sendEmailOtpAction(input: {
       });
       if (audience && belongs !== audience) return wrongSideResult(belongs);
     }
+    if (!profile && createIfMissing && signupIdentity?.ok) {
+      const { data: phoneOwner } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("phone_e164", signupIdentity.identity.phoneE164)
+        .maybeSingle();
+      if (phoneOwner) {
+        return { error: CUSTOMER_SIGNUP_PHONE_CONFLICT_MESSAGE };
+      }
+    }
 
     const sent = await sendAuthEmailOtp({
       admin,
       email: parsed.email,
       createIfMissing,
       userMetadata:
-        audience === "shopper" ? { account_type: "customer" } : undefined,
+        audience === "shopper"
+          ? {
+              account_type: "customer",
+              ...(signupIdentity?.ok
+                ? {
+                    first_name: signupIdentity.identity.firstName,
+                    display_name: signupIdentity.identity.displayName,
+                    phone_e164: signupIdentity.identity.phoneE164,
+                  }
+                : {}),
+            }
+          : undefined,
     });
     if (sent.error) return { error: sent.error };
     return { email: parsed.email, masked: maskEmail(parsed.email) };
