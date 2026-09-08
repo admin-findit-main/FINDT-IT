@@ -3,6 +3,13 @@ import {
   hasVerifiedEmailIdentity,
   isWaitingHubRequest,
 } from "@/lib/services/hub-policy";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+const loyaltyService = readFileSync(
+  path.join(process.cwd(), "src/lib/services/loyalty.ts"),
+  "utf8"
+);
 
 describe("Hub service privacy policy", () => {
   it("requires verified email identity without requiring a verified phone", () => {
@@ -34,5 +41,15 @@ describe("Hub service privacy policy", () => {
         expiresAt: "2026-09-08T00:00:00.000Z",
       })
     ).toBe(false);
+  });
+
+  it("uses amount RPCs for phone purchases and preserves request purchases", () => {
+    expect(loyaltyService).toContain('"confirm_hub_amount_purchase"');
+    expect(loyaltyService).toContain(
+      '"confirm_pending_store_amount_purchase"'
+    );
+    expect(loyaltyService).toContain("p_amount_cents: input.amountCents");
+    expect(loyaltyService).toContain('"confirm_store_purchase"');
+    expect(loyaltyService).toContain('.select("enabled, points_per_dollar")');
   });
 });

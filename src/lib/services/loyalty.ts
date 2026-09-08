@@ -1,5 +1,6 @@
 "use server";
 
+import { createHmac } from "node:crypto";
 import {
   boundUuid,
   maskPhoneE164,
@@ -7,17 +8,15 @@ import {
 } from "@findit/domain";
 import { isDemoMode } from "@/lib/config/env";
 import {
-  formatRewardsClaimCode,
-  generateRewardsClaimCode,
-  hashRewardsClaimCode,
-} from "@/lib/loyalty/claim-code";
+  estimateHubPoints,
+  MAX_HUB_AMOUNT_CENTS,
+} from "@/lib/hub/amount";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { logSecurityEvent } from "@/lib/security/audit";
 import { toPublicError } from "@/lib/security/public-error";
 import { getCurrentProfile, getStoreWorkspaceAction } from "@/lib/services/actions";
 import { resolveHubTerminalAction } from "@/lib/services/hub-devices";
 import { hasVerifiedEmailIdentity } from "@/lib/services/hub-policy";
-import { claimPendingStoreRewards } from "@/lib/services/rewards-claim";
 import { getHubClockStateAction } from "@/lib/services/shifts";
 import { trackEvent } from "@/lib/services/analytics";
 
@@ -31,6 +30,8 @@ export type CustomerLookupResult =
       maskedEmail: string;
       displayName: string;
       pointsBalance: number;
+      pointsPerDollar: number;
+      rewardsEnabled: boolean;
       memberSince: string | null;
     }
   | {
@@ -38,6 +39,8 @@ export type CustomerLookupResult =
       maskedPhone: string;
       displayName: "Store rewards customer";
       pointsBalance: number;
+      pointsPerDollar: number;
+      rewardsEnabled: boolean;
       memberSince: string | null;
       storeOnly: true;
     }
@@ -56,7 +59,6 @@ type PendingCustomerResult =
   | {
       ok: true;
       customer: Extract<CustomerLookupResult, { status: "pending" }>;
-      claimCode: string | null;
     }
   | { ok: false; error: string };
 
@@ -284,13 +286,17 @@ type PendingRelationshipRow = {
 
 function pendingCustomer(
   maskedPhone: string,
-  row: PendingRelationshipRow
+  row: PendingRelationshipRow,
+  pointsPerDollar: number,
+  rewardsEnabled: boolean
 ): Extract<CustomerLookupResult, { status: "pending" }> {
   return {
     status: "pending",
     maskedPhone,
     displayName: "Store rewards customer",
     pointsBalance: row.points_balance || 0,
+    pointsPerDollar,
+    rewardsEnabled,
     memberSince: row.first_seen_at || null,
     storeOnly: true,
   };
@@ -300,11 +306,12 @@ async function lookupPendingCustomer(input: {
   storeId: string;
   phoneE164: string;
   maskedPhone: string;
+  pointsPerDollar?: number;
+  rewardsEnabled?: boolean;
 }): Promise<
   | {
       customer: Extract<CustomerLookupResult, { status: "pending" }> | null;
       relationshipId: string | null;
-      claimCodeHash: string | null;
     }
   | { error: string }
 > {
@@ -312,14 +319,14 @@ async function lookupPendingCustomer(input: {
   const admin = createServiceClient();
   const { data: claim, error: claimError } = await admin
     .from("store_customer_claims")
-    .select("store_customer_id, claim_code_hash")
+    .select("store_customer_id")
     .eq("store_id", input.storeId)
     .eq("phone_e164", input.phoneE164)
     .is("claimed_at", null)
     .maybeSingle();
   if (claimError) return { error: "Could not look up that customer." };
   if (!claim) {
-    return { customer: null, relationshipId: null, claimCodeHash: null };
+    return { customer: null, relationshipId: null };
   }
   const { data: row, error: relationshipError } = await admin
     .from("store_customers")
@@ -331,9 +338,15 @@ async function lookupPendingCustomer(input: {
     .maybeSingle();
   if (relationshipError) return { error: "Could not look up that customer." };
   return {
-    customer: row ? pendingCustomer(input.maskedPhone, row) : null,
+    customer: row
+      ? pendingCustomer(
+          input.maskedPhone,
+          row,
+          input.pointsPerDollar ?? 1,
+          input.rewardsEnabled ?? false
+        )
+      : null,
     relationshipId: row ? claim.store_customer_id : null,
-    claimCodeHash: row ? claim.claim_code_hash : null,
   };
 }
 
@@ -357,7 +370,19 @@ export async function lookupHubCustomerAction(
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  const lookup = await lookupCustomerByPhone(rawPhone);
+  const [{ data: rewardSettings }, lookup] = await Promise.all([
+    admin
+      .from("store_reward_settings")
+      .select("enabled, points_per_dollar")
+      .eq("store_id", operator.actor.storeId)
+      .maybeSingle(),
+    lookupCustomerByPhone(rawPhone),
+  ]);
+  const pointsPerDollar = Math.max(
+    1,
+    Number(rewardSettings?.points_per_dollar) || 1
+  );
+  const rewardsEnabled = rewardSettings?.enabled ?? false;
   if ("error" in lookup) return { status: "error", error: lookup.error };
   const profile = lookup.customer;
   const maskedPhone = lookup.maskedPhone;
@@ -375,6 +400,8 @@ export async function lookupHubCustomerAction(
       storeId: operator.actor.storeId,
       phoneE164: parsed.e164,
       maskedPhone,
+      pointsPerDollar,
+      rewardsEnabled,
     });
     if ("error" in pending) {
       return { status: "error", error: pending.error };
@@ -398,6 +425,8 @@ export async function lookupHubCustomerAction(
     maskedEmail: maskEmail(profile.email),
     displayName: safeCustomerName(profile),
     pointsBalance: relationship?.points_balance || 0,
+    pointsPerDollar,
+    rewardsEnabled,
     memberSince: relationship?.first_seen_at || null,
   };
 }
@@ -407,12 +436,17 @@ function pendingOperationId(value: string) {
   return operationId ? `pending:${operationId}` : null;
 }
 
-function claimCodeMaterial(phoneE164: string) {
-  const code = generateRewardsClaimCode();
-  return {
-    code,
-    hash: hashRewardsClaimCode(phoneE164, code),
-  };
+function internalPendingClaimHash(phoneE164: string, operationId: string) {
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) {
+    throw new Error("Pending rewards HMAC secret is unavailable.");
+  }
+  return createHmac(
+    "sha256",
+    secret
+  )
+    .update(`${phoneE164}:${operationId}`)
+    .digest("hex");
 }
 
 export async function createPendingStoreCustomerAction(input: {
@@ -443,26 +477,25 @@ export async function createPendingStoreCustomerAction(input: {
     };
   }
 
-  const material = claimCodeMaterial(parsed.e164);
   if (isDemoMode()) {
     return {
       ok: true,
       customer: pendingCustomer(maskPhoneE164(parsed.e164), {
         points_balance: 0,
         first_seen_at: new Date().toISOString(),
-      }),
-      claimCode: formatRewardsClaimCode(material.code),
+      }, 1, true),
     };
   }
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
+  const claimCodeHash = internalPendingClaimHash(parsed.e164, operationId);
   const { data, error } = await admin.rpc(
     "create_or_get_pending_store_customer",
     {
       p_store_id: operator.actor.storeId,
       p_phone_e164: parsed.e164,
-      p_claim_code_hash: material.hash,
+      p_claim_code_hash: claimCodeHash,
       p_create_idempotency_key: operationId,
       p_employee_user_id: operator.actor.employeeUserId,
       p_shift_employee_id: operator.actor.shiftEmployeeId,
@@ -489,6 +522,11 @@ export async function createPendingStoreCustomerAction(input: {
   if (relationshipError || !relationship) {
     return { ok: false, error: "Could not create store rewards. Try again." };
   }
+  const { data: rewardSettings } = await admin
+    .from("store_reward_settings")
+    .select("enabled, points_per_dollar")
+    .eq("store_id", operator.actor.storeId)
+    .maybeSingle();
 
   void logSecurityEvent({
     actorId: operator.actor.employeeUserId,
@@ -496,95 +534,19 @@ export async function createPendingStoreCustomerAction(input: {
     resource: operator.actor.storeId,
     metadata: {
       storeId: operator.actor.storeId,
-      codeIssued: row.created,
+      pendingCreated: row.created,
       shiftEmployeeId: operator.actor.shiftEmployeeId,
       hubDeviceId: operator.actor.hubDeviceId,
     },
   });
   return {
     ok: true,
-    customer: pendingCustomer(maskPhoneE164(parsed.e164), relationship),
-    claimCode: row.created ? formatRewardsClaimCode(material.code) : null,
-  };
-}
-
-export async function issuePendingConnectionCodeAction(input: {
-  phone: string;
-  operationId: string;
-}): Promise<PendingCustomerResult> {
-  const operator = await requireStoreOperator();
-  if (!operator.ok) return { ok: false, error: operator.error };
-  const operationId = pendingOperationId(input.operationId);
-  if (!operationId) return { ok: false, error: "Refresh and try again." };
-  const parsed = normalizePhoneToE164(input.phone);
-  if (!parsed.ok) return { ok: false, error: parsed.error };
-  const limited = await consumeRateLimit({
-    bucket: "loyalty-claim",
-    limit: 5,
-    windowMs: 10 * 60_000,
-    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
-  });
-  if (!limited.ok) return { ok: false, error: limited.error };
-
-  const material = claimCodeMaterial(parsed.e164);
-  if (isDemoMode()) {
-    return {
-      ok: true,
-      customer: pendingCustomer(maskPhoneE164(parsed.e164), {
-        points_balance: 0,
-        first_seen_at: new Date().toISOString(),
-      }),
-      claimCode: formatRewardsClaimCode(material.code),
-    };
-  }
-
-  const pending = await lookupPendingCustomer({
-    storeId: operator.actor.storeId,
-    phoneE164: parsed.e164,
-    maskedPhone: maskPhoneE164(parsed.e164),
-  });
-  if ("error" in pending) return { ok: false, error: pending.error };
-  if (
-    !pending.customer ||
-    !pending.relationshipId ||
-    !pending.claimCodeHash
-  ) {
-    return { ok: false, error: "Store rewards were not found." };
-  }
-  const { createServiceClient } = await import("@/lib/supabase/admin");
-  const admin = createServiceClient();
-  const { data, error } = await admin.rpc(
-    "issue_pending_store_customer_code",
-    {
-      p_store_id: operator.actor.storeId,
-      p_store_customer_id: pending.relationshipId,
-      p_expected_claim_code_hash: pending.claimCodeHash,
-      p_claim_code_hash: material.hash,
-      p_issue_idempotency_key: operationId,
-      p_employee_user_id: operator.actor.employeeUserId,
-      p_shift_employee_id: operator.actor.shiftEmployeeId,
-      p_hub_device_id: operator.actor.hubDeviceId,
-    }
-  );
-  const row = data?.[0] as { already_issued: boolean } | undefined;
-  if (error || !row) {
-    return { ok: false, error: "Could not issue a new connection code." };
-  }
-  void logSecurityEvent({
-    actorId: operator.actor.employeeUserId,
-    action: "pending_store_customer_code_issued",
-    resource: operator.actor.storeId,
-    metadata: {
-      storeId: operator.actor.storeId,
-      newlyIssued: !row.already_issued,
-      shiftEmployeeId: operator.actor.shiftEmployeeId,
-      hubDeviceId: operator.actor.hubDeviceId,
-    },
-  });
-  return {
-    ok: true,
-    customer: pending.customer,
-    claimCode: row.already_issued ? null : formatRewardsClaimCode(material.code),
+    customer: pendingCustomer(
+      maskPhoneE164(parsed.e164),
+      relationship,
+      Math.max(1, Number(rewardSettings?.points_per_dollar) || 1),
+      rewardSettings?.enabled ?? false
+    ),
   };
 }
 
@@ -594,9 +556,18 @@ async function confirmPurchase(input: {
   requestId: string | null;
   source: "request" | "phone_lookup";
   operationId: string;
+  amountCents?: number;
 }): Promise<PurchaseResult> {
   const operationId = boundUuid(input.operationId);
   if (!operationId) return { ok: false, error: "Refresh and try again." };
+  if (
+    input.source === "phone_lookup" &&
+    (!Number.isInteger(input.amountCents) ||
+      input.amountCents! < 1 ||
+      input.amountCents! > MAX_HUB_AMOUNT_CENTS)
+  ) {
+    return { ok: false, error: "Enter a valid purchase amount." };
+  }
 
   const limited = await consumeRateLimit({
     bucket: "confirm-purchase",
@@ -609,8 +580,14 @@ async function confirmPurchase(input: {
   if (isDemoMode()) {
     return {
       ok: true,
-      pointsAwarded: 0,
-      pointsBalance: 0,
+      pointsAwarded:
+        input.source === "phone_lookup"
+          ? estimateHubPoints(input.amountCents || 0, 1)
+          : 0,
+      pointsBalance:
+        input.source === "phone_lookup"
+          ? estimateHubPoints(input.amountCents || 0, 1)
+          : 0,
       alreadyConfirmed: false,
     };
   }
@@ -622,16 +599,27 @@ async function confirmPurchase(input: {
       ? `request:${input.requestId}`
       : `phone:${operationId}`;
 
-  const { data, error } = await admin.rpc("confirm_store_purchase", {
-    p_store_id: input.actor.storeId,
-    p_customer_id: input.customerId,
-    p_employee_user_id: input.actor.employeeUserId,
-    p_shift_employee_id: input.actor.shiftEmployeeId,
-    p_hub_device_id: input.actor.hubDeviceId,
-    p_request_id: input.requestId,
-    p_source: input.source,
-    p_idempotency_key: idempotencyKey,
-  });
+  const { data, error } =
+    input.source === "request"
+      ? await admin.rpc("confirm_store_purchase", {
+          p_store_id: input.actor.storeId,
+          p_customer_id: input.customerId,
+          p_employee_user_id: input.actor.employeeUserId,
+          p_shift_employee_id: input.actor.shiftEmployeeId,
+          p_hub_device_id: input.actor.hubDeviceId,
+          p_request_id: input.requestId,
+          p_source: input.source,
+          p_idempotency_key: idempotencyKey,
+        })
+      : await admin.rpc("confirm_hub_amount_purchase", {
+          p_store_id: input.actor.storeId,
+          p_customer_id: input.customerId,
+          p_amount_cents: input.amountCents,
+          p_employee_user_id: input.actor.employeeUserId,
+          p_shift_employee_id: input.actor.shiftEmployeeId,
+          p_hub_device_id: input.actor.hubDeviceId,
+          p_idempotency_key: idempotencyKey,
+        });
 
   if (error || !data?.[0]) {
     const message = error?.message || "";
@@ -668,6 +656,7 @@ async function confirmPurchase(input: {
       metadata: {
         source: input.source,
         points: row.points_awarded,
+        amountCents: input.amountCents ?? null,
         duplicate: row.already_confirmed,
       },
     }),
@@ -704,6 +693,7 @@ async function confirmPurchase(input: {
 export async function confirmLookupPurchaseAction(input: {
   phone: string;
   operationId: string;
+  amountCents: number;
 }): Promise<PurchaseResult> {
   const operator = await requireStoreOperator();
   if (!operator.ok) return { ok: false, error: operator.error };
@@ -719,17 +709,26 @@ export async function confirmLookupPurchaseAction(input: {
     requestId: null,
     source: "phone_lookup",
     operationId: input.operationId,
+    amountCents: input.amountCents,
   });
 }
 
 export async function confirmPendingPurchaseAction(input: {
   phone: string;
   operationId: string;
+  amountCents: number;
 }): Promise<PurchaseResult> {
   const operator = await requireStoreOperator();
   if (!operator.ok) return { ok: false, error: operator.error };
   const operationId = boundUuid(input.operationId);
   if (!operationId) return { ok: false, error: "Refresh and try again." };
+  if (
+    !Number.isInteger(input.amountCents) ||
+    input.amountCents < 1 ||
+    input.amountCents > MAX_HUB_AMOUNT_CENTS
+  ) {
+    return { ok: false, error: "Enter a valid purchase amount." };
+  }
   const parsed = normalizePhoneToE164(input.phone);
   if (!parsed.ok) return { ok: false, error: parsed.error };
   const limited = await consumeRateLimit({
@@ -741,10 +740,11 @@ export async function confirmPendingPurchaseAction(input: {
   if (!limited.ok) return { ok: false, error: limited.error };
 
   if (isDemoMode()) {
+    const points = estimateHubPoints(input.amountCents, 1);
     return {
       ok: true,
-      pointsAwarded: 0,
-      pointsBalance: 0,
+      pointsAwarded: points,
+      pointsBalance: points,
       alreadyConfirmed: false,
     };
   }
@@ -759,9 +759,10 @@ export async function confirmPendingPurchaseAction(input: {
   }
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  const { data, error } = await admin.rpc("confirm_pending_store_purchase", {
+  const { data, error } = await admin.rpc("confirm_pending_store_amount_purchase", {
     p_store_id: operator.actor.storeId,
     p_store_customer_id: pending.relationshipId,
+    p_amount_cents: input.amountCents,
     p_employee_user_id: operator.actor.employeeUserId,
     p_shift_employee_id: operator.actor.shiftEmployeeId,
     p_hub_device_id: operator.actor.hubDeviceId,
@@ -785,6 +786,7 @@ export async function confirmPendingPurchaseAction(input: {
     metadata: {
       storeId: operator.actor.storeId,
       points: row.points_awarded,
+      amountCents: input.amountCents,
       shiftEmployeeId: operator.actor.shiftEmployeeId,
       hubDeviceId: operator.actor.hubDeviceId,
     },
@@ -1162,6 +1164,7 @@ export async function getStoreRewardSettingsAction() {
     return {
       storeId: workspace.store.id,
       enabled: false,
+      pointsPerDollar: 1,
       pointsPerPurchase: 10,
       rewardThresholdPoints: 100,
       rewardValueCents: 500,
@@ -1177,6 +1180,7 @@ export async function getStoreRewardSettingsAction() {
   return {
     storeId: workspace.store.id,
     enabled: data?.enabled ?? false,
+    pointsPerDollar: data?.points_per_dollar ?? 1,
     pointsPerPurchase: data?.points_per_purchase ?? 10,
     rewardThresholdPoints: data?.reward_threshold_points ?? 100,
     rewardValueCents: data?.reward_value_cents ?? 500,
@@ -1185,6 +1189,7 @@ export async function getStoreRewardSettingsAction() {
 
 export async function updateStoreRewardSettingsAction(input: {
   enabled: boolean;
+  pointsPerDollar: number;
   pointsPerPurchase: number;
   rewardThresholdPoints: number;
   rewardValueCents: number;
@@ -1195,6 +1200,7 @@ export async function updateStoreRewardSettingsAction(input: {
     return { ok: false as const, error: "Only owners and managers can change rewards." };
   }
   const values = [
+    input.pointsPerDollar,
     input.pointsPerPurchase,
     input.rewardThresholdPoints,
     input.rewardValueCents,
@@ -1203,6 +1209,8 @@ export async function updateStoreRewardSettingsAction(input: {
     return { ok: false as const, error: "Use whole numbers for reward settings." };
   }
   if (
+    input.pointsPerDollar < 1 ||
+    input.pointsPerDollar > 1000 ||
     input.pointsPerPurchase < 1 ||
     input.pointsPerPurchase > 1000 ||
     input.rewardThresholdPoints < 1 ||
@@ -1219,6 +1227,7 @@ export async function updateStoreRewardSettingsAction(input: {
     const { error } = await admin.from("store_reward_settings").upsert({
       store_id: workspace.store.id,
       enabled: input.enabled,
+      points_per_dollar: input.pointsPerDollar,
       points_per_purchase: input.pointsPerPurchase,
       reward_threshold_points: input.rewardThresholdPoints,
       reward_value_cents: input.rewardValueCents,
@@ -1233,6 +1242,7 @@ export async function updateStoreRewardSettingsAction(input: {
     resource: workspace.store.id,
     metadata: {
       enabled: input.enabled,
+      pointsPerDollar: input.pointsPerDollar,
       pointsPerPurchase: input.pointsPerPurchase,
       rewardThresholdPoints: input.rewardThresholdPoints,
       rewardValueCents: input.rewardValueCents,
@@ -1257,19 +1267,4 @@ export async function getMyStoreRewardsAction() {
     .order("last_seen_at", { ascending: false })
     .limit(50);
   return data || [];
-}
-
-export async function connectMyStoreRewardsAction(input: {
-  phone: string;
-  code: string;
-}) {
-  const profile = await getCurrentProfile();
-  if (!profile || profile.account_type !== "customer") {
-    return { ok: false as const, error: "Please sign in as a shopper." };
-  }
-  return claimPendingStoreRewards({
-    customerId: profile.id,
-    phone: input.phone,
-    code: input.code,
-  });
 }

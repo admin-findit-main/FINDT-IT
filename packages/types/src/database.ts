@@ -598,7 +598,8 @@ export interface StorePurchase {
   shift_employee_id: string | null;
   hub_device_id: string | null;
   request_id: string | null;
-  source: "request" | "phone_lookup";
+  source: "request" | "phone_lookup" | "hub_phone_pending";
+  amount_cents: number;
   points_awarded: number;
   status: "confirmed" | "reversed";
   idempotency_key: string;
@@ -609,6 +610,7 @@ export interface StorePurchase {
 export interface StoreRewardSettings {
   store_id: string;
   enabled: boolean;
+  points_per_dollar: number;
   points_per_purchase: number;
   reward_threshold_points: number;
   reward_value_cents: number;

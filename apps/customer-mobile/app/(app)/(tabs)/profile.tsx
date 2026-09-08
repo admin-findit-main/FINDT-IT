@@ -104,8 +104,8 @@ export default function ProfileScreen() {
           />
           <Text style={[styles.hint, { color: theme.inkMuted }]}>
             Self-reported and unverified. An exact phone match can help stores
-            find an email-confirmed account; a connection code proves pending
-            rewards are yours.
+            find an email-confirmed account. Store-only rewards remain at that
+            store until secure phone verification is available.
           </Text>
         </GlassCard>
 

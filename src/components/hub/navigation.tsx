@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import {
   Clock3,
   MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   UserRound,
   type LucideIcon,
@@ -26,11 +29,17 @@ export function HubNavigation({
   waitingCount: number;
   onChange: (section: HubSection) => void;
 }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
-    <aside className="z-20 flex shrink-0 bg-[#171315] text-white md:w-60 md:flex-col md:border-r md:border-black/10">
+    <aside
+      className={`z-20 flex shrink-0 bg-[#171315] text-white transition-[width] duration-300 ease-in-out md:flex-col md:border-r md:border-black/10 ${
+        collapsed ? "md:w-20" : "md:w-60"
+      }`}
+    >
       <nav
         aria-label="Hub navigation"
-        className="grid w-full grid-cols-4 gap-1 p-2 md:flex md:flex-col md:gap-2 md:p-4"
+        className="grid w-full grid-cols-4 gap-1 p-2 md:flex md:flex-1 md:flex-col md:gap-2 md:p-4"
       >
         {ITEMS.map((item) => {
           const Icon = item.icon;
@@ -40,18 +49,31 @@ export function HubNavigation({
               key={item.id}
               type="button"
               aria-current={selected ? "page" : undefined}
+              aria-label={item.label}
               onClick={() => onChange(item.id)}
-              className={`relative flex min-h-14 items-center justify-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors md:min-h-14 md:justify-start md:px-4 ${
+              className={`relative flex min-h-14 items-center justify-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors md:min-h-14 ${
+                collapsed ? "md:px-0" : "md:justify-start md:px-4"
+              } ${
                 selected
                   ? "bg-white text-[#171315]"
                   : "text-white/70 hover:bg-white/10 hover:text-white"
               }`}
             >
               <Icon className="h-5 w-5 shrink-0" />
-              <span className="hidden md:inline">{item.label}</span>
+              <span
+                className={`hidden whitespace-nowrap md:inline ${
+                  collapsed ? "md:hidden" : ""
+                }`}
+              >
+                {item.label}
+              </span>
               <span className="text-[10px] md:hidden">{item.label}</span>
               {item.id === "requests" && waitingCount > 0 ? (
-                <span className="absolute right-2 top-1.5 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#B42332] px-1 text-[10px] font-bold leading-none text-white md:static md:ml-auto">
+                <span
+                  className={`absolute right-2 top-1.5 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#B42332] px-1 text-[10px] font-bold leading-none text-white ${
+                    collapsed ? "md:right-1 md:top-1" : "md:static md:ml-auto"
+                  }`}
+                >
                   {waitingCount > 99 ? "99+" : waitingCount}
                 </span>
               ) : null}
@@ -59,6 +81,31 @@ export function HubNavigation({
           );
         })}
       </nav>
+      <div className="hidden border-t border-white/10 p-3 md:block">
+        <button
+          type="button"
+          aria-label={collapsed ? "Expand Hub sidebar" : "Collapse Hub sidebar"}
+          aria-expanded={!collapsed}
+          onClick={() => setCollapsed((value) => !value)}
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-5 w-5" />
+          ) : (
+            <>
+              <PanelLeftClose className="h-5 w-5" />
+              <span>Collapse</span>
+            </>
+          )}
+        </button>
+        <p
+          className={`mt-3 whitespace-nowrap text-center text-xs text-white/50 ${
+            collapsed ? "sr-only" : ""
+          }`}
+        >
+          Powered by FINDIT+
+        </p>
+      </div>
     </aside>
   );
 }

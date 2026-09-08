@@ -84,7 +84,8 @@ export default function ProfilePage() {
           <p className="mt-1 text-xs text-ink-muted">
             This number is self-reported and remains unverified. For convenience,
             stores can find an email-confirmed account by an exact phone match.
-            A connection code—not the phone—is proof for pending rewards.
+            Store-only rewards remain at that store until secure phone
+            verification is available.
           </p>
         </div>
         <div>

@@ -274,53 +274,6 @@ export async function fetchMyStoreRewards() {
   return data || [];
 }
 
-export async function connectStoreRewards(input: {
-  phone: string;
-  code: string;
-}): Promise<
-  | { ok: true; storeName: string; pointsBalance: number }
-  | { ok?: false; error: string }
-> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.access_token) return { error: "Please sign in." };
-  const origin = (
-    process.env.EXPO_PUBLIC_APP_URL || "https://dashboard.askfindit.com"
-  ).replace(/\/$/, "");
-  const response = await fetch(`${origin}/api/rewards/connect`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(input),
-  });
-  const body = (await response.json().catch(() => ({}))) as {
-    ok?: boolean;
-    error?: string;
-    storeName?: string;
-    pointsBalance?: number;
-  };
-  if (
-    !response.ok ||
-    !body.ok ||
-    typeof body.storeName !== "string" ||
-    typeof body.pointsBalance !== "number"
-  ) {
-    return {
-      error:
-        body.error ||
-        "That store rewards connection is invalid, expired, or already used.",
-    };
-  }
-  return {
-    ok: true,
-    storeName: body.storeName,
-    pointsBalance: body.pointsBalance,
-  };
-}
-
 export async function updateMyPlace(input: {
   city: string;
   state: string;

@@ -4,10 +4,14 @@ import { useEffect, useState } from "react";
 import { Delete, UserRoundSearch } from "lucide-react";
 import { formatUsNationalInput } from "@findit/domain";
 import {
+  estimateHubPoints,
+  formatHubAmount,
+  MAX_HUB_AMOUNT_CENTS,
+} from "@/lib/hub/amount";
+import {
   confirmPendingPurchaseAction,
   confirmLookupPurchaseAction,
   createPendingStoreCustomerAction,
-  issuePendingConnectionCodeAction,
   lookupHubCustomerAction,
   type CustomerLookupResult,
 } from "@/lib/services/loyalty";
@@ -16,7 +20,14 @@ type FoundCustomer = Extract<
   CustomerLookupResult,
   { status: "found" | "pending" }
 >;
-type Stage = "home" | "keypad" | "found" | "confirm" | "success" | "not-found";
+type Stage =
+  | "home"
+  | "keypad"
+  | "found"
+  | "amount"
+  | "confirm"
+  | "success"
+  | "not-found";
 
 const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 const PRIVATE_STATE_TIMEOUT_MS = 45_000;
@@ -28,35 +39,40 @@ export function HubCustomerWorkspace({
 }) {
   const [stage, setStage] = useState<Stage>("home");
   const [digits, setDigits] = useState("");
+  const [amountCents, setAmountCents] = useState(0);
   const [customer, setCustomer] = useState<FoundCustomer | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{
+    amountCents: number;
     pointsAwarded: number;
     pointsBalance: number;
   } | null>(null);
   const [operationId, setOperationId] = useState("");
-  const [claimCode, setClaimCode] = useState<string | null>(null);
+  const [pendingCreateOperationId, setPendingCreateOperationId] = useState("");
 
   function reset() {
     setStage("home");
     setDigits("");
+    setAmountCents(0);
     setCustomer(null);
     setError(null);
     setSuccess(null);
     setOperationId("");
-    setClaimCode(null);
+    setPendingCreateOperationId("");
   }
 
   useEffect(() => {
     if (
-      !["keypad", "found", "confirm", "success", "not-found"].includes(stage)
+      !["keypad", "found", "amount", "confirm", "success", "not-found"].includes(
+        stage
+      )
     ) {
       return;
     }
     const timer = window.setTimeout(reset, PRIVATE_STATE_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, [stage, digits, claimCode]);
+  }, [stage, digits, amountCents]);
 
   function addDigit(digit: string) {
     if (busy || digits.length >= 10) return;
@@ -64,11 +80,18 @@ export function HubCustomerWorkspace({
     setError(null);
   }
 
+  function addAmountDigit(digit: string) {
+    if (busy) return;
+    setAmountCents((value) =>
+      Math.min(MAX_HUB_AMOUNT_CENTS, value * 10 + Number(digit))
+    );
+    setError(null);
+  }
+
   async function search() {
     if (busy || digits.length !== 10) return;
     setBusy(true);
     setError(null);
-    setClaimCode(null);
     let result: CustomerLookupResult;
     try {
       result = await lookupHubCustomerAction(digits);
@@ -97,7 +120,9 @@ export function HubCustomerWorkspace({
     if (busy) return;
     setBusy(true);
     setError(null);
-    const createOperationId = crypto.randomUUID();
+    const createOperationId =
+      pendingCreateOperationId || crypto.randomUUID();
+    setPendingCreateOperationId(createOperationId);
     try {
       const result = await createPendingStoreCustomerAction({
         phone: digits,
@@ -108,34 +133,11 @@ export function HubCustomerWorkspace({
         return;
       }
       setCustomer(result.customer);
-      setClaimCode(result.claimCode);
       setOperationId(crypto.randomUUID());
+      setPendingCreateOperationId("");
       setStage("found");
     } catch (createError) {
       console.error("[FINDIT Hub] pending rewards creation failed", createError);
-      setError("We couldn’t connect. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function issueNewCode() {
-    if (busy || customer?.status !== "pending") return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await issuePendingConnectionCodeAction({
-        phone: digits,
-        operationId: crypto.randomUUID(),
-      });
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setCustomer(result.customer);
-      setClaimCode(result.claimCode);
-    } catch (issueError) {
-      console.error("[FINDIT Hub] connection code issue failed", issueError);
       setError("We couldn’t connect. Try again.");
     } finally {
       setBusy(false);
@@ -153,6 +155,7 @@ export function HubCustomerWorkspace({
       const input = {
         phone: digits,
         operationId: operationId || crypto.randomUUID(),
+        amountCents,
       };
       result =
         customer.status === "pending"
@@ -170,6 +173,7 @@ export function HubCustomerWorkspace({
       return;
     }
     setSuccess({
+      amountCents,
       pointsAwarded: result.pointsAwarded,
       pointsBalance: result.pointsBalance,
     });
@@ -203,36 +207,26 @@ export function HubCustomerWorkspace({
 
   if (stage === "success" && success) {
     return (
-      <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-6 py-10 text-center">
-        <div className="grid h-16 w-16 place-items-center rounded-full bg-[#EAF6EF] text-3xl text-[#18784A]">
+      <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-6 py-4 text-center md:py-10">
+        <div className="grid h-14 w-14 place-items-center rounded-full bg-[#EAF6EF] text-2xl text-[#18784A] md:h-16 md:w-16 md:text-3xl">
           ✓
         </div>
-        <h1 className="mt-6 text-4xl font-bold tracking-tight text-[#171315]">
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-[#171315] md:mt-6 md:text-4xl">
           Purchase confirmed
         </h1>
-        <p className="mt-6 text-3xl font-bold text-[#8E1F2D]">
+        <p className="mt-2 text-xl font-semibold tabular-nums text-[#171315] md:mt-4 md:text-2xl">
+          {formatHubAmount(success.amountCents)}
+        </p>
+        <p className="mt-4 text-2xl font-bold text-[#8E1F2D] md:mt-6 md:text-3xl">
           +{success.pointsAwarded} points
         </p>
-        <p className="mt-2 text-lg text-[#6D6669]">
+        <p className="mt-1 text-base text-[#6D6669] md:mt-2 md:text-lg">
           {success.pointsBalance} total points
         </p>
-        {claimCode ? (
-          <div className="mt-7 w-full rounded-2xl border border-[#DED9DB] bg-white p-6">
-            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#81797C]">
-              Connection code
-            </p>
-            <p className="mt-3 font-mono text-3xl font-bold tracking-[0.08em] text-[#171315]">
-              {claimCode}
-            </p>
-            <p className="mt-4 text-base text-[#6D6669]">
-              Open FINDIT → Rewards → Connect store rewards
-            </p>
-          </div>
-        ) : null}
         <button
           type="button"
           onClick={reset}
-          className="mt-10 min-h-14 w-full max-w-sm rounded-xl bg-[#171315] px-8 text-base font-bold text-white"
+          className="mt-5 min-h-12 w-full max-w-sm rounded-xl bg-[#171315] px-8 text-base font-bold text-white md:mt-10 md:min-h-14"
         >
           DONE
         </button>
@@ -274,37 +268,13 @@ export function HubCustomerWorkspace({
               </p>
             ) : null}
           </div>
-          {claimCode ? (
-            <div className="mt-7 rounded-2xl border border-[#DED9DB] bg-[#FAF8F9] p-5 text-center">
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#81797C]">
-                Connection code
-              </p>
-              <p className="mt-3 font-mono text-3xl font-bold tracking-[0.08em] text-[#171315]">
-                {claimCode}
-              </p>
-              <p className="mt-3 text-sm text-[#6D6669]">
-                Give this code to the customer. They can enter it in FINDIT →
-                Rewards → Connect store rewards.
-              </p>
-            </div>
-          ) : null}
           <button
             type="button"
-            onClick={() => setStage("confirm")}
+            onClick={() => setStage("amount")}
             className="mt-8 min-h-14 w-full rounded-xl bg-[#8E1F2D] px-6 text-base font-bold text-white"
           >
-            CONTINUE
+            ENTER PURCHASE AMOUNT
           </button>
-          {customer.status === "pending" ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void issueNewCode()}
-              className="mt-3 min-h-12 w-full rounded-xl border border-[#CEC7CA] px-5 text-sm font-semibold text-[#413B3E] disabled:opacity-50"
-            >
-              {busy ? "ISSUING…" : "ISSUE NEW CONNECTION CODE"}
-            </button>
-          ) : null}
           {error ? (
             <p className="mt-4 rounded-xl bg-[#FFF0F1] px-4 py-3 text-sm text-[#8E1F2D]">
               {error}
@@ -315,23 +285,131 @@ export function HubCustomerWorkspace({
     );
   }
 
+  if (stage === "amount" && customer) {
+    const estimatedPoints = estimateHubPoints(
+      amountCents,
+      customer.rewardsEnabled ? customer.pointsPerDollar : 0
+    );
+    return (
+      <section className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden px-4 py-3 sm:px-6 md:px-8 md:py-5">
+        <div className="flex shrink-0 items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#7A1D28]">
+              Purchase amount
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#171315] md:text-3xl">
+              Enter the total
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStage("found")}
+            className="min-h-11 rounded-xl px-4 text-sm font-semibold text-[#6D6669]"
+          >
+            Back
+          </button>
+        </div>
+
+        <div className="mt-3 grid min-h-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_18rem] sm:items-center sm:gap-4 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-6">
+          <div className="rounded-2xl border border-[#DED9DB] bg-white p-4 text-center md:p-7">
+            <p className="truncate text-sm font-semibold text-[#6D6669]">
+              {customer.displayName}
+            </p>
+            <p
+              aria-label="Purchase amount"
+              aria-live="polite"
+              className="mt-2 text-4xl font-bold tabular-nums tracking-tight text-[#171315] md:text-6xl"
+            >
+              {formatHubAmount(amountCents)}
+            </p>
+            <p className="mt-2 text-sm font-semibold text-[#8E1F2D] md:text-base">
+              Estimated {estimatedPoints} point
+              {estimatedPoints === 1 ? "" : "s"}
+            </p>
+            <p className="mt-1 text-xs text-[#81797C]">
+              Final points are calculated when the purchase is confirmed.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 md:gap-3">
+            {DIGITS.map((digit) => (
+              <button
+                key={digit}
+                type="button"
+                disabled={busy}
+                onClick={() => addAmountDigit(digit)}
+                className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-xl font-semibold text-[#171315] active:bg-[#EEE9EB] md:min-h-14 md:text-2xl"
+              >
+                {digit}
+              </button>
+            ))}
+            <button
+              type="button"
+              disabled={busy || amountCents === 0}
+              onClick={() => setAmountCents(0)}
+              className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-sm font-semibold text-[#413B3E] disabled:opacity-35 md:min-h-14"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => addAmountDigit("0")}
+              className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-xl font-semibold text-[#171315] md:min-h-14 md:text-2xl"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              disabled={busy || amountCents === 0}
+              aria-label="Delete last amount digit"
+              onClick={() => setAmountCents((value) => Math.floor(value / 10))}
+              className="grid min-h-11 place-items-center rounded-xl border border-[#D8D1D4] bg-white text-[#413B3E] disabled:opacity-35 md:min-h-14"
+            >
+              <Delete className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              disabled={amountCents === 0}
+              onClick={() => setStage("confirm")}
+              className="col-span-3 min-h-11 rounded-xl bg-[#8E1F2D] px-5 text-sm font-bold text-white disabled:bg-[#C7BFC2] md:min-h-14"
+            >
+              REVIEW PURCHASE
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   if (stage === "confirm" && customer) {
     return (
-      <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-6 py-10">
-        <div className="rounded-2xl border border-[#DED9DB] bg-white p-7 text-center md:p-9">
-          <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#81797C]">
+      <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 py-2 md:px-6 md:py-10">
+        <div className="rounded-2xl border border-[#DED9DB] bg-white p-4 text-center md:p-9">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#81797C] md:text-sm">
             Confirm transaction
           </p>
-          <h1 className="mt-3 break-words text-3xl font-bold tracking-tight text-[#171315]">
+          <h1 className="mt-1 break-words text-xl font-bold tracking-tight text-[#171315] md:mt-3 md:text-3xl">
             Confirm purchase for {customer.displayName}?
           </h1>
-          <p className="mt-3 text-base text-[#6D6669]">
+          <p className="mt-2 text-2xl font-bold tabular-nums text-[#171315] md:mt-5 md:text-4xl">
+            {formatHubAmount(amountCents)}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-[#8E1F2D] md:mt-2 md:text-base">
+            Estimated{" "}
+            {estimateHubPoints(
+              amountCents,
+              customer.rewardsEnabled ? customer.pointsPerDollar : 0
+            )}{" "}
+            points
+          </p>
+          <p className="mt-1 text-sm text-[#6D6669] md:mt-3 md:text-base">
             {customer.status === "pending"
               ? "Points will be saved in rewards for this store only."
               : "Points will be awarded to this customer account."}
           </p>
           {error ? (
-            <p className="mt-5 rounded-xl bg-[#FFF0F1] px-4 py-3 text-sm text-[#8E1F2D]">
+            <p className="mt-2 rounded-xl bg-[#FFF0F1] px-4 py-2 text-sm text-[#8E1F2D] md:mt-5 md:py-3">
               {error}
             </p>
           ) : null}
@@ -339,15 +417,15 @@ export function HubCustomerWorkspace({
             type="button"
             disabled={busy}
             onClick={() => void confirmPurchase()}
-            className="mt-8 min-h-16 w-full rounded-xl bg-[#8E1F2D] px-6 text-lg font-bold text-white disabled:opacity-50"
+            className="mt-3 min-h-11 w-full rounded-xl bg-[#8E1F2D] px-6 text-base font-bold text-white disabled:opacity-50 md:mt-8 md:min-h-16 md:text-lg"
           >
             {busy ? "CONFIRMING…" : "CONFIRM PURCHASE"}
           </button>
           <button
             type="button"
             disabled={busy}
-            onClick={() => setStage("found")}
-            className="mt-3 min-h-12 w-full rounded-xl text-sm font-semibold text-[#6D6669]"
+            onClick={() => setStage("amount")}
+            className="mt-1 min-h-11 w-full rounded-xl text-sm font-semibold text-[#6D6669] md:mt-3 md:min-h-12"
           >
             Back
           </button>
@@ -399,13 +477,13 @@ export function HubCustomerWorkspace({
   }
 
   return (
-    <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-6 py-8">
+    <section className="mx-auto flex h-full w-full max-w-2xl flex-col justify-center overflow-hidden px-4 py-3 sm:px-6 md:py-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#7A1D28]">
             Find Customer
           </p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#171315]">
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#171315] md:text-3xl">
             Enter customer&apos;s phone number
           </h1>
         </div>
@@ -433,7 +511,7 @@ export function HubCustomerWorkspace({
 
       <div
         aria-label="Customer phone number"
-        className="mt-7 flex min-h-20 items-center justify-center rounded-2xl border border-[#CEC7CA] bg-white px-6 text-center text-3xl font-semibold tracking-[0.08em] text-[#171315]"
+        className="mt-3 flex min-h-14 items-center justify-center rounded-2xl border border-[#CEC7CA] bg-white px-6 text-center text-2xl font-semibold tracking-[0.08em] text-[#171315] md:min-h-16 md:text-3xl"
       >
         {digits ? formatUsNationalInput(digits) : "(___) ___-____"}
       </div>
@@ -444,14 +522,14 @@ export function HubCustomerWorkspace({
         </p>
       ) : null}
 
-      <div className="mt-5 grid grid-cols-3 gap-3">
+      <div className="mt-3 grid grid-cols-3 gap-2 md:gap-3">
         {DIGITS.map((digit) => (
           <button
             key={digit}
             type="button"
             disabled={busy}
             onClick={() => addDigit(digit)}
-            className="min-h-16 rounded-xl border border-[#D8D1D4] bg-white text-2xl font-semibold text-[#171315] active:bg-[#EEE9EB]"
+            className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-xl font-semibold text-[#171315] active:bg-[#EEE9EB] md:min-h-12 md:text-2xl"
           >
             {digit}
           </button>
@@ -461,7 +539,7 @@ export function HubCustomerWorkspace({
           disabled={busy || digits.length === 0}
           aria-label="Delete last digit"
           onClick={() => setDigits((value) => value.slice(0, -1))}
-          className="grid min-h-16 place-items-center rounded-xl border border-[#D8D1D4] bg-white text-[#413B3E] disabled:opacity-35"
+          className="grid min-h-11 place-items-center rounded-xl border border-[#D8D1D4] bg-white text-[#413B3E] disabled:opacity-35 md:min-h-12"
         >
           <Delete className="h-6 w-6" />
         </button>
@@ -469,7 +547,7 @@ export function HubCustomerWorkspace({
           type="button"
           disabled={busy}
           onClick={() => addDigit("0")}
-          className="min-h-16 rounded-xl border border-[#D8D1D4] bg-white text-2xl font-semibold text-[#171315]"
+          className="min-h-11 rounded-xl border border-[#D8D1D4] bg-white text-xl font-semibold text-[#171315] md:min-h-12 md:text-2xl"
         >
           0
         </button>
@@ -477,7 +555,7 @@ export function HubCustomerWorkspace({
           type="button"
           disabled={busy || digits.length !== 10}
           onClick={() => void search()}
-          className="min-h-16 rounded-xl bg-[#8E1F2D] px-3 text-sm font-bold text-white disabled:bg-[#C7BFC2]"
+          className="min-h-11 rounded-xl bg-[#8E1F2D] px-3 text-sm font-bold text-white disabled:bg-[#C7BFC2] md:min-h-12"
         >
           {busy ? "SEARCHING…" : "SEARCH"}
         </button>

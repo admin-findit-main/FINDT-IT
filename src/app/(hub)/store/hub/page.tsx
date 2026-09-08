@@ -453,7 +453,11 @@ export default function FinditHubPage() {
           waitingCount={waitingCount}
           onChange={setSection}
         />
-        <main className="min-h-0 flex-1 overflow-y-auto">
+        <main
+          className={`min-h-0 flex-1 ${
+            section === "customers" ? "overflow-hidden" : "overflow-y-auto"
+          }`}
+        >
           {section === "customers" ? (
             <HubCustomerWorkspace
               onPurchaseConfirmed={() =>

@@ -1,16 +1,11 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/primitives";
-import { ConnectStoreRewardsForm } from "@/components/customer/connect-store-rewards-form";
 import { ShopperFinditPoints } from "@/components/customer/findit-points";
-import { getCurrentProfile } from "@/lib/services/actions";
 import { getMyStoreRewardsAction } from "@/lib/services/loyalty";
 import { formatRelativeTime } from "@/lib/utils";
 
 export default async function ShopperRewardsPage() {
-  const [relationships, profile] = await Promise.all([
-    getMyStoreRewardsAction(),
-    getCurrentProfile(),
-  ]);
+  const relationships = await getMyStoreRewardsAction();
 
   return (
     <div className="mx-auto max-w-xl px-5 py-8 pb-12 sm:px-8">
@@ -20,8 +15,6 @@ export default async function ShopperRewardsPage() {
       </p>
 
       <ShopperFinditPoints />
-
-      <ConnectStoreRewardsForm defaultPhone={profile?.phone_e164 || ""} />
 
       <h2 className="mt-8 text-sm font-semibold uppercase tracking-wider text-ink-muted">
         Store rewards

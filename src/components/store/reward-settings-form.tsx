@@ -12,13 +12,17 @@ export function RewardSettingsForm({
 }: {
   initial: {
     enabled: boolean;
+    pointsPerDollar: number;
     pointsPerPurchase: number;
     rewardThresholdPoints: number;
     rewardValueCents: number;
   };
 }) {
   const [enabled, setEnabled] = useState(initial.enabled);
-  const [points, setPoints] = useState(initial.pointsPerPurchase);
+  const [pointsPerDollar, setPointsPerDollar] = useState(
+    initial.pointsPerDollar
+  );
+  const [legacyPoints, setLegacyPoints] = useState(initial.pointsPerPurchase);
   const [threshold, setThreshold] = useState(initial.rewardThresholdPoints);
   const [valueDollars, setValueDollars] = useState(
     (initial.rewardValueCents / 100).toFixed(2)
@@ -34,7 +38,8 @@ export function RewardSettingsForm({
         const dollars = Number(valueDollars);
         const result = await updateStoreRewardSettingsAction({
           enabled,
-          pointsPerPurchase: points,
+          pointsPerDollar,
+          pointsPerPurchase: legacyPoints,
           rewardThresholdPoints: threshold,
           rewardValueCents: Number.isFinite(dollars)
             ? Math.round(dollars * 100)
@@ -64,17 +69,40 @@ export function RewardSettingsForm({
         <IosSwitch decorative label="Store rewards" checked={enabled} />
       </button>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <Label htmlFor="points-per-purchase">Points per purchase</Label>
+          <Label htmlFor="points-per-dollar">Points per dollar</Label>
+          <Input
+            id="points-per-dollar"
+            type="number"
+            min={1}
+            max={1000}
+            value={pointsPerDollar}
+            onChange={(event) =>
+              setPointsPerDollar(Number(event.target.value))
+            }
+          />
+          <p className="mt-1 text-xs text-ink-muted">
+            Used for amount purchases entered in Hub.
+          </p>
+        </div>
+        <div>
+          <Label htmlFor="points-per-purchase">
+            Points per request purchase
+          </Label>
           <Input
             id="points-per-purchase"
             type="number"
             min={1}
             max={1000}
-            value={points}
-            onChange={(event) => setPoints(Number(event.target.value))}
+            value={legacyPoints}
+            onChange={(event) =>
+              setLegacyPoints(Number(event.target.value))
+            }
           />
+          <p className="mt-1 text-xs text-ink-muted">
+            Kept for the legacy request-confirmation flow.
+          </p>
         </div>
         <div>
           <Label htmlFor="reward-threshold">Points for a reward</Label>
