@@ -4,9 +4,11 @@ import {
   formatCityState,
   formatShortPlace,
   isCompleteShortPlace,
+  mergeZipIntoGpsPlace,
   normalizeStateCode,
   normalizeStoreLocation,
   parseCityLookup,
+  parsePhotonReverse,
   parsePhotonStreetFeatures,
   parseReverseGeocode,
   parseZipLookup,
@@ -212,5 +214,44 @@ describe("parseReverseGeocode", () => {
         postcode: "M5V",
       })
     ).toBeNull();
+  });
+});
+
+describe("mergeZipIntoGpsPlace", () => {
+  it("does not replace a GPS reverse city with the Zippopotam centroid city", () => {
+    expect(
+      mergeZipIntoGpsPlace(
+        { city: "Reston", state: "VA", postalCode: "20191" },
+        { city: "Herndon", state: "VA", postalCode: "20191" }
+      )
+    ).toEqual({ city: "Reston", state: "VA", postalCode: "20191" });
+  });
+
+  it("fills missing ZIP only when GPS already has a city", () => {
+    expect(
+      mergeZipIntoGpsPlace(
+        { city: "Falls Church", state: "VA", postalCode: "" },
+        { city: "Falls Church", state: "VA", postalCode: "22046" }
+      )
+    ).toEqual({ city: "Falls Church", state: "VA", postalCode: "22046" });
+  });
+});
+
+describe("parsePhotonReverse", () => {
+  it("reads Photon reverse properties without requiring a street", () => {
+    expect(
+      parsePhotonReverse({
+        features: [
+          {
+            properties: {
+              countrycode: "US",
+              city: "Alexandria",
+              state: "Virginia",
+              postcode: "22314",
+            },
+          },
+        ],
+      })
+    ).toEqual({ city: "Alexandria", state: "VA", postalCode: "22314" });
   });
 });

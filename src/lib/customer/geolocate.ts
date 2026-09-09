@@ -11,17 +11,19 @@ export type GeolocateOk = {
 export type GeolocateFail = { ok: false; error: string };
 
 const POSITION_OPTIONS: PositionOptions = {
-  enableHighAccuracy: false,
+  enableHighAccuracy: true,
   timeout: 12_000,
-  maximumAge: 5 * 60_000,
+  maximumAge: 45_000,
 };
 
 const GEOCODE_BUDGET_MS = 8_000;
 const LAST_KNOWN_OPTIONS: PositionOptions = {
   enableHighAccuracy: false,
   timeout: 3_000,
-  maximumAge: Infinity,
+  maximumAge: 2 * 60_000,
 };
+/** Reject last-known fixes worse than ~2 km — too coarse for nearest-store. */
+const MAX_LAST_KNOWN_ACCURACY_M = 2_000;
 
 export function geolocationErrorMessage(err: unknown): string {
   const code =
@@ -46,6 +48,15 @@ function readPosition(
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(resolve, reject, options);
   });
+}
+
+function isUsableLastKnown(pos: GeolocationPosition): boolean {
+  const accuracy = pos.coords.accuracy;
+  if (Number.isFinite(accuracy) && accuracy > MAX_LAST_KNOWN_ACCURACY_M) {
+    return false;
+  }
+  const ageMs = Date.now() - pos.timestamp;
+  return Number.isFinite(ageMs) && ageMs <= 2 * 60_000;
 }
 
 export async function reverseGeocodeWithBudget(
@@ -90,7 +101,9 @@ export async function geolocateUsPlace(): Promise<GeolocateOk | GeolocateFail> {
           ? Number((error as { code: number }).code)
           : NaN;
       if (code === 1) throw error;
-      pos = await readPosition(LAST_KNOWN_OPTIONS);
+      const last = await readPosition(LAST_KNOWN_OPTIONS);
+      if (!isUsableLastKnown(last)) throw error;
+      pos = last;
     }
     const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
     const place = await reverseGeocodeWithBudget(coords.lat, coords.lng);

@@ -40,6 +40,56 @@ export async function fetchRoutableCategories(): Promise<
   }
 }
 
+export type PublicStoreMapItem = {
+  id: string;
+  name: string;
+  slug: string;
+  street_address: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  phone: string | null;
+  website: string | null;
+  is_verified: boolean;
+  accepting_requests: boolean;
+  avg_response_minutes: number | null;
+  latitude: number;
+  longitude: number;
+  business_type: string | null;
+  open_now: boolean;
+  open_label: string;
+  hours_label: string;
+  distance_miles: number | null;
+  hours: {
+    day_of_week: number;
+    open_time: string | null;
+    close_time: string | null;
+    is_closed: boolean;
+  }[];
+};
+
+export async function fetchStoresMap(
+  lat?: number,
+  lng?: number
+): Promise<PublicStoreMapItem[]> {
+  try {
+    const params = new URLSearchParams();
+    if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
+      params.set("lat", String(lat));
+      params.set("lng", String(lng));
+    }
+    const qs = params.toString();
+    const response = await fetch(
+      `${customerWebOrigin()}/api/customer/stores-map${qs ? `?${qs}` : ""}`
+    );
+    if (!response.ok) return [];
+    const body = (await response.json()) as { stores?: PublicStoreMapItem[] };
+    return body.stores || [];
+  } catch {
+    return [];
+  }
+}
+
 export async function reverseGeocodeFromWeb(
   latitude: number,
   longitude: number

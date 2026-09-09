@@ -46,9 +46,10 @@ const ITEMS: {
   href: Href;
   label: string;
   icon: React.ComponentProps<typeof FontAwesome>["name"];
-  match: "index" | "requests" | "notifications" | "rewards" | "plan" | "profile";
+  match: "index" | "map" | "requests" | "notifications" | "rewards" | "plan" | "profile";
 }[] = [
   { href: "/(app)/(tabs)", label: "Find", icon: "search", match: "index" },
+  { href: "/(app)/(tabs)/map" as Href, label: "Stores", icon: "map", match: "map" },
   { href: "/(app)/(tabs)/requests", label: "Requests", icon: "list", match: "requests" },
   { href: "/(app)/(tabs)/notifications", label: "Alerts", icon: "bell", match: "notifications" },
   { href: "/(app)/(tabs)/rewards", label: "Rewards", icon: "gift", match: "rewards" },
@@ -64,6 +65,7 @@ function activeMenuKey(pathname: string, segments: string[]) {
   if (path.includes("/request/")) return "requests";
   const leaf = segments.filter(Boolean).at(-1) || "";
   if (
+    leaf === "map" ||
     leaf === "requests" ||
     leaf === "notifications" ||
     leaf === "rewards" ||
@@ -72,6 +74,7 @@ function activeMenuKey(pathname: string, segments: string[]) {
   ) {
     return leaf;
   }
+  if (path.includes("/map")) return "map";
   if (path.includes("/requests")) return "requests";
   if (path.includes("/notifications")) return "notifications";
   if (path.includes("/rewards")) return "rewards";

@@ -258,6 +258,7 @@ export async function updateSession(request: NextRequest) {
     internalPath.startsWith("/notifications") ||
     internalPath.startsWith("/profile") ||
     internalPath.startsWith("/plan") ||
+    internalPath.startsWith("/map") ||
     isStoreAppPath(internalPath) ||
     isAdminAppPath(internalPath) ||
     isWelcome;
@@ -284,6 +285,7 @@ export async function updateSession(request: NextRequest) {
       internalPath.startsWith("/notifications") ||
       internalPath.startsWith("/profile") ||
       internalPath.startsWith("/plan") ||
+      internalPath.startsWith("/map") ||
       isWelcome;
     url.pathname =
       isStoreAppPath(internalPath) || isAdminAppPath(internalPath)

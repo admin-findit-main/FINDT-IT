@@ -59,6 +59,7 @@ describe("pretty store and dashboard paths", () => {
 
   it("keeps shopper store profiles on the dashboard app", () => {
     expect(surfaceForAppPath("/shops/acme")).toBe("dashboard");
+    expect(surfaceForAppPath("/map")).toBe("dashboard");
     expect(surfaceForAppPath("/stores/acme")).toBe("www");
     expect(surfaceForAppPath("/store")).toBe("store");
     expect(surfaceForAppPath("/store/requests")).toBe("store");

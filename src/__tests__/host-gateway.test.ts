@@ -191,6 +191,26 @@ describe("decideHostRouting", () => {
     }
   });
 
+  it("keeps the customer stores map on the dashboard", () => {
+    const decision = decideHostRouting(
+      req("dashboard.askfindit.com", "/map"),
+      "customer"
+    );
+    expect(decision.kind).toBe("continue");
+    if (decision.kind === "continue") {
+      expect(decision.internalPath).toBe("/map");
+    }
+  });
+
+  it("sends www stores map links to the dashboard app", () => {
+    const decision = decideHostRouting(req("www.askfindit.com", "/map"), "anonymous");
+    expect(decision.kind).toBe("redirect");
+    if (decision.kind === "redirect") {
+      expect(decision.url.hostname).toBe("dashboard.askfindit.com");
+      expect(decision.url.pathname).toBe("/map");
+    }
+  });
+
   it("does not rewrite API push delivery on dashboard or store hosts", () => {
     for (const host of ["dashboard.askfindit.com", "store.askfindit.com"]) {
       const decision = decideHostRouting(req(host, "/api/push/deliver"), "anonymous");

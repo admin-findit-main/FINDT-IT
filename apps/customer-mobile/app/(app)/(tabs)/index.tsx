@@ -194,7 +194,10 @@ export default function HomeFindItScreen() {
         return;
       }
       const current = Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy:
+          "BestForNavigation" in Location.Accuracy
+            ? Location.Accuracy.BestForNavigation
+            : Location.Accuracy.High,
       });
       const loc = await Promise.race([
         current,
@@ -203,8 +206,8 @@ export default function HomeFindItScreen() {
         ),
       ]).catch(async () => {
         const last = await Location.getLastKnownPositionAsync({
-          maxAge: 15 * 60_000,
-          requiredAccuracy: 5_000,
+          maxAge: 60_000,
+          requiredAccuracy: 2_000,
         });
         if (!last) throw new Error("location-unavailable");
         return last;
@@ -222,10 +225,22 @@ export default function HomeFindItScreen() {
           loc.coords.latitude,
           loc.coords.longitude
         );
-        if (found) next = found;
-      } else if (next.postalCode) {
-        const zip = await lookupUsZip(next.postalCode);
-        if (zip) next = zip;
+        if (found) {
+          next = {
+            city: next.city.trim() || found.city,
+            state: next.state || found.state,
+            postalCode: next.postalCode || found.postalCode,
+          };
+        }
+      } else if (!next.postalCode) {
+        // Keep GPS city/state; only fill a missing ZIP when needed.
+        const found = await reverseGeocodeFromWeb(
+          loc.coords.latitude,
+          loc.coords.longitude
+        );
+        if (found?.postalCode) {
+          next = { ...next, postalCode: found.postalCode };
+        }
       }
       setPlace(next);
       setEditPlace(!isCompleteShortPlace(next));

@@ -232,9 +232,55 @@ export function parseReverseGeocode(payload: unknown): ShortPlace | null {
   return { city, state, postalCode };
 }
 
+/**
+ * Merge Zippopotam into a GPS reverse result.
+ * Never replace a city/state the reverse geocoder already found with the ZIP
+ * centroid “place name” (often the post office city, miles away).
+ */
+export function mergeZipIntoGpsPlace(
+  gps: ShortPlace,
+  fromZip: ShortPlace | null
+): ShortPlace {
+  if (!fromZip) return gps;
+  return {
+    city: gps.city.trim() || fromZip.city,
+    state: normalizeStateCode(gps.state) || fromZip.state,
+    postalCode: digitsPostalCode(gps.postalCode) || fromZip.postalCode,
+  };
+}
+
+/** Parse Photon reverse (or search) payload into city / state / ZIP. No street required. */
+export function parsePhotonReverse(payload: unknown): ShortPlace | null {
+  if (!payload || typeof payload !== "object") return null;
+  const features = (payload as { features?: unknown[] }).features;
+  const feature = Array.isArray(features) ? features[0] : null;
+  if (!feature || typeof feature !== "object") return null;
+  const props = (feature as { properties?: Record<string, unknown> }).properties;
+  if (!props) return null;
+  const country = String(props.countrycode || props.country || "").toUpperCase();
+  if (country && country !== "US" && country !== "USA" && country !== "UNITED STATES") {
+    return null;
+  }
+  const city = String(
+    props.city ||
+      props.town ||
+      props.village ||
+      props.municipality ||
+      props.locality ||
+      props.district ||
+      props.county ||
+      ""
+  ).trim();
+  const state = normalizeStateCode(String(props.state || ""));
+  const postalCode = digitsPostalCode(String(props.postcode || ""));
+  if (!city && !postalCode) return null;
+  return { city, state, postalCode };
+}
+
 const ZIPPO = "https://api.zippopotam.us/us";
 const REVERSE_GEOCODE =
   "https://api.bigdatacloud.net/data/reverse-geocode-client";
+const PHOTON_REVERSE = "https://photon.komoot.io/reverse";
 
 const zipLookupCache = new Map<string, ShortPlace | null>();
 
@@ -257,27 +303,54 @@ export async function lookupUsZip(zip: string): Promise<ShortPlace | null> {
   }
 }
 
-/** GPS → city, state, ZIP. Never a street address. */
-export async function reverseGeocodeUs(
+async function reverseGeocodePhoton(
   latitude: number,
   longitude: number
 ): Promise<ShortPlace | null> {
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  try {
+    const url = new URL(PHOTON_REVERSE);
+    url.searchParams.set("lat", String(latitude));
+    url.searchParams.set("lon", String(longitude));
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    return parsePhotonReverse(await res.json());
+  } catch {
+    return null;
+  }
+}
+
+async function reverseGeocodeBigDataCloud(
+  latitude: number,
+  longitude: number
+): Promise<ShortPlace | null> {
   try {
     const res = await fetch(
       `${REVERSE_GEOCODE}?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`
     );
     if (!res.ok) return null;
-    const parsed = parseReverseGeocode(await res.json());
-    if (!parsed) return null;
-    if (parsed.postalCode) {
-      const fromZip = await lookupUsZip(parsed.postalCode);
-      if (fromZip) return fromZip;
-    }
-    return parsed;
+    return parseReverseGeocode(await res.json());
   } catch {
     return null;
   }
+}
+
+/**
+ * GPS → city, state, ZIP. Never a street address.
+ * Prefer Photon reverse; fall back to BigDataCloud. Zippopotam may fill blank
+ * fields only — never overwrite a reverse-geocoded city with the ZIP centroid.
+ */
+export async function reverseGeocodeUs(
+  latitude: number,
+  longitude: number
+): Promise<ShortPlace | null> {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  const parsed =
+    (await reverseGeocodePhoton(latitude, longitude)) ||
+    (await reverseGeocodeBigDataCloud(latitude, longitude));
+  if (!parsed) return null;
+  if (!parsed.postalCode) return parsed;
+  const fromZip = await lookupUsZip(parsed.postalCode);
+  return mergeZipIntoGpsPlace(parsed, fromZip);
 }
 
 export type StreetAddressSuggestion = {

@@ -135,7 +135,7 @@ export function decideHostRouting(
     if (publicPath === "/login" || publicPath.startsWith("/login/")) {
       return { kind: "redirect", url: absolute(request, "dashboard", publicPath) };
     }
-    if (publicPath.startsWith("/home") || publicPath.startsWith("/plan") || publicPath.startsWith("/profile") || publicPath.startsWith("/welcome") || publicPath.startsWith("/notifications") || publicPath.startsWith("/shops") || publicPath.startsWith("/requests")) {
+    if (publicPath.startsWith("/home") || publicPath.startsWith("/plan") || publicPath.startsWith("/map") || publicPath.startsWith("/profile") || publicPath.startsWith("/welcome") || publicPath.startsWith("/notifications") || publicPath.startsWith("/shops") || publicPath.startsWith("/requests")) {
       return { kind: "redirect", url: absolute(request, "dashboard", publicPath) };
     }
     if (isStoreAppPath(publicPath) || isAdminAppPath(publicPath) || publicPath.startsWith("/invite")) {
@@ -231,6 +231,7 @@ export function decideHostRouting(
     if (
       publicPath.startsWith("/home") ||
       publicPath.startsWith("/plan") ||
+      publicPath.startsWith("/map") ||
       publicPath.startsWith("/profile") ||
       publicPath.startsWith("/welcome") ||
       publicPath.startsWith("/shops") ||

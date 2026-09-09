@@ -173,6 +173,7 @@ export function surfaceForAppPath(pathname: string): Exclude<ProductSurface, "lo
     path.startsWith("/notifications") ||
     path.startsWith("/profile") ||
     path.startsWith("/plan") ||
+    path.startsWith("/map") ||
     path.startsWith("/welcome") ||
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
