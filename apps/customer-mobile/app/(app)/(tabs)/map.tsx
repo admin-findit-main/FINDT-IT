@@ -14,7 +14,6 @@ import {
   Dimensions,
   FlatList,
   Linking,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -23,7 +22,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
-import { formatShortPlace, mapsDirectionsUrl } from "@findit/domain";
+import {
+  formatShortPlace,
+  mapsDirectionsUrl,
+  publicStoreMapRating,
+} from "@findit/domain";
 import { radius, spacing, typography } from "@findit/theme";
 import { useAppTheme } from "@findit/theme/native";
 import {
@@ -161,6 +164,36 @@ function CircleButton({
   );
 }
 
+function StarRow({ stars }: { stars: number }) {
+  const full = Math.floor(stars);
+  const half = stars - full >= 0.5;
+  return (
+    <View
+      style={styles.starRow}
+      accessibilityLabel={`${stars} out of 5`}
+    >
+      {Array.from({ length: 5 }).map((_, index) => {
+        const filled = index < full || (index === full && half);
+        const name =
+          index < full
+            ? "star"
+            : index === full && half
+              ? "star-half-full"
+              : "star-o";
+        return (
+          <FontAwesome
+            key={index}
+            name={name}
+            size={16}
+            color={filled ? ACCENT : "rgba(0,0,0,0.15)"}
+            style={styles.starIcon}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 export default function StoresMapScreen() {
   const theme = useAppTheme();
   const router = useRouter();
@@ -215,9 +248,17 @@ export default function StoresMapScreen() {
     () => stores.findIndex((s) => s.id === selectedId),
     [stores, selectedId]
   );
+  const selected = useMemo(
+    () => stores.find((s) => s.id === selectedId) || null,
+    [stores, selectedId]
+  );
   const profile = useMemo(
     () => stores.find((s) => s.id === profileId) || null,
     [stores, profileId]
+  );
+  const profileRating = useMemo(
+    () => (profile ? publicStoreMapRating(profile) : null),
+    [profile]
   );
 
   const html = useMemo(
@@ -290,18 +331,6 @@ export default function StoresMapScreen() {
         )}
       </View>
 
-      <View
-        pointerEvents="box-none"
-        style={[styles.topBar, { paddingTop: Math.max(insets.top, 12) }]}
-      >
-        <CircleButton label="Go back" onPress={() => router.replace("/(app)/(tabs)")}>
-          <FontAwesome name="arrow-left" size={18} color="#171315" />
-        </CircleButton>
-        <CircleButton label="About FINDIT map" onPress={() => setInfoOpen(true)}>
-          <FontAwesome name="info" size={18} color="#171315" />
-        </CircleButton>
-      </View>
-
       {stores.length > 0 ? (
         <View
           pointerEvents="box-none"
@@ -310,6 +339,22 @@ export default function StoresMapScreen() {
             { paddingBottom: Math.max(insets.bottom, 12) },
           ]}
         >
+          {selected ? (
+            <View style={styles.openPillWrap}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${selected.name}`}
+                onPress={() => openProfile(selected.id)}
+                style={({ pressed }) => [
+                  styles.openStorePill,
+                  pressed && { opacity: 0.9 },
+                ]}
+              >
+                <FontAwesome name="map-marker" size={16} color={ACCENT} />
+                <Text style={styles.openStorePillText}>Open {selected.name}</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <FlatList
             ref={listRef}
             horizontal
@@ -329,8 +374,7 @@ export default function StoresMapScreen() {
             renderItem={({ item }) => {
               const active = item.id === selectedId;
               return (
-                <Pressable
-                  onPress={() => openProfile(item.id)}
+                <View
                   style={[
                     styles.card,
                     {
@@ -403,100 +447,131 @@ export default function StoresMapScreen() {
                       {item.distance_miles} mi away
                     </Text>
                   ) : null}
-                </Pressable>
+                </View>
               );
             }}
           />
         </View>
       ) : null}
 
-      <Modal
-        visible={Boolean(profile)}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setProfileId(null)}
-      >
-        <Pressable style={styles.sheetScrim} onPress={() => setProfileId(null)} />
-        <View style={[styles.sheet, { backgroundColor: theme.solid1 }]}>
-          {profile ? (
-            <>
+      {profile && profileRating ? (
+        <View style={styles.overlay}>
+          <Pressable
+            style={styles.overlayScrim}
+            accessibilityRole="button"
+            accessibilityLabel="Close store profile"
+            onPress={() => setProfileId(null)}
+          />
+          <View style={styles.overlayCenter} pointerEvents="box-none">
+            <View
+              style={[styles.profileDialog, { backgroundColor: theme.solid1 }]}
+            >
               <Text style={[styles.sheetTitle, { color: theme.ink }]}>
                 {profile.name}
               </Text>
               <Text style={[styles.sheetAddr, { color: theme.inkMuted }]}>
                 {formatAddress(profile)}
               </Text>
-              <Text
+
+              <View
                 style={[
-                  styles.sheetOpen,
-                  { color: profile.open_now ? "#8E1F2D" : theme.inkMuted },
+                  styles.ratingBox,
+                  {
+                    borderColor: theme.hairlineStrong,
+                    backgroundColor: theme.solid2,
+                  },
                 ]}
               >
-                {profile.open_label}
-              </Text>
-              {profile.hours_label ? (
-                <Text style={[styles.sheetHours, { color: theme.inkMuted }]}>
-                  {profile.hours_label}
+                <Text style={[styles.ratingLabel, { color: theme.inkSubtle }]}>
+                  Rating
                 </Text>
-              ) : null}
-              {profile.phone ? (
-                <Pressable onPress={() => Linking.openURL(`tel:${profile.phone}`)}>
-                  <Text style={[styles.sheetPhone, { color: theme.ink }]}>
-                    {profile.phone}
+                <View style={styles.ratingRow}>
+                  <StarRow stars={profileRating.stars} />
+                  <Text style={[styles.ratingScore, { color: theme.ink }]}>
+                    {profileRating.score != null
+                      ? profileRating.score.toFixed(1)
+                      : "—"}
                   </Text>
-                </Pressable>
-              ) : null}
+                </View>
+                <Text style={[styles.ratingCaption, { color: theme.inkMuted }]}>
+                  {profileRating.label}
+                  {profile.open_now ? " · Open now" : " · Closed"}
+                </Text>
+              </View>
+
               <Pressable
                 onPress={() => Linking.openURL(mapsDirectionsUrl(profile))}
                 style={[styles.primaryBtn, { backgroundColor: ACCENT }]}
               >
-                <Text style={styles.primaryBtnText}>Get directions</Text>
+                <Text style={styles.primaryBtnText}>Open in Maps</Text>
               </Pressable>
-              <Pressable onPress={() => setProfileId(null)} style={styles.closeBtn}>
-                <Text style={{ color: theme.inkMuted, fontWeight: "600" }}>Close</Text>
-              </Pressable>
-            </>
-          ) : null}
+              <Text style={[styles.mapsNote, { color: theme.inkMuted }]}>
+                Opens your device's default Maps app for driving directions.
+              </Text>
+            </View>
+          </View>
         </View>
-      </Modal>
+      ) : null}
 
-      <Modal
-        visible={infoOpen}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setInfoOpen(false)}
-      >
-        <Pressable style={styles.sheetScrim} onPress={() => setInfoOpen(false)} />
-        <View style={[styles.infoSheet, { backgroundColor: theme.solid1 }]}>
-          <Text style={[styles.sheetTitle, { color: theme.ink }]}>About this map</Text>
-          <Text style={[styles.infoLead, { color: theme.inkMuted }]}>
-            How FINDIT works, and how we treat your data.
-          </Text>
-          <Text style={[styles.infoHead, { color: theme.ink }]}>How FINDIT works</Text>
-          <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
-            You ask nearby stores if they have a product. Stores answer In Stock,
-            Out of Stock, or Can Order. You choose where to go. FINDIT is not a
-            checkout cart — it connects you with local stores that participate.
-          </Text>
-          <Text style={[styles.infoHead, { color: theme.ink }]}>Your privacy</Text>
-          <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
-            We do not sell your personal data to third-party companies or any other
-            companies. Location on this map is used to show FINDIT stores near you
-            and to sort them nearest first.
-          </Text>
-          <Text style={[styles.infoHead, { color: theme.ink }]}>This map</Text>
-          <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
-            Pins are active FINDIT stores with a map location. Swipe the cards to
-            browse, or tap a pin for hours and directions.
-          </Text>
+      {infoOpen ? (
+        <View style={styles.overlay}>
           <Pressable
+            style={styles.overlayScrim}
+            accessibilityRole="button"
+            accessibilityLabel="Close about map"
             onPress={() => setInfoOpen(false)}
-            style={[styles.primaryBtn, { backgroundColor: "#171315", marginTop: 18 }]}
-          >
-            <Text style={styles.primaryBtnText}>Got it</Text>
-          </Pressable>
+          />
+          <View style={styles.overlayCenter} pointerEvents="box-none">
+            <View
+              style={[styles.profileDialog, { backgroundColor: theme.solid1 }]}
+            >
+              <Text style={[styles.sheetTitle, { color: theme.ink }]}>
+                About this map
+              </Text>
+              <Text style={[styles.infoLead, { color: theme.inkMuted }]}>
+                How FINDIT works, and how we treat your data.
+              </Text>
+              <Text style={[styles.infoHead, { color: theme.ink }]}>
+                How FINDIT works
+              </Text>
+              <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
+                You ask nearby stores if they have a product. Stores answer In Stock,
+                Out of Stock, or Can Order. You choose where to go. FINDIT is not a
+                checkout cart — it connects you with local stores that participate.
+              </Text>
+              <Text style={[styles.infoHead, { color: theme.ink }]}>Your privacy</Text>
+              <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
+                We do not sell your personal data to third-party companies or any other
+                companies. Location on this map is used to show FINDIT stores near you
+                and to sort them nearest first.
+              </Text>
+              <Text style={[styles.infoHead, { color: theme.ink }]}>This map</Text>
+              <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
+                Swipe the cards to browse stores. Tap a pin, or the Open button above
+                the cards, for rating and directions in your device Maps app.
+              </Text>
+              <Pressable
+                onPress={() => setInfoOpen(false)}
+                style={[styles.primaryBtn, { backgroundColor: "#171315", marginTop: 18 }]}
+              >
+                <Text style={styles.primaryBtnText}>Got it</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </Modal>
+      ) : null}
+
+      <View
+        pointerEvents="box-none"
+        style={[styles.topBar, { paddingTop: Math.max(insets.top, 12) }]}
+      >
+        <CircleButton label="Go back" onPress={() => router.replace("/(app)/(tabs)")}>
+          <FontAwesome name="arrow-left" size={18} color="#171315" />
+        </CircleButton>
+        <CircleButton label="About FINDIT map" onPress={() => setInfoOpen(true)}>
+          <FontAwesome name="info" size={18} color="#171315" />
+        </CircleButton>
+      </View>
     </View>
   );
 }
@@ -520,7 +595,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 20,
+    zIndex: 1100,
     paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -545,8 +620,34 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 20,
+    zIndex: 500,
     paddingTop: 28,
+  },
+  openPillWrap: {
+    alignItems: "center",
+    marginBottom: 12,
+    paddingHorizontal: spacing.lg,
+  },
+  openStorePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.7)",
+    backgroundColor: "rgba(255,255,255,0.95)",
+    shadowColor: "#171315",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
+  },
+  openStorePillText: {
+    fontSize: typography.size.footnote,
+    fontWeight: typography.weight.semibold,
+    color: "#171315",
   },
   cards: {
     paddingHorizontal: spacing.lg,
@@ -595,24 +696,71 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: typography.weight.semibold,
   },
-  sheetScrim: {
-    flex: 1,
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 1000,
+  },
+  overlayScrim: {
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.4)",
   },
-  sheet: {
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
+  overlayCenter: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
   },
-  infoSheet: {
-    marginHorizontal: 18,
-    marginBottom: 36,
-    borderRadius: 22,
+  profileDialog: {
+    width: "100%",
+    maxWidth: 384,
+    borderRadius: 24,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: 28,
     paddingBottom: spacing.lg,
+  },
+  starRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  starIcon: {
+    width: 16,
+  },
+  ratingBox: {
+    marginTop: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  ratingLabel: {
+    fontSize: 11,
+    fontWeight: typography.weight.semibold,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  ratingRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  ratingScore: {
+    fontSize: typography.size.footnote,
+    fontWeight: typography.weight.bold,
+    fontVariant: ["tabular-nums"],
+  },
+  ratingCaption: {
+    marginTop: 6,
+    fontSize: typography.size.caption,
+    lineHeight: 16,
+  },
+  mapsNote: {
+    marginTop: 8,
+    textAlign: "center",
+    fontSize: typography.size.caption,
+    lineHeight: 16,
   },
   sheetTitle: {
     fontSize: typography.size.title3,
@@ -622,22 +770,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: typography.size.footnote,
     lineHeight: 20,
-  },
-  sheetOpen: {
-    marginTop: spacing.md,
-    fontSize: typography.size.body,
-    fontWeight: typography.weight.semibold,
-  },
-  sheetHours: {
-    marginTop: spacing.sm,
-    fontSize: typography.size.caption,
-    lineHeight: 18,
-  },
-  sheetPhone: {
-    marginTop: spacing.md,
-    fontSize: typography.size.body,
-    fontWeight: typography.weight.semibold,
-    textDecorationLine: "underline",
   },
   primaryBtn: {
     marginTop: spacing.lg,
@@ -650,11 +782,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: typography.size.body,
     fontWeight: typography.weight.bold,
-  },
-  closeBtn: {
-    marginTop: spacing.md,
-    alignItems: "center",
-    paddingVertical: spacing.sm,
   },
   infoLead: {
     marginTop: 6,

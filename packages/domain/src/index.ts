@@ -30,3 +30,4 @@ export * from "./catalog";
 export * from "./classify";
 export * from "./usage-pricing";
 export * from "./request-images";
+export * from "./store-map-rating";
