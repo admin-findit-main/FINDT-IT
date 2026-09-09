@@ -99,7 +99,7 @@ export default function ProfileScreen() {
             }}
             keyboardType="phone-pad"
             autoComplete="tel"
-            placeholder="(571) 259-9714"
+            placeholder="(xxx)-xxx-xxxx"
             containerStyle={{ marginBottom: 0 }}
           />
           <Text style={[styles.hint, { color: theme.inkMuted }]}>

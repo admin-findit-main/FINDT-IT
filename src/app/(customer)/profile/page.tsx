@@ -79,7 +79,7 @@ export default function ProfilePage() {
             autoComplete="tel"
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
-            placeholder="(571) 259-9714"
+            placeholder="(xxx)-xxx-xxxx"
           />
           <p className="mt-1 text-xs text-ink-muted">
             This number is self-reported and remains unverified. For convenience,
