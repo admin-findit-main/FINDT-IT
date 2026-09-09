@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { looksLikeServiceRoleKey } from "@findit/domain";
+import {
+  looksLikeServiceRoleKey,
+  PILOT_BYPASS_STORE_REQUEST_CAPS,
+} from "@findit/domain";
 
 const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional().or(z.literal("")),
@@ -117,13 +120,15 @@ export function isDemoMode(): boolean {
 
 /**
  * Store free-tier routing caps (not consumer Finds).
- * Pilot still relaxes store caps. Consumer Finds use bypassConsumerPlanLimits().
+ * The product switch stays on until billing launches; the env override remains a QA escape hatch.
+ * Consumer Finds use bypassConsumerPlanLimits().
  */
 export function bypassPlanLimits(): boolean {
   const env = getEnv();
-  if (env.FINDIT_BYPASS_PLAN_LIMITS === "true") return true;
-  if (isPilotMode()) return true;
-  return false;
+  return (
+    PILOT_BYPASS_STORE_REQUEST_CAPS ||
+    env.FINDIT_BYPASS_PLAN_LIMITS === "true"
+  );
 }
 
 /** Consumer monthly Finds. Pilot mode does NOT skip this. */

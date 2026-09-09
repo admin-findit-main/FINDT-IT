@@ -8,13 +8,13 @@ export function HubHeader({
   employeeName?: string | null;
 }) {
   return (
-    <header className="flex min-h-20 shrink-0 items-center justify-between border-b border-[#E2DCDE] bg-white px-5 md:px-8">
-      <div className="flex min-w-0 items-center gap-5">
+    <header className="flex min-h-20 shrink-0 items-center justify-between border-b border-[#E2DCDE] bg-white px-5 [@media(max-height:500px)]:min-h-11 [@media(max-height:500px)]:px-3 md:px-8">
+      <div className="flex min-w-0 items-center gap-5 max-[479px]:gap-2">
         <p className="shrink-0 text-xl font-black tracking-[-0.04em] text-[#171315]">
           FINDIT <span className="text-[#8E1F2D]">HUB</span>
         </p>
         <div className="hidden h-8 w-px bg-[#E2DCDE] sm:block" />
-        <div className="min-w-0">
+        <div className="min-w-0 max-[479px]:hidden">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#81797C]">
             Current store
           </p>

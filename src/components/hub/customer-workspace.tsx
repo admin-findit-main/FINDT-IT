@@ -62,7 +62,7 @@ function KeypadKey({
       aria-label={label}
       disabled={disabled}
       onClick={onPress}
-      className={`grid min-h-11 place-items-center border text-xl font-bold tabular-nums transition-[background-color,border-color,color,transform] duration-100 focus-visible:z-10 focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#F2A1AB] active:translate-y-px disabled:pointer-events-none disabled:border-white/5 disabled:bg-[#262123] disabled:text-white/25 sm:min-h-12 md:min-h-14 md:text-2xl ${toneClasses[tone]} ${className}`}
+      className={`grid min-h-11 min-w-0 place-items-center border text-xl font-bold tabular-nums transition-[background-color,border-color,color,transform] duration-100 focus-visible:z-10 focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#F2A1AB] active:translate-y-px disabled:pointer-events-none disabled:border-white/5 disabled:bg-[#262123] disabled:text-white/25 md:min-h-14 md:text-2xl ${toneClasses[tone]} ${className}`}
     >
       {children}
     </button>
@@ -328,10 +328,13 @@ export function HubCustomerWorkspace({
       customer.rewardsEnabled ? customer.pointsPerDollar : 0
     );
     return (
-      <section className="mx-auto grid h-full w-full max-w-6xl grid-rows-[minmax(0,1fr)] overflow-hidden p-3 sm:grid-cols-[minmax(0,1fr)_20rem] sm:gap-4 sm:p-4 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-6 md:p-6">
-        <div className="flex min-h-0 flex-col justify-center border-b border-[#DED9DB] px-2 pb-3 sm:border-b-0 sm:border-r sm:px-3 sm:pb-0 sm:pr-6 md:pr-10">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+      <section
+        data-hub-customer-workspace="amount"
+        className="mx-auto grid h-full w-full max-w-6xl grid-cols-[minmax(0,1fr)_minmax(9.5rem,42%)] grid-rows-[minmax(0,1fr)] gap-1 overflow-hidden p-1 min-[480px]:grid-cols-[minmax(0,1fr)_minmax(12rem,42%)] min-[480px]:gap-2 min-[480px]:p-2 md:gap-6 md:p-6 lg:grid-cols-[minmax(0,1fr)_22rem]"
+      >
+        <div className="flex min-h-0 min-w-0 flex-col justify-center border-r border-[#DED9DB] px-1 pr-2 min-[480px]:px-2 min-[480px]:pr-4 md:px-3 md:pr-10">
+          <div className="flex min-w-0 items-start justify-between gap-1 min-[480px]:gap-3">
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8E1F2D] md:text-sm">
                 Purchase amount
               </p>
@@ -348,14 +351,15 @@ export function HubCustomerWorkspace({
               ← Back
             </button>
           </div>
-          <div className="mt-3 border-l-4 border-[#8E1F2D] bg-white px-4 py-3 md:mt-6 md:px-6 md:py-5">
+          <div className="@container mt-2 min-w-0 border-l-4 border-[#8E1F2D] bg-white px-2 py-2 min-[480px]:px-4 min-[480px]:py-3 md:mt-6 md:px-6 md:py-5">
             <p className="truncate text-sm font-semibold text-[#6D6669]">
               {customer.displayName}
             </p>
             <p
               aria-label="Purchase amount"
               aria-live="polite"
-              className="mt-1 truncate text-4xl font-black tabular-nums tracking-[-0.04em] text-[#171315] md:mt-2 md:text-6xl"
+              data-hub-number-display="amount"
+              className="mt-1 whitespace-nowrap text-[clamp(1.125rem,10cqw,3.5rem)] font-black leading-none tabular-nums tracking-[-0.045em] text-[#171315] md:mt-2"
             >
               {formatHubAmount(amountCents)}
             </p>
@@ -371,11 +375,15 @@ export function HubCustomerWorkspace({
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-col justify-center bg-[#171315] p-2 sm:p-3 md:p-4">
-          <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45">
-            Amount keypad · cents enter automatically
+        <div
+          data-hub-keypad="amount"
+          className="flex min-h-0 min-w-0 flex-col justify-center bg-[#171315] p-1 md:p-4"
+        >
+          <p className="mb-1 truncate px-0.5 text-[9px] font-bold uppercase leading-3 tracking-[0.1em] text-white/45 min-[480px]:text-[10px] md:mb-2 md:px-1 md:text-[11px] md:tracking-[0.16em]">
+            Amount keypad
+            <span className="sr-only"> · cents enter automatically</span>
           </p>
-          <div className="grid grid-cols-3 gap-1.5 md:gap-2">
+          <div className="grid grid-cols-3 gap-1 md:gap-2">
             {DIGITS.map((digit) => (
               <KeypadKey
                 key={digit}
@@ -414,7 +422,7 @@ export function HubCustomerWorkspace({
             disabled={busy || amountCents === 0}
             onPress={() => setStage("confirm")}
             tone="primary"
-            className="mt-2 px-4 text-sm tracking-[0.04em] md:text-base"
+            className="mt-1 px-1 text-[10px] tracking-[0.02em] min-[480px]:text-xs md:mt-2 md:px-4 md:text-base md:tracking-[0.04em]"
           >
             REVIEW PURCHASE
           </KeypadKey>
@@ -518,10 +526,13 @@ export function HubCustomerWorkspace({
   }
 
   return (
-    <section className="mx-auto grid h-full w-full max-w-5xl grid-rows-[minmax(0,1fr)] overflow-hidden p-3 sm:grid-cols-[minmax(0,1fr)_20rem] sm:gap-4 sm:p-4 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-6 md:p-6">
-      <div className="flex min-h-0 flex-col justify-center border-b border-[#DED9DB] px-2 pb-3 sm:border-b-0 sm:border-r sm:px-3 sm:pb-0 sm:pr-6 md:pr-10">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+    <section
+      data-hub-customer-workspace="phone"
+      className="mx-auto grid h-full w-full max-w-5xl grid-cols-[minmax(0,1fr)_minmax(9.5rem,42%)] grid-rows-[minmax(0,1fr)] gap-1 overflow-hidden p-1 min-[480px]:grid-cols-[minmax(0,1fr)_minmax(12rem,42%)] min-[480px]:gap-2 min-[480px]:p-2 md:gap-6 md:p-6 lg:grid-cols-[minmax(0,1fr)_22rem]"
+    >
+      <div className="flex min-h-0 min-w-0 flex-col justify-center border-r border-[#DED9DB] px-1 pr-2 min-[480px]:px-2 min-[480px]:pr-4 md:px-3 md:pr-10">
+        <div className="flex min-w-0 items-start justify-between gap-1 min-[480px]:gap-3">
+          <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#8E1F2D] md:text-sm">
               Find customer
             </p>
@@ -539,14 +550,15 @@ export function HubCustomerWorkspace({
           </button>
         </div>
 
-        <div className="mt-3 border-l-4 border-[#8E1F2D] bg-white px-4 py-3 md:mt-6 md:px-6 md:py-5">
+        <div className="@container mt-2 min-w-0 border-l-4 border-[#8E1F2D] bg-white px-2 py-2 min-[480px]:px-4 min-[480px]:py-3 md:mt-6 md:px-6 md:py-5">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#81797C]">
             Customer phone number
           </p>
           <div
             aria-label="Customer phone number"
             aria-live="polite"
-            className="mt-1 truncate text-3xl font-black tabular-nums tracking-[0.04em] text-[#171315] md:mt-2 md:text-5xl"
+            data-hub-number-display="phone"
+            className="mt-1 whitespace-nowrap text-[clamp(1.125rem,9cqw,3rem)] font-black leading-none tabular-nums tracking-[-0.025em] text-[#171315] md:mt-2"
           >
             {digits ? formatUsNationalInput(digits) : "(•••) •••-••••"}
           </div>
@@ -578,11 +590,14 @@ export function HubCustomerWorkspace({
         ) : null}
       </div>
 
-      <div className="flex min-h-0 flex-col justify-center bg-[#171315] p-2 sm:p-3 md:p-4">
-        <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45">
+      <div
+        data-hub-keypad="phone"
+        className="flex min-h-0 min-w-0 flex-col justify-center bg-[#171315] p-1 md:p-4"
+      >
+        <p className="mb-1 px-0.5 text-[9px] font-bold uppercase leading-3 tracking-[0.1em] text-white/45 min-[480px]:text-[10px] md:mb-2 md:px-1 md:text-[11px] md:tracking-[0.16em]">
           Customer keypad
         </p>
-        <div className="grid grid-cols-3 gap-1.5 md:gap-2">
+        <div className="grid grid-cols-3 gap-1 md:gap-2">
           {DIGITS.map((digit) => (
             <KeypadKey
               key={digit}
@@ -611,7 +626,7 @@ export function HubCustomerWorkspace({
             disabled={busy || digits.length !== 10}
             onPress={() => void search()}
             tone="primary"
-            className="px-2 text-xs tracking-[0.04em] md:text-sm"
+            className="px-0.5 text-[9px] min-[480px]:text-[10px] md:px-0.5 md:text-[11px]"
           >
             {busy ? "WAIT…" : "SEARCH"}
           </KeypadKey>

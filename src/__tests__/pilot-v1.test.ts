@@ -24,6 +24,7 @@ import {
 } from "@/lib/services/request-lifecycle";
 import { isStoreOpenAt } from "@/lib/services/store-hours";
 import { bypassConsumerPlanLimits, bypassPlanLimits, isPilotMode } from "@/lib/config/env";
+import { PILOT_BYPASS_STORE_REQUEST_CAPS } from "@/lib/config/constants";
 
 beforeEach(() => {
   resetDemoState();
@@ -279,20 +280,54 @@ describe("store hours", () => {
 });
 
 describe("pilot mode flags", () => {
-  it("relaxes store routing caps when pilot mode is on, not consumer Finds", () => {
-    process.env.FINDIT_PILOT_MODE = "true";
+  it("uses the explicit no-billing product switch for store caps only", () => {
+    process.env.FINDIT_PILOT_MODE = "false";
     process.env.FINDIT_BYPASS_PLAN_LIMITS = "false";
-    expect(isPilotMode()).toBe(true);
+    expect(PILOT_BYPASS_STORE_REQUEST_CAPS).toBe(true);
+    expect(isPilotMode()).toBe(false);
     expect(bypassPlanLimits()).toBe(true);
     expect(bypassConsumerPlanLimits()).toBe(false);
   });
 
-  it("respects bypass off when pilot mode is off", () => {
-    process.env.FINDIT_PILOT_MODE = "false";
-    process.env.FINDIT_BYPASS_PLAN_LIMITS = "false";
-    expect(isPilotMode()).toBe(false);
-    expect(bypassPlanLimits()).toBe(false);
-    expect(bypassConsumerPlanLimits()).toBe(false);
+  it("routes an over-cap free store with the product switch while false enforces", () => {
+    const input = {
+      request: {
+        id: "live-regression",
+        postal_code: "22044",
+        city: "Falls Church",
+        category: "Tobacco & Vape",
+        radius_miles: 40,
+      },
+      stores: [
+        {
+          id: "nearest-active-store",
+          is_active: true,
+          is_suspended: false,
+          acceptingRequests: true,
+          postal_code: "22044",
+          city: "Falls Church",
+          service_radius_miles: 40,
+          subscription_plan: "free",
+          categories: ["Tobacco & Vape"],
+          service_zips: ["22044"],
+          month_targets_received: 20,
+          free_plan_monthly_cap: 20,
+        },
+      ],
+    };
+
+    expect(
+      selectEligibleStores({
+        ...input,
+        bypassPlanCaps: PILOT_BYPASS_STORE_REQUEST_CAPS,
+      }).eligible.map((store) => store.storeId)
+    ).toEqual(["nearest-active-store"]);
+    expect(
+      selectEligibleStores({ ...input, bypassPlanCaps: false }).excluded
+    ).toContainEqual({
+      storeId: "nearest-active-store",
+      reason: "plan_cap",
+    });
   });
 
   it("skips consumer Finds only with FINDIT_BYPASS_PLAN_LIMITS", () => {

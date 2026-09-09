@@ -302,3 +302,52 @@ describe("nearest-first target ordering", () => {
     ]);
   });
 });
+
+describe("trial store request cap", () => {
+  const request = {
+    id: "over-cap",
+    postal_code: "22044",
+    city: "Falls Church",
+    category: "Tobacco & Vape",
+    radius_miles: 40,
+  };
+  const stores = [
+    {
+      id: "nearest-free-store",
+      is_active: true,
+      is_suspended: false,
+      acceptingRequests: true,
+      postal_code: "22044",
+      city: "Falls Church",
+      service_radius_miles: 40,
+      subscription_plan: "free",
+      categories: ["Tobacco & Vape"],
+      service_zips: ["22044"],
+      month_targets_received: 21,
+      free_plan_monthly_cap: 20,
+    },
+  ];
+
+  it("keeps an over-cap free store eligible only with an explicit bypass", () => {
+    const enforced = selectEligibleStores({
+      request,
+      stores,
+      bypassPlanCaps: false,
+    });
+    expect(enforced.eligible).toEqual([]);
+    expect(enforced.excluded).toContainEqual({
+      storeId: "nearest-free-store",
+      reason: "plan_cap",
+    });
+
+    const bypassed = selectEligibleStores({
+      request,
+      stores,
+      bypassPlanCaps: true,
+    });
+    expect(bypassed.eligible.map((store) => store.storeId)).toEqual([
+      "nearest-free-store",
+    ]);
+    expect(bypassed.excluded).toEqual([]);
+  });
+});

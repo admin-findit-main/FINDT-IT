@@ -12,6 +12,7 @@ import {
   responseTimeSeconds,
   selectEligibleStores,
   STORE_PLANS_FREE_MONTHLY,
+  PILOT_BYPASS_STORE_REQUEST_CAPS,
   FREE_MONTHLY_REQUEST_LIMIT,
   PLUS_MONTHLY_REQUEST_LIMIT,
   MAX_CUSTOMER_RADIUS_MILES,
@@ -34,7 +35,7 @@ Deno.serve(async (req) => {
   const bypassConsumerLimits =
     Deno.env.get("FINDIT_BYPASS_PLAN_LIMITS") === "true";
   const bypassStoreCaps =
-    bypassConsumerLimits || Deno.env.get("FINDIT_PILOT_MODE") === "true";
+    PILOT_BYPASS_STORE_REQUEST_CAPS || bypassConsumerLimits;
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {

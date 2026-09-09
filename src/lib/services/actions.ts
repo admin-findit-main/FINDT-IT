@@ -64,7 +64,11 @@ import type {
   StoreResponse,
   RespondToStoreRequestRpcRow,
 } from "@/types/database";
-import { CUSTOMER_PLANS, STORE_PLANS } from "@/lib/config/constants";
+import {
+  CUSTOMER_PLANS,
+  PILOT_BYPASS_STORE_REQUEST_CAPS,
+  STORE_PLANS,
+} from "@/lib/config/constants";
 import { bypassConsumerPlanLimits, bypassPlanLimits, isPilotMode } from "@/lib/config/env";
 import {
   accountContactLabel,
@@ -1393,7 +1397,8 @@ async function routeRequestToStores(requestId: string): Promise<number> {
     },
     stores: candidates,
     alreadyTargetedStoreIds: (existingTargets || []).map((t) => t.store_id),
-    bypassPlanCaps: bypassPlanLimits(),
+    bypassPlanCaps:
+      PILOT_BYPASS_STORE_REQUEST_CAPS || bypassPlanLimits(),
   });
 
   const nowIso = new Date().toISOString();

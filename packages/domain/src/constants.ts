@@ -205,6 +205,13 @@ export type StorePlanId = PlanId;
 /** Trial store monthly inbound-request cap used by routing. Keep Edge in lockstep. */
 export const STORE_PLANS_FREE_MONTHLY = STORE_PLANS.free.monthlyRequests;
 
+/**
+ * Billing-launch switch for trial/free store inbound-request caps.
+ * Keep true during the no-billing pilot; set false only when store billing launches.
+ * Keep the Edge copy in `_shared/domain.ts` in lockstep.
+ */
+export const PILOT_BYPASS_STORE_REQUEST_CAPS = true;
+
 export const MAX_ACTIVE_REQUESTS_PER_HOUR = 10;
 export const MAX_APPLICATIONS_PER_DAY = 3;
 export const MIN_PRODUCT_NAME_LENGTH = 2;

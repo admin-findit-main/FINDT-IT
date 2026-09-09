@@ -1,7 +1,8 @@
 /** Shared helpers for FINDIT Edge Functions (Deno).
  * Keep numeric caps in lockstep with packages/domain/src/constants.ts
  * (FREE_MONTHLY_REQUEST_LIMIT, PLUS_MONTHLY_REQUEST_LIMIT, FREE_MAX_RADIUS_MILES,
- * PLUS_MAX_RADIUS_MILES, STORE_PLANS.free.monthlyRequests, MAX_CUSTOMER_RADIUS_MILES).
+ * PLUS_MAX_RADIUS_MILES, STORE_PLANS.free.monthlyRequests, MAX_CUSTOMER_RADIUS_MILES)
+ * and keep PILOT_BYPASS_STORE_REQUEST_CAPS synchronized with the billing launch switch.
  * The domain vitest `edge-sync` test fails if these literals drift.
  */
 
@@ -28,6 +29,10 @@ export const FREE_MONTHLY_REQUEST_LIMIT = 5;
 export const PLUS_MONTHLY_REQUEST_LIMIT = 25;
 export const PLUS_MAX_RADIUS_MILES = 40;
 export const FREE_MAX_RADIUS_MILES = 10;
+/**
+ * Keep true during the no-billing pilot; set false only when store billing launches.
+ */
+export const PILOT_BYPASS_STORE_REQUEST_CAPS = true;
 
 export function normalizeProductName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
