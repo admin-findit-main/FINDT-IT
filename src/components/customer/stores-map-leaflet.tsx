@@ -5,25 +5,49 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { PublicStoreMapItem } from "@/lib/services/stores-map";
 
-const ACCENT = "#E5231B";
+const ACCENT = "#B42332";
 
 function storeIcon(selected: boolean) {
-  const size = selected ? 28 : 22;
+  const size = selected ? 32 : 24;
   return L.divIcon({
     className: "findit-store-marker",
     iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    html: `<span style="display:block;width:${size}px;height:${size}px;border-radius:999px;background:${ACCENT};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);${
-      selected ? "outline:3px solid rgba(229,35,27,.35);" : ""
-    }"></span>`,
+    iconAnchor: [size / 2, size],
+    html: `<span style="
+      display:block;
+      width:${size}px;
+      height:${size}px;
+      border-radius:999px 999px 999px 4px;
+      transform:rotate(-45deg);
+      background:${ACCENT};
+      border:2.5px solid #fff;
+      box-shadow:0 4px 14px rgba(23,19,21,.35);
+      ${selected ? "outline:3px solid rgba(180,35,50,.28);outline-offset:2px;" : ""}
+    "><span style="
+      display:block;
+      width:8px;
+      height:8px;
+      margin:${(size - 8) / 2}px auto 0;
+      border-radius:999px;
+      background:#fff;
+      transform:rotate(45deg);
+    "></span></span>`,
   });
 }
 
 const userIcon = L.divIcon({
   className: "findit-user-marker",
-  iconSize: [14, 14],
-  iconAnchor: [7, 7],
-  html: `<span style="display:block;width:14px;height:14px;border-radius:999px;background:#0B0B0C;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);"></span>`,
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+  html: `<span style="
+    display:block;
+    width:18px;
+    height:18px;
+    border-radius:999px;
+    background:#171315;
+    border:3px solid #fff;
+    box-shadow:0 0 0 6px rgba(23,19,21,.16), 0 2px 8px rgba(0,0,0,.28);
+  "></span>`,
 });
 
 export function StoresMapLeaflet({
@@ -31,11 +55,13 @@ export function StoresMapLeaflet({
   selectedId,
   userCoords,
   onSelect,
+  bottomPad = 180,
 }: {
   stores: PublicStoreMapItem[];
   selectedId: string | null;
   userCoords: { lat: number; lng: number } | null;
   onSelect: (id: string) => void;
+  bottomPad?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -62,13 +88,21 @@ export function StoresMapLeaflet({
     });
     L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> · CARTO',
       maxZoom: 19,
     }).addTo(map);
-    L.control.zoom({ position: "topright" }).addTo(map);
+    L.control.zoom({ position: "bottomright" }).addTo(map);
     mapRef.current = map;
+
+    const resize = () => {
+      map.invalidateSize({ animate: false });
+    };
+    window.setTimeout(resize, 60);
+    window.addEventListener("resize", resize);
+
     const markers = markersRef.current;
     return () => {
+      window.removeEventListener("resize", resize);
       map.remove();
       mapRef.current = null;
       markers.clear();
@@ -118,14 +152,19 @@ export function StoresMapLeaflet({
       }
     }
 
+    map.invalidateSize({ animate: false });
     if (latLngs.length === 1) {
-      map.setView(latLngs[0], 13);
+      map.setView(latLngs[0], 14);
     } else if (latLngs.length > 1) {
-      map.fitBounds(L.latLngBounds(latLngs), { padding: [40, 40], maxZoom: 13 });
+      map.fitBounds(L.latLngBounds(latLngs), {
+        paddingTopLeft: [28, 88],
+        paddingBottomRight: [28, Math.max(bottomPad, 120)],
+        maxZoom: 14,
+      });
     }
     // Only refit when the store set / user coords change, not on selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boundsKey]);
+  }, [boundsKey, bottomPad]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -141,5 +180,5 @@ export function StoresMapLeaflet({
     }
   }, [selectedId, stores]);
 
-  return <div ref={containerRef} className="h-full min-h-[16rem] w-full" />;
+  return <div ref={containerRef} className="h-full w-full" />;
 }

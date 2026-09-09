@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type Ref } from "react";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useRouter } from "expo-router";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type Ref,
+} from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -11,14 +21,11 @@ import {
   View,
   type ViewToken,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
-import {
-  formatShortPlace,
-  mapsDirectionsUrl,
-} from "@findit/domain";
+import { formatShortPlace, mapsDirectionsUrl } from "@findit/domain";
 import { radius, spacing, typography } from "@findit/theme";
 import { useAppTheme } from "@findit/theme/native";
-import { AppChrome } from "@/components/app-menu";
 import {
   fetchStoresMap,
   type PublicStoreMapItem,
@@ -36,9 +43,11 @@ const MapWebView = WebView as unknown as ComponentType<{
   domStorageEnabled?: boolean;
   setSupportMultipleWindows?: boolean;
 }>;
-const CARD_WIDTH = Math.min(280, Dimensions.get("window").width * 0.78);
+
+const CARD_WIDTH = Math.min(288, Dimensions.get("window").width * 0.8);
 const CARD_GAP = 12;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
+const ACCENT = "#B42332";
 
 function formatAddress(store: PublicStoreMapItem) {
   const line = (store.street_address || "").trim();
@@ -51,7 +60,7 @@ function formatAddress(store: PublicStoreMapItem) {
   return line || place || "Location unavailable";
 }
 
-function leafletHtml(stores: PublicStoreMapItem[], selectedId: string | null) {
+function leafletHtml(stores: PublicStoreMapItem[]) {
   const payload = JSON.stringify({
     stores: stores.map((s) => ({
       id: s.id,
@@ -59,8 +68,7 @@ function leafletHtml(stores: PublicStoreMapItem[], selectedId: string | null) {
       lat: s.latitude,
       lng: s.longitude,
     })),
-    selectedId,
-    accent: "#E5231B",
+    accent: ACCENT,
   });
   return `<!DOCTYPE html>
 <html>
@@ -70,8 +78,9 @@ function leafletHtml(stores: PublicStoreMapItem[], selectedId: string | null) {
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-  html, body, #map { margin:0; padding:0; height:100%; width:100%; background:#F7F7F8; }
+  html, body, #map { margin:0; padding:0; height:100%; width:100%; background:#F0ECEE; }
   .leaflet-control-attribution { font-size: 10px; }
+  .leaflet-bottom.leaflet-right { bottom: 12px; right: 8px; }
 </style>
 </head>
 <body>
@@ -80,32 +89,36 @@ function leafletHtml(stores: PublicStoreMapItem[], selectedId: string | null) {
   const boot = ${payload};
   const map = L.map('map', { zoomControl: false, attributionControl: true });
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OSM &copy; CARTO',
+    attribution: '&copy; OSM · CARTO',
     maxZoom: 19
   }).addTo(map);
-  L.control.zoom({ position: 'topright' }).addTo(map);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
   const markers = {};
   function icon(selected) {
-    const size = selected ? 28 : 22;
+    const size = selected ? 32 : 24;
     return L.divIcon({
       className: '',
       iconSize: [size, size],
-      iconAnchor: [size/2, size/2],
-      html: '<span style="display:block;width:'+size+'px;height:'+size+'px;border-radius:999px;background:'+boot.accent+';border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);"></span>'
+      iconAnchor: [size/2, size],
+      html: '<span style="display:block;width:'+size+'px;height:'+size+'px;border-radius:999px 999px 999px 4px;transform:rotate(-45deg);background:'+boot.accent+';border:2.5px solid #fff;box-shadow:0 4px 14px rgba(23,19,21,.35);"><span style="display:block;width:8px;height:8px;margin:'+((size-8)/2)+'px auto 0;border-radius:999px;background:#fff;transform:rotate(45deg);"></span></span>'
     });
   }
   const latLngs = [];
   boot.stores.forEach(function(store) {
     const ll = [store.lat, store.lng];
     latLngs.push(ll);
-    const m = L.marker(ll, { icon: icon(store.id === boot.selectedId), title: store.name }).addTo(map);
+    const m = L.marker(ll, { icon: icon(false), title: store.name }).addTo(map);
     m.on('click', function() {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'select', id: store.id }));
     });
     markers[store.id] = m;
   });
-  if (latLngs.length === 1) map.setView(latLngs[0], 13);
-  else if (latLngs.length > 1) map.fitBounds(latLngs, { padding: [36, 36], maxZoom: 13 });
+  if (latLngs.length === 1) map.setView(latLngs[0], 14);
+  else if (latLngs.length > 1) map.fitBounds(latLngs, {
+    paddingTopLeft: [28, 96],
+    paddingBottomRight: [28, 220],
+    maxZoom: 14
+  });
   function applySelection(id) {
     Object.keys(markers).forEach(function(key) {
       markers[key].setIcon(icon(key === id));
@@ -114,30 +127,50 @@ function leafletHtml(stores: PublicStoreMapItem[], selectedId: string | null) {
       map.panTo(markers[id].getLatLng(), { animate: true });
     }
   }
-  document.addEventListener('message', function(e) {
+  function onNativeMessage(raw) {
     try {
-      const msg = JSON.parse(e.data);
+      const msg = JSON.parse(raw);
       if (msg.type === 'select') applySelection(msg.id);
     } catch (err) {}
-  });
-  window.addEventListener('message', function(e) {
-    try {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'select') applySelection(msg.id);
-    } catch (err) {}
-  });
+  }
+  document.addEventListener('message', function(e) { onNativeMessage(e.data); });
+  window.addEventListener('message', function(e) { onNativeMessage(e.data); });
 </script>
 </body>
 </html>`;
 }
 
+function CircleButton({
+  label,
+  onPress,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.circleBtn, pressed && { opacity: 0.85 }]}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 export default function StoresMapScreen() {
   const theme = useAppTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [stores, setStores] = useState<PublicStoreMapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
   const listRef = useRef<FlatList<PublicStoreMapItem>>(null);
   const webRef = useRef<WebView>(null);
   const suppressScrollSelect = useRef(false);
@@ -188,9 +221,7 @@ export default function StoresMapScreen() {
   );
 
   const html = useMemo(
-    () => leafletHtml(stores, selectedId),
-    // Re-bootstrap only when the store set changes; selection is injected.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => leafletHtml(stores),
     [stores]
   );
 
@@ -223,44 +254,62 @@ export default function StoresMapScreen() {
   }
 
   return (
-    <AppChrome title="Stores">
-      <View style={styles.fill}>
-        <View style={[styles.mapWrap, { backgroundColor: theme.solid2 }]}>
-          {loading && stores.length === 0 ? (
-            <View style={styles.center}>
-              <ActivityIndicator color={theme.accent} />
-            </View>
-          ) : stores.length === 0 ? (
-            <View style={styles.center}>
-              <Text style={[styles.empty, { color: theme.inkMuted }]}>
-                {error || "No FINDIT stores with a map location yet."}
-              </Text>
-            </View>
-          ) : (
-            <MapWebView
-              ref={webRef}
-              originWhitelist={["*"]}
-              source={{ html }}
-              style={styles.map}
-              onMessage={(event) => {
-                try {
-                  const msg = JSON.parse(event.nativeEvent.data) as {
-                    type?: string;
-                    id?: string;
-                  };
-                  if (msg.type === "select" && msg.id) openProfile(msg.id);
-                } catch {
-                  /* ignore */
-                }
-              }}
-              javaScriptEnabled
-              domStorageEnabled
-              setSupportMultipleWindows={false}
-            />
-          )}
-        </View>
+    <View style={[styles.fill, { backgroundColor: "#F0ECEE" }]}>
+      <View style={styles.mapWrap}>
+        {loading && stores.length === 0 ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={ACCENT} />
+          </View>
+        ) : stores.length === 0 ? (
+          <View style={styles.center}>
+            <Text style={[styles.empty, { color: theme.inkMuted }]}>
+              {error || "No FINDIT stores with a map location yet."}
+            </Text>
+          </View>
+        ) : (
+          <MapWebView
+            ref={webRef}
+            originWhitelist={["*"]}
+            source={{ html }}
+            style={styles.map}
+            onMessage={(event) => {
+              try {
+                const msg = JSON.parse(event.nativeEvent.data) as {
+                  type?: string;
+                  id?: string;
+                };
+                if (msg.type === "select" && msg.id) openProfile(msg.id);
+              } catch {
+                /* ignore */
+              }
+            }}
+            javaScriptEnabled
+            domStorageEnabled
+            setSupportMultipleWindows={false}
+          />
+        )}
+      </View>
 
-        {stores.length > 0 ? (
+      <View
+        pointerEvents="box-none"
+        style={[styles.topBar, { paddingTop: Math.max(insets.top, 12) }]}
+      >
+        <CircleButton label="Go back" onPress={() => router.replace("/(app)/(tabs)")}>
+          <FontAwesome name="arrow-left" size={18} color="#171315" />
+        </CircleButton>
+        <CircleButton label="About FINDIT map" onPress={() => setInfoOpen(true)}>
+          <FontAwesome name="info" size={18} color="#171315" />
+        </CircleButton>
+      </View>
+
+      {stores.length > 0 ? (
+        <View
+          pointerEvents="box-none"
+          style={[
+            styles.cardDock,
+            { paddingBottom: Math.max(insets.bottom, 12) },
+          ]}
+        >
           <FlatList
             ref={listRef}
             horizontal
@@ -286,44 +335,80 @@ export default function StoresMapScreen() {
                     styles.card,
                     {
                       width: CARD_WIDTH,
-                      backgroundColor: active ? theme.accentSoft : theme.solid1,
-                      borderColor: active ? theme.accent : theme.hairlineStrong,
+                      backgroundColor: active ? "#171315" : "rgba(255,255,255,0.96)",
+                      borderColor: active ? "#171315" : "rgba(255,255,255,0.8)",
                     },
                   ]}
                 >
                   <View style={styles.cardTop}>
                     <Text
-                      style={[styles.cardName, { color: theme.ink }]}
+                      style={[
+                        styles.cardName,
+                        { color: active ? "#fff" : theme.ink },
+                      ]}
                       numberOfLines={1}
                     >
                       {item.name}
                     </Text>
-                    <Text
+                    <View
                       style={[
-                        styles.openLabel,
-                        { color: item.open_now ? theme.accentInk : theme.inkMuted },
+                        styles.openPill,
+                        {
+                          backgroundColor: item.open_now
+                            ? active
+                              ? ACCENT
+                              : "rgba(180,35,50,0.12)"
+                            : active
+                              ? "rgba(255,255,255,0.14)"
+                              : "rgba(0,0,0,0.05)",
+                        },
                       ]}
                     >
-                      {item.open_label}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.openLabel,
+                          {
+                            color: item.open_now
+                              ? active
+                                ? "#fff"
+                                : "#8E1F2D"
+                              : active
+                                ? "rgba(255,255,255,0.75)"
+                                : theme.inkMuted,
+                          },
+                        ]}
+                      >
+                        {item.open_label}
+                      </Text>
+                    </View>
                   </View>
                   <Text
-                    style={[styles.cardAddr, { color: theme.inkMuted }]}
+                    style={[
+                      styles.cardAddr,
+                      { color: active ? "rgba(255,255,255,0.7)" : theme.inkMuted },
+                    ]}
                     numberOfLines={2}
                   >
                     {formatAddress(item)}
                   </Text>
                   {item.distance_miles != null ? (
-                    <Text style={[styles.miles, { color: theme.inkSubtle }]}>
-                      {item.distance_miles} mi
+                    <Text
+                      style={[
+                        styles.miles,
+                        {
+                          color: active ? "rgba(255,255,255,0.55)" : theme.inkSubtle,
+                        },
+                      ]}
+                    >
+                      {item.distance_miles} mi away
                     </Text>
                   ) : null}
                 </Pressable>
               );
             }}
           />
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
       <Modal
         visible={Boolean(profile)}
@@ -344,7 +429,7 @@ export default function StoresMapScreen() {
               <Text
                 style={[
                   styles.sheetOpen,
-                  { color: profile.open_now ? theme.accentInk : theme.inkMuted },
+                  { color: profile.open_now ? "#8E1F2D" : theme.inkMuted },
                 ]}
               >
                 {profile.open_label}
@@ -363,11 +448,9 @@ export default function StoresMapScreen() {
               ) : null}
               <Pressable
                 onPress={() => Linking.openURL(mapsDirectionsUrl(profile))}
-                style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
+                style={[styles.primaryBtn, { backgroundColor: ACCENT }]}
               >
-                <Text style={[styles.primaryBtnText, { color: theme.inkInverse }]}>
-                  Get directions
-                </Text>
+                <Text style={styles.primaryBtnText}>Get directions</Text>
               </Pressable>
               <Pressable onPress={() => setProfileId(null)} style={styles.closeBtn}>
                 <Text style={{ color: theme.inkMuted, fontWeight: "600" }}>Close</Text>
@@ -376,13 +459,51 @@ export default function StoresMapScreen() {
           ) : null}
         </View>
       </Modal>
-    </AppChrome>
+
+      <Modal
+        visible={infoOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setInfoOpen(false)}
+      >
+        <Pressable style={styles.sheetScrim} onPress={() => setInfoOpen(false)} />
+        <View style={[styles.infoSheet, { backgroundColor: theme.solid1 }]}>
+          <Text style={[styles.sheetTitle, { color: theme.ink }]}>About this map</Text>
+          <Text style={[styles.infoLead, { color: theme.inkMuted }]}>
+            How FINDIT works, and how we treat your data.
+          </Text>
+          <Text style={[styles.infoHead, { color: theme.ink }]}>How FINDIT works</Text>
+          <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
+            You ask nearby stores if they have a product. Stores answer In Stock,
+            Out of Stock, or Can Order. You choose where to go. FINDIT is not a
+            checkout cart — it connects you with local stores that participate.
+          </Text>
+          <Text style={[styles.infoHead, { color: theme.ink }]}>Your privacy</Text>
+          <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
+            We do not sell your personal data to third-party companies or any other
+            companies. Location on this map is used to show FINDIT stores near you
+            and to sort them nearest first.
+          </Text>
+          <Text style={[styles.infoHead, { color: theme.ink }]}>This map</Text>
+          <Text style={[styles.infoBody, { color: theme.inkMuted }]}>
+            Pins are active FINDIT stores with a map location. Swipe the cards to
+            browse, or tap a pin for hours and directions.
+          </Text>
+          <Pressable
+            onPress={() => setInfoOpen(false)}
+            style={[styles.primaryBtn, { backgroundColor: "#171315", marginTop: 18 }]}
+          >
+            <Text style={styles.primaryBtnText}>Got it</Text>
+          </Pressable>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  mapWrap: { flex: 1, minHeight: 240 },
+  mapWrap: { ...StyleSheet.absoluteFill },
   map: { flex: 1, backgroundColor: "transparent" },
   center: {
     flex: 1,
@@ -394,17 +515,54 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: typography.size.footnote,
   },
+  topBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  circleBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,0,0,0.08)",
+    shadowColor: "#171315",
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  cardDock: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 20,
+    paddingTop: 28,
+  },
   cards: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
     gap: CARD_GAP,
   },
   card: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.lg,
+    borderRadius: 18,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: 14,
     marginRight: CARD_GAP,
+    shadowColor: "#171315",
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 5,
   },
   cardTop: {
     flexDirection: "row",
@@ -414,12 +572,17 @@ const styles = StyleSheet.create({
   },
   cardName: {
     flex: 1,
-    fontSize: typography.size.body,
+    fontSize: 15,
     fontWeight: typography.weight.bold,
   },
+  openPill: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
   openLabel: {
-    fontSize: 11,
-    fontWeight: typography.weight.semibold,
+    fontSize: 10,
+    fontWeight: typography.weight.bold,
     textTransform: "uppercase",
   },
   cardAddr: {
@@ -430,7 +593,7 @@ const styles = StyleSheet.create({
   miles: {
     marginTop: 8,
     fontSize: 11,
-    fontWeight: typography.weight.medium,
+    fontWeight: typography.weight.semibold,
   },
   sheetScrim: {
     flex: 1,
@@ -442,6 +605,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.xl,
+  },
+  infoSheet: {
+    marginHorizontal: 18,
+    marginBottom: 36,
+    borderRadius: 22,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   sheetTitle: {
     fontSize: typography.size.title3,
@@ -476,6 +647,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryBtnText: {
+    color: "#fff",
     fontSize: typography.size.body,
     fontWeight: typography.weight.bold,
   },
@@ -483,5 +655,21 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     alignItems: "center",
     paddingVertical: spacing.sm,
+  },
+  infoLead: {
+    marginTop: 6,
+    marginBottom: 8,
+    fontSize: typography.size.footnote,
+    lineHeight: 20,
+  },
+  infoHead: {
+    marginTop: 14,
+    fontSize: typography.size.body,
+    fontWeight: typography.weight.bold,
+  },
+  infoBody: {
+    marginTop: 6,
+    fontSize: typography.size.footnote,
+    lineHeight: 20,
   },
 });

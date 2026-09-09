@@ -3,13 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ExternalLink, MapPin, Phone } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  ExternalLink,
+  Info,
+  MapPin,
+  Phone,
+} from "lucide-react";
 import { formatShortPlace, mapsDirectionsAnchorProps } from "@findit/domain";
 import { GlassSheet } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { PublicStoreMapItem } from "@/lib/services/stores-map";
 import { geolocateUsPlace } from "@/lib/customer/geolocate";
+import { usePublicHref } from "@/components/host/host-surface";
 
 const StoresMapLeaflet = dynamic(
   () =>
@@ -19,7 +27,7 @@ const StoresMapLeaflet = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="grid h-full min-h-[16rem] place-items-center bg-[var(--fd-ink-50)] text-sm text-ink-muted">
+      <div className="grid h-full place-items-center bg-[#F0ECEE] text-sm text-ink-muted">
         Loading map…
       </div>
     ),
@@ -37,17 +45,45 @@ function formatAddress(store: PublicStoreMapItem) {
   return line || place || "Location unavailable";
 }
 
+function CircleMapButton({
+  label,
+  onClick,
+  children,
+  className,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className={cn(
+        "grid h-11 w-11 place-items-center rounded-full border border-black/8 bg-white text-[#171315] shadow-[0_8px_24px_rgba(23,19,21,0.18)] transition active:scale-[0.96]",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function StoresMap() {
+  const router = useRouter();
+  const homeHref = usePublicHref("/home");
   const [stores, setStores] = useState<PublicStoreMapItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [userCoords, setUserCoords] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
-  const stripRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const load = useCallback(async (coords?: { lat: number; lng: number } | null) => {
@@ -121,14 +157,14 @@ export function StoresMap() {
   }
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="relative min-h-[18rem] flex-1 overflow-hidden border-y border-hairline-strong bg-[var(--fd-ink-50)] sm:min-h-[22rem]">
+    <div className="relative h-dvh w-full overflow-hidden bg-[#F0ECEE]">
+      <div className="absolute inset-0">
         {loading && stores.length === 0 ? (
-          <div className="grid h-full min-h-[16rem] place-items-center text-sm text-ink-muted">
+          <div className="grid h-full place-items-center text-sm text-ink-muted">
             Finding stores…
           </div>
         ) : stores.length === 0 ? (
-          <div className="grid h-full min-h-[16rem] place-items-center px-6 text-center text-sm text-ink-muted">
+          <div className="grid h-full place-items-center px-8 text-center text-sm text-ink-muted">
             {error || "No FINDIT stores with a map location yet."}
           </div>
         ) : (
@@ -137,58 +173,89 @@ export function StoresMap() {
             selectedId={selectedId}
             userCoords={userCoords}
             onSelect={(id) => selectStore(id, true)}
+            bottomPad={220}
           />
         )}
       </div>
 
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[500] flex items-start justify-between px-4 pt-[max(0.85rem,env(safe-area-inset-top))]">
+        <div className="pointer-events-auto">
+          <CircleMapButton label="Go back" onClick={() => router.push(homeHref)}>
+            <ArrowLeft className="h-5 w-5" strokeWidth={2.4} />
+          </CircleMapButton>
+        </div>
+        <div className="pointer-events-auto">
+          <CircleMapButton label="About FINDIT map" onClick={() => setInfoOpen(true)}>
+            <Info className="h-5 w-5" strokeWidth={2.4} />
+          </CircleMapButton>
+        </div>
+      </div>
+
       {stores.length > 0 ? (
-        <div
-          ref={stripRef}
-          className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 py-4 sm:px-8"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {stores.map((store) => {
-            const active = store.id === selectedId;
-            return (
-              <button
-                key={store.id}
-                type="button"
-                ref={(node) => {
-                  if (node) cardRefs.current.set(store.id, node);
-                  else cardRefs.current.delete(store.id);
-                }}
-                onClick={() => selectStore(store.id, true)}
-                className={cn(
-                  "w-[min(17.5rem,78vw)] shrink-0 snap-center rounded-2xl border px-4 py-3 text-left transition-colors",
-                  active
-                    ? "border-accent bg-accent-soft"
-                    : "border-hairline-strong bg-white hover:bg-black/[0.02]"
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="truncate text-sm font-bold tracking-tight text-ink">
-                    {store.name}
-                  </p>
-                  <span
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[500] bg-gradient-to-t from-black/25 via-black/10 to-transparent pb-[max(1rem,env(safe-area-inset-bottom))] pt-10">
+          <div
+            className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-5"
+            style={{ scrollbarWidth: "none" }}
+          >
+            {stores.map((store) => {
+              const active = store.id === selectedId;
+              return (
+                <button
+                  key={store.id}
+                  type="button"
+                  ref={(node) => {
+                    if (node) cardRefs.current.set(store.id, node);
+                    else cardRefs.current.delete(store.id);
+                  }}
+                  onClick={() => selectStore(store.id, true)}
+                  className={cn(
+                    "w-[min(18rem,82vw)] shrink-0 snap-center rounded-2xl border px-4 py-3.5 text-left shadow-[0_12px_32px_rgba(23,19,21,0.18)] transition",
+                    active
+                      ? "border-transparent bg-[#171315] text-white"
+                      : "border-white/70 bg-white/95 text-ink backdrop-blur-md"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="truncate text-[15px] font-bold tracking-tight">
+                      {store.name}
+                    </p>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                        store.open_now
+                          ? active
+                            ? "bg-[#B42332] text-white"
+                            : "bg-[#B42332]/12 text-[#8E1F2D]"
+                          : active
+                            ? "bg-white/15 text-white/75"
+                            : "bg-black/[0.05] text-ink-muted"
+                      )}
+                    >
+                      {store.open_label}
+                    </span>
+                  </div>
+                  <p
                     className={cn(
-                      "shrink-0 text-[11px] font-semibold uppercase tracking-wide",
-                      store.open_now ? "text-accent-ink" : "text-ink-muted"
+                      "mt-1.5 line-clamp-2 text-[12px] leading-4",
+                      active ? "text-white/70" : "text-ink-muted"
                     )}
                   >
-                    {store.open_label}
-                  </span>
-                </div>
-                <p className="mt-1 line-clamp-2 text-[12px] leading-4 text-ink-muted">
-                  {formatAddress(store)}
-                </p>
-                {store.distance_miles != null ? (
-                  <p className="mt-2 text-[11px] font-medium text-ink-subtle">
-                    {store.distance_miles} mi
+                    {formatAddress(store)}
                   </p>
-                ) : null}
-              </button>
-            );
-          })}
+                  {store.distance_miles != null ? (
+                    <p
+                      className={cn(
+                        "mt-2 text-[11px] font-semibold",
+                        active ? "text-white/55" : "text-ink-subtle"
+                      )}
+                    >
+                      {store.distance_miles} mi away
+                    </p>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : null}
 
@@ -203,11 +270,11 @@ export function StoresMap() {
         {profile ? (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-accent" strokeWidth={2.2} />
+              <MapPin className="h-4 w-4 text-[#B42332]" strokeWidth={2.2} />
               <span
                 className={cn(
                   "font-semibold",
-                  profile.open_now ? "text-accent-ink" : "text-ink-muted"
+                  profile.open_now ? "text-[#8E1F2D]" : "text-ink-muted"
                 )}
               >
                 {profile.open_label}
@@ -240,6 +307,46 @@ export function StoresMap() {
             </div>
           </div>
         ) : null}
+      </GlassSheet>
+
+      <GlassSheet
+        open={infoOpen}
+        onOpenChange={setInfoOpen}
+        title="About this map"
+        description="How FINDIT works, and how we treat your data."
+      >
+        <div className="space-y-5 text-sm leading-relaxed text-ink">
+          <section>
+            <h3 className="font-bold tracking-tight text-ink">How FINDIT works</h3>
+            <p className="mt-1.5 text-ink-muted">
+              You ask nearby stores if they have a product. Stores answer In Stock,
+              Out of Stock, or Can Order. You choose where to go. FINDIT is not a
+              checkout cart — it connects you with local stores that participate.
+            </p>
+          </section>
+          <section>
+            <h3 className="font-bold tracking-tight text-ink">Your privacy</h3>
+            <p className="mt-1.5 text-ink-muted">
+              We do not sell your personal data to third-party companies or any
+              other companies. Location on this map is used to show FINDIT stores
+              near you and to sort them nearest first.
+            </p>
+          </section>
+          <section>
+            <h3 className="font-bold tracking-tight text-ink">This map</h3>
+            <p className="mt-1.5 text-ink-muted">
+              Pins are active FINDIT stores with a verified map location. Swipe the
+              cards below to browse, or tap a pin for hours and directions.
+            </p>
+          </section>
+          <Link
+            href="/privacy"
+            className="inline-flex text-sm font-semibold text-[#8E1F2D] underline underline-offset-2"
+            onClick={() => setInfoOpen(false)}
+          >
+            Read the Privacy Policy
+          </Link>
+        </div>
       </GlassSheet>
 
       {selected && !profile ? (

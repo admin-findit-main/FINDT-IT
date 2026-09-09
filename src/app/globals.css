@@ -411,3 +411,21 @@ h1 {
   width: 44px !important;
   height: 44px !important;
 }
+
+/* FINDIT stores map — Leaflet chrome stays out of the floating controls. */
+.findit-store-marker,
+.findit-user-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-bottom.leaflet-right {
+  margin-bottom: 8px;
+  margin-right: 8px;
+}
+
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(8px);
+  font-size: 10px !important;
+}
