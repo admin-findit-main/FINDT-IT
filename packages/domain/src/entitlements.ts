@@ -49,6 +49,37 @@ export function planLimitReachedMessage(entitlements: ConsumerEntitlements): str
   return `You've used your ${entitlements.monthlyRequestLimit} free Finds this month.`;
 }
 
+export type MonthlyFindGrant = {
+  finds?: number | null;
+};
+
+/** Sum trusted grant rows without allowing malformed values into allowance math. */
+export function sumMonthlyFindGrants(
+  grants: readonly MonthlyFindGrant[] | null | undefined
+): number {
+  return (grants || []).reduce((total, grant) => {
+    const finds = grant.finds;
+    if (!Number.isSafeInteger(finds) || (finds ?? 0) <= 0) return total;
+    const next = total + (finds as number);
+    return Number.isSafeInteger(next) ? next : Number.MAX_SAFE_INTEGER;
+  }, 0);
+}
+
+export function effectiveMonthlyFindLimit(
+  baseLimit: number,
+  bonusFinds: number
+): number {
+  const base = Number.isSafeInteger(baseLimit) && baseLimit > 0 ? baseLimit : 0;
+  const bonus =
+    Number.isSafeInteger(bonusFinds) && bonusFinds > 0 ? bonusFinds : 0;
+  const total = base + bonus;
+  return Number.isSafeInteger(total) ? total : Number.MAX_SAFE_INTEGER;
+}
+
+export function totalFindsAllowanceReachedMessage(limit: number): string {
+  return `You've used your total Finds allowance of ${limit} this month.`;
+}
+
 export function radiusLimitMessage(entitlements: ConsumerEntitlements): string {
   return `${entitlements.brandName} searches up to ${entitlements.maxSearchRadiusMiles} miles.`;
 }
@@ -84,22 +115,33 @@ export function countsTowardMonthlyFindCap(_status?: string | null): boolean {
 }
 
 export function monthlyFindWindowStart(now = new Date()): Date {
-  const start = new Date(now.getTime());
-  start.setDate(1);
-  start.setHours(0, 0, 0, 0);
-  return start;
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+export function monthlyFindWindowEnd(now = new Date()): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
+/** PostgreSQL `date` value for the current UTC grant period. */
+export function monthlyFindPeriodStart(now = new Date()): string {
+  return monthlyFindWindowStart(now).toISOString().slice(0, 10);
 }
 
 export function createdInMonthlyFindWindow(
   createdAt: string,
   now = new Date()
 ): boolean {
-  return new Date(createdAt) >= monthlyFindWindowStart(now);
+  const created = new Date(createdAt);
+  return (
+    !Number.isNaN(created.getTime()) &&
+    created >= monthlyFindWindowStart(now) &&
+    created < monthlyFindWindowEnd(now)
+  );
 }
 
 export function isMonthlyFindCapError(message: string | null | undefined): boolean {
   if (!message) return false;
-  return /Finds (this|per) month/i.test(message);
+  return /Finds (?:allowance .* )?(?:this|per) month/i.test(message);
 }
 
 export function customerPlanPriceLabel(planId: CustomerPlanId): string {

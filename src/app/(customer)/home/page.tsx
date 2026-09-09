@@ -29,8 +29,8 @@ import {
   getConsumerEntitlements,
   isAgeRestrictedCategory,
   isAgeRestrictedFind,
-  planLimitReachedMessage,
   radiusOptionsForPlan,
+  totalFindsAllowanceReachedMessage,
 } from "@/lib/config/constants";
 import {
   FindSendOverlay,
@@ -116,8 +116,12 @@ export default function CustomerHomePage() {
     }
     getCustomerPlanUsageAction().then((u) => {
       if (!u || u.bypassed) return;
-      const word = u.entitlements.planId === "plus" ? "FINDIT+ Finds" : "free Finds";
-      setUsageLabel(`${u.remaining} of ${u.limit} ${word} left this month`);
+      const bonusLabel = u.bonus
+        ? ` (includes ${u.bonus} bonus ${u.bonus === 1 ? "Find" : "Finds"})`
+        : "";
+      setUsageLabel(
+        `${u.remaining} of ${u.limit} Finds left this month${bonusLabel}`
+      );
       if (u.remaining === 0) {
         setUpgrade({ used: u.used, limit: u.limit });
         setStep("query");
@@ -200,7 +204,7 @@ export default function CustomerHomePage() {
 
   function goNextFromQuery() {
     if (upgrade) {
-      toast.error(planLimitReachedMessage(entitlements));
+      toast.error(totalFindsAllowanceReachedMessage(upgrade.limit));
       return;
     }
     const value = productName.trim();
@@ -327,7 +331,7 @@ export default function CustomerHomePage() {
   async function submitRequest(forceDuplicate = false, ageOk = idConfirmed) {
     if (upgrade) {
       setStep("query");
-      toast.error(planLimitReachedMessage(entitlements));
+      toast.error(totalFindsAllowanceReachedMessage(upgrade.limit));
       return;
     }
     if (restricted && !ageOk) {

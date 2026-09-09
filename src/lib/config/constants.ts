@@ -46,6 +46,7 @@ export {
   PAYMENTS_COMING_SOON_NOTE,
   WAITING_FOR_REPLY_HINT,
   planLimitReachedMessage,
+  totalFindsAllowanceReachedMessage,
   radiusLimitMessage,
   isMonthlyFindCapError,
   monthlyFindWindowStart,

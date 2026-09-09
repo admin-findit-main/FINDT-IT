@@ -12,10 +12,14 @@ import {
   createdInMonthlyFindWindow,
   customerPlanCatalog,
   customerPlanPriceLabel,
+  effectiveMonthlyFindLimit,
   getConsumerEntitlements,
   isMonthlyFindCapError,
+  monthlyFindPeriodStart,
   planLimitReachedMessage,
   radiusOptionsForPlan,
+  sumMonthlyFindGrants,
+  totalFindsAllowanceReachedMessage,
   widerRadiusOptions,
 } from "../entitlements";
 
@@ -98,12 +102,45 @@ describe("getConsumerEntitlements", () => {
     expect(createdInMonthlyFindWindow(lastMonth.toISOString())).toBe(false);
   });
 
+  it("adds only valid bonus grants to the effective monthly allowance", () => {
+    const bonus = sumMonthlyFindGrants([
+      { finds: 5 },
+      { finds: 7 },
+      { finds: 0 },
+      { finds: -2 },
+      { finds: 1.5 },
+      { finds: null },
+    ]);
+    expect(bonus).toBe(12);
+    expect(effectiveMonthlyFindLimit(25, bonus)).toBe(37);
+    expect(effectiveMonthlyFindLimit(25, Number.NaN)).toBe(25);
+    expect(totalFindsAllowanceReachedMessage(37)).toMatch(
+      /total Finds allowance of 37 this month/i
+    );
+  });
+
+  it("uses a UTC calendar month for requests and grants", () => {
+    const instant = new Date("2026-09-01T00:30:00.000Z");
+    expect(monthlyFindPeriodStart(instant)).toBe("2026-09-01");
+    expect(
+      createdInMonthlyFindWindow("2026-09-30T23:59:59.999Z", instant)
+    ).toBe(true);
+    expect(
+      createdInMonthlyFindWindow("2026-10-01T00:00:00.000Z", instant)
+    ).toBe(false);
+  });
+
   it("recognizes monthly cap errors from server and database copy", () => {
     expect(
       isMonthlyFindCapError("You've used your 5 free Finds this month.")
     ).toBe(true);
     expect(
       isMonthlyFindCapError("FINDIT+ includes 25 Finds per month.")
+    ).toBe(true);
+    expect(
+      isMonthlyFindCapError(
+        "You've used your total Finds allowance of 35 this month."
+      )
     ).toBe(true);
     expect(isMonthlyFindCapError("Couldn't create your request.")).toBe(false);
   });

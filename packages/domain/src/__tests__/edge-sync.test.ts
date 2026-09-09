@@ -10,10 +10,16 @@ import {
   PLUS_MONTHLY_REQUEST_LIMIT,
   STORE_PLANS_FREE_MONTHLY,
 } from "../constants";
+import {
+  effectiveMonthlyFindLimit,
+  sumMonthlyFindGrants,
+} from "../entitlements";
 import { MAX_CUSTOMER_RADIUS_MILES } from "../routing";
 import {
+  effectiveMonthlyFindLimit as edgeEffectiveMonthlyFindLimit,
   PILOT_BYPASS_STORE_REQUEST_CAPS as EDGE_PILOT_BYPASS_STORE_REQUEST_CAPS,
   selectEligibleStores as selectEdgeEligibleStores,
+  sumMonthlyFindGrants as edgeSumMonthlyFindGrants,
 } from "../../../../supabase/functions/_shared/domain";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +38,7 @@ const authEmailEdgePath = resolve(
 );
 const capMigrationPath = resolve(
   here,
-  "../../../../supabase/migrations/20260326000013_monthly_find_cap.sql"
+  "../../../../supabase/migrations/20260909022500_customer_find_grants.sql"
 );
 
 describe("Edge domain constants stay aligned with @findit/domain", () => {
@@ -71,6 +77,14 @@ describe("Edge domain constants stay aligned with @findit/domain", () => {
     expect(edge).toContain('dispensary: "dispensary"');
     expect(edge).toContain("a.estimatedMiles - b.estimatedMiles");
     expect(edge).toContain('isAgeRestrictedFind');
+  });
+
+  it("keeps bonus Find arithmetic aligned in Edge", () => {
+    const rows = [{ finds: 4 }, { finds: 6 }, { finds: 0 }];
+    expect(edgeSumMonthlyFindGrants(rows)).toBe(sumMonthlyFindGrants(rows));
+    expect(edgeEffectiveMonthlyFindLimit(25, 10)).toBe(
+      effectiveMonthlyFindLimit(25, 10)
+    );
   });
 
   it("uses the synchronized pilot switch in Edge routing while false enforces", () => {

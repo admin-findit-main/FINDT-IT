@@ -34,6 +34,32 @@ export const FREE_MAX_RADIUS_MILES = 10;
  */
 export const PILOT_BYPASS_STORE_REQUEST_CAPS = true;
 
+export function sumMonthlyFindGrants(
+  grants: readonly { finds?: number | null }[] | null | undefined
+): number {
+  return (grants || []).reduce((total, grant) => {
+    const finds = grant.finds;
+    if (!Number.isSafeInteger(finds) || (finds ?? 0) <= 0) return total;
+    const next = total + (finds as number);
+    return Number.isSafeInteger(next) ? next : Number.MAX_SAFE_INTEGER;
+  }, 0);
+}
+
+export function effectiveMonthlyFindLimit(
+  baseLimit: number,
+  bonusFinds: number
+): number {
+  const base = Number.isSafeInteger(baseLimit) && baseLimit > 0 ? baseLimit : 0;
+  const bonus =
+    Number.isSafeInteger(bonusFinds) && bonusFinds > 0 ? bonusFinds : 0;
+  const total = base + bonus;
+  return Number.isSafeInteger(total) ? total : Number.MAX_SAFE_INTEGER;
+}
+
+export function totalFindsAllowanceReachedMessage(limit: number): string {
+  return `You've used your total Finds allowance of ${limit} this month.`;
+}
+
 export function normalizeProductName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
 }

@@ -23,7 +23,10 @@ export default function PlanPage() {
     });
     getCustomerPlanUsageAction().then((u) => {
       if (!u || u.bypassed) return;
-      setUsageLabel(`${u.used} / ${u.limit} Finds used this month`);
+      const bonusLabel = u.bonus
+        ? `; the ${u.limit} allowance includes ${u.bonus} bonus ${u.bonus === 1 ? "Find" : "Finds"}`
+        : "";
+      setUsageLabel(`${u.used} / ${u.limit} Finds used this month${bonusLabel}`);
     });
   }, []);
 

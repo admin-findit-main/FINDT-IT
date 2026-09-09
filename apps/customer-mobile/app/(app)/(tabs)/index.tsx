@@ -36,10 +36,10 @@ import {
   isMonthlyFindCapError,
   lookupUsZip,
   normalizeStateCode,
-  planLimitReachedMessage,
   radiusOptionsForPlan,
   REQUEST_IMAGES_BUCKET,
   shortPlaceFromProfile,
+  totalFindsAllowanceReachedMessage,
   type ShortPlace,
   type RoutableCategoryCount,
 } from "@findit/domain";
@@ -116,8 +116,12 @@ export default function HomeFindItScreen() {
   const loadUsage = useCallback(async () => {
     const usage = await fetchPlanUsage();
     if (!usage) return;
-    const word = usage.entitlements.planId === "plus" ? "FINDIT+ Finds" : "free Finds";
-    setUsageLabel(`${usage.remaining} of ${usage.limit} ${word} left this month`);
+    const bonusLabel = usage.bonus
+      ? ` (includes ${usage.bonus} bonus ${usage.bonus === 1 ? "Find" : "Finds"})`
+      : "";
+    setUsageLabel(
+      `${usage.remaining} of ${usage.limit} Finds left this month${bonusLabel}`
+    );
     setAtCap(usage.remaining === 0);
     setUsed(usage.used);
     setLimit(usage.limit);
@@ -259,7 +263,7 @@ export default function HomeFindItScreen() {
 
   const goRadius = () => {
     if (atCap) {
-      setError(planLimitReachedMessage(entitlements));
+      setError(totalFindsAllowanceReachedMessage(limit));
       setStep("query");
       return;
     }
@@ -318,7 +322,7 @@ export default function HomeFindItScreen() {
 
   const onSubmit = async (ageOk = idConfirmed) => {
     if (atCap) {
-      setError(planLimitReachedMessage(entitlements));
+      setError(totalFindsAllowanceReachedMessage(limit));
       setStep("query");
       return;
     }

@@ -25,7 +25,12 @@ export default function PlanScreen() {
   useEffect(() => {
     fetchPlanUsage().then((usage) => {
       if (!usage) return;
-      setUsageLabel(`${usage.used} / ${usage.limit} Finds used this month`);
+      const bonusLabel = usage.bonus
+        ? `; the ${usage.limit} allowance includes ${usage.bonus} bonus ${usage.bonus === 1 ? "Find" : "Finds"}`
+        : "";
+      setUsageLabel(
+        `${usage.used} / ${usage.limit} Finds used this month${bonusLabel}`
+      );
     });
   }, [profile?.subscription_plan]);
 

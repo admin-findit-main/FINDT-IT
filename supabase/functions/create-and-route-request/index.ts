@@ -1,4 +1,7 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.112.2";
+import {
+  createClient,
+  type SupabaseClient,
+} from "https://esm.sh/@supabase/supabase-js@2.112.2";
 import {
   corsHeaders,
   deriveRequestStatus,
@@ -15,6 +18,9 @@ import {
   PILOT_BYPASS_STORE_REQUEST_CAPS,
   FREE_MONTHLY_REQUEST_LIMIT,
   PLUS_MONTHLY_REQUEST_LIMIT,
+  effectiveMonthlyFindLimit,
+  sumMonthlyFindGrants,
+  totalFindsAllowanceReachedMessage,
   MAX_CUSTOMER_RADIUS_MILES,
   resolveOwnedRequestImageInput,
 } from "../_shared/domain.ts";
@@ -170,12 +176,39 @@ Deno.serve(async (req) => {
   }
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count: recentCount } = await admin
-    .from("customer_requests")
-    .select("*", { count: "exact", head: true })
-    .eq("customer_id", user.id)
-    .gte("created_at", hourAgo)
-    .in("status", ["active", "partially_answered", "answered", "draft"]);
+  const now = new Date();
+  const customerMonthStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+  );
+  const customerMonthEnd = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)
+  );
+  const grantPeriodStart = customerMonthStart.toISOString().slice(0, 10);
+  const [
+    { count: recentCount },
+    { data: grantRows, error: grantError },
+  ] = await Promise.all([
+    admin
+      .from("customer_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("customer_id", user.id)
+      .gte("created_at", hourAgo)
+      .in("status", ["active", "partially_answered", "answered", "draft"]),
+    admin
+      .from("customer_find_grants")
+      .select("finds")
+      .eq("customer_id", user.id)
+      .eq("period_start", grantPeriodStart),
+  ]);
+  const isPlus = profile.subscription_plan === "plus";
+  const baseMonthlyLimit = isPlus
+    ? PLUS_MONTHLY_REQUEST_LIMIT
+    : FREE_MONTHLY_REQUEST_LIMIT;
+  const bonusFinds = sumMonthlyFindGrants(grantRows);
+  const effectiveMonthlyLimit = effectiveMonthlyFindLimit(
+    baseMonthlyLimit,
+    bonusFinds
+  );
   if ((recentCount || 0) >= 10) {
     return jsonResponse(
       { error: "You can create up to 10 requests per hour." },
@@ -213,24 +246,18 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (!bypassConsumerLimits) {
-    const isPlus = profile.subscription_plan === "plus";
-    const monthlyLimit = isPlus ? PLUS_MONTHLY_REQUEST_LIMIT : FREE_MONTHLY_REQUEST_LIMIT;
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+  if (!bypassConsumerLimits && !grantError) {
     // Count every created Find this month, including cancelled ones.
     const { count } = await admin
       .from("customer_requests")
       .select("*", { count: "exact", head: true })
       .eq("customer_id", user.id)
-      .gte("created_at", monthStart.toISOString());
-    if ((count || 0) >= monthlyLimit) {
+      .gte("created_at", customerMonthStart.toISOString())
+      .lt("created_at", customerMonthEnd.toISOString());
+    if ((count || 0) >= effectiveMonthlyLimit) {
       return jsonResponse(
         {
-          error: isPlus
-            ? `FINDIT+ includes ${monthlyLimit} Finds per month.`
-            : `You've used your ${monthlyLimit} free Finds this month.`,
+          error: totalFindsAllowanceReachedMessage(effectiveMonthlyLimit),
           code: "plan_limit",
           upgradeRequired: !isPlus,
         },
@@ -321,17 +348,13 @@ Deno.serve(async (req) => {
         );
       }
     }
-    const capHit = /Finds this month/i.test(error?.message || "");
+    const capHit = /Finds .*this month/i.test(error?.message || "");
     if (capHit) {
-      const isPlus = profile.subscription_plan === "plus";
-      const monthlyLimit = isPlus
-        ? PLUS_MONTHLY_REQUEST_LIMIT
-        : FREE_MONTHLY_REQUEST_LIMIT;
       return jsonResponse(
         {
-          error: isPlus
-            ? `FINDIT+ includes ${monthlyLimit} Finds per month.`
-            : `You've used your ${monthlyLimit} free Finds this month.`,
+          error:
+            error?.message ||
+            totalFindsAllowanceReachedMessage(effectiveMonthlyLimit),
           code: "plan_limit",
           upgradeRequired: !isPlus,
         },
@@ -591,7 +614,7 @@ Deno.serve(async (req) => {
 });
 
 async function fanoutEmployeePush(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   members: { user_id: string | null; store_id: string }[],
   payload: { title: string; body: string; data: Record<string, string> }
 ) {

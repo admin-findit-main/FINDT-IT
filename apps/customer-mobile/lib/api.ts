@@ -1,7 +1,11 @@
 import { invokeCreateAndRouteRequest } from "@findit/supabase-client";
 import {
+  effectiveMonthlyFindLimit,
   getConsumerEntitlements,
+  monthlyFindPeriodStart,
+  monthlyFindWindowEnd,
   monthlyFindWindowStart,
+  sumMonthlyFindGrants,
   type CreateRequestInput,
   type RoutableCategoryCount,
   type ShortPlace,
@@ -124,23 +128,46 @@ export async function fetchPlanUsage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("subscription_plan")
-    .eq("id", user.id)
-    .maybeSingle();
+  const now = new Date();
+  const monthStart = monthlyFindWindowStart(now).toISOString();
+  const monthEnd = monthlyFindWindowEnd(now).toISOString();
+  const periodStart = monthlyFindPeriodStart(now);
+  const [
+    { data: profile, error: profileError },
+    { count, error: countError },
+    { data: grants, error: grantsError },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("subscription_plan")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("customer_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("customer_id", user.id)
+      .gte("created_at", monthStart)
+      .lt("created_at", monthEnd),
+    supabase
+      .from("customer_find_grants")
+      .select("finds")
+      .eq("customer_id", user.id)
+      .eq("period_start", periodStart),
+  ]);
+  if (profileError || countError || grantsError) return null;
   const entitlements = getConsumerEntitlements(profile?.subscription_plan);
-  const { count } = await supabase
-    .from("customer_requests")
-    .select("*", { count: "exact", head: true })
-    .eq("customer_id", user.id)
-    .gte("created_at", monthlyFindWindowStart().toISOString());
   const used = count || 0;
+  const bonus = sumMonthlyFindGrants(grants);
+  const limit = effectiveMonthlyFindLimit(
+    entitlements.monthlyRequestLimit,
+    bonus
+  );
   return {
     entitlements,
     used,
-    limit: entitlements.monthlyRequestLimit,
-    remaining: Math.max(0, entitlements.monthlyRequestLimit - used),
+    bonus,
+    limit,
+    remaining: Math.max(0, limit - used),
   };
 }
 

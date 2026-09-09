@@ -78,9 +78,11 @@ import {
   isAccountDeletionConfirmed,
   isAgeRestrictedFind,
   classifyRequest,
+  effectiveMonthlyFindLimit,
   isMonthlyFindCapError,
+  monthlyFindPeriodStart,
+  monthlyFindWindowEnd,
   monthlyFindWindowStart,
-  planLimitReachedMessage,
   radiusExceedsPlan,
   radiusLimitMessage,
   resolveOwnedRequestImageInput,
@@ -91,6 +93,8 @@ import {
   boundUuid,
   boundSlug,
   signupSchema,
+  sumMonthlyFindGrants,
+  totalFindsAllowanceReachedMessage,
   reportSchema,
   loginAudienceForAccount,
   wrongLoginSideMessage,
@@ -1070,9 +1074,13 @@ export async function createCustomerRequestAction(raw: unknown) {
   }
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const monthStart = monthlyFindWindowStart().toISOString();
+  const now = new Date();
+  const monthStart = monthlyFindWindowStart(now).toISOString();
+  const monthEnd = monthlyFindWindowEnd(now).toISOString();
+  const grantPeriodStart = monthlyFindPeriodStart(now);
   const checkMonthly = !bypassConsumerPlanLimits();
-  const [recentResult, existingActive, monthlyResult, point] = await Promise.all([
+  const entitlements = getConsumerEntitlements(profile.subscription_plan);
+  const [recentResult, existingActive, monthlyResult, grantResult, point] = await Promise.all([
     supabase
       .from("customer_requests")
       .select("*", { count: "exact", head: true })
@@ -1094,13 +1102,26 @@ export async function createCustomerRequestAction(raw: unknown) {
           .select("*", { count: "exact", head: true })
           .eq("customer_id", user.id)
           .gte("created_at", monthStart)
+          .lt("created_at", monthEnd)
       : Promise.resolve({ count: 0 }),
+    checkMonthly
+      ? supabase
+          .from("customer_find_grants")
+          .select("finds")
+          .eq("customer_id", user.id)
+          .eq("period_start", grantPeriodStart)
+      : Promise.resolve({ data: [] as { finds: number }[], error: null }),
     resolvePoint({
       postalCode: parsed.data.postalCode,
       latitude: parsed.data.latitude,
       longitude: parsed.data.longitude,
     }),
   ]);
+  const bonusFinds = sumMonthlyFindGrants(grantResult.data);
+  const effectiveMonthlyLimit = effectiveMonthlyFindLimit(
+    entitlements.monthlyRequestLimit,
+    bonusFinds
+  );
 
   if ((recentResult.count || 0) >= 10) {
     return { error: "You can create up to 10 requests per hour." };
@@ -1121,10 +1142,12 @@ export async function createCustomerRequestAction(raw: unknown) {
   }
 
   if (checkMonthly) {
-    const entitlements = getConsumerEntitlements(profile.subscription_plan);
-    if ((monthlyResult.count || 0) >= entitlements.monthlyRequestLimit) {
+    if (
+      !grantResult.error &&
+      (monthlyResult.count || 0) >= effectiveMonthlyLimit
+    ) {
       return {
-        error: planLimitReachedMessage(entitlements),
+        error: totalFindsAllowanceReachedMessage(effectiveMonthlyLimit),
         code: "plan_limit" as const,
         upgradeRequired: entitlements.planId === "free",
       };
@@ -1189,9 +1212,10 @@ export async function createCustomerRequestAction(raw: unknown) {
 
   if (error || !request) {
     if (isMonthlyFindCapError(error?.message)) {
-      const entitlements = getConsumerEntitlements(profile.subscription_plan);
       return {
-        error: planLimitReachedMessage(entitlements),
+        error:
+          error?.message ||
+          totalFindsAllowanceReachedMessage(effectiveMonthlyLimit),
         code: "plan_limit" as const,
         upgradeRequired: entitlements.planId === "free",
       };
@@ -2942,24 +2966,47 @@ export async function getCustomerPlanUsageAction() {
   if (!profile) return null;
   const entitlements = getConsumerEntitlements(profile.subscription_plan);
   let used = 0;
+  let bonus = 0;
   if (isDemoMode()) {
     used = demoCountCustomerRequestsThisMonth(profile.id);
   } else {
     const { supabase, user } = await getSupabaseUser();
     if (!user) return null;
-    const { count } = await supabase
-      .from("customer_requests")
-      .select("*", { count: "exact", head: true })
-      .eq("customer_id", user.id)
-      .gte("created_at", monthlyFindWindowStart().toISOString());
+    const now = new Date();
+    const monthStart = monthlyFindWindowStart(now).toISOString();
+    const monthEnd = monthlyFindWindowEnd(now).toISOString();
+    const grantPeriodStart = monthlyFindPeriodStart(now);
+    const [
+      { count, error: countError },
+      { data: grants, error: grantsError },
+    ] = await Promise.all([
+      supabase
+        .from("customer_requests")
+        .select("*", { count: "exact", head: true })
+        .eq("customer_id", user.id)
+        .gte("created_at", monthStart)
+        .lt("created_at", monthEnd),
+      supabase
+        .from("customer_find_grants")
+        .select("finds")
+        .eq("customer_id", user.id)
+        .eq("period_start", grantPeriodStart),
+    ]);
+    if (countError || grantsError) return null;
     used = count || 0;
+    bonus = sumMonthlyFindGrants(grants);
   }
+  const limit = effectiveMonthlyFindLimit(
+    entitlements.monthlyRequestLimit,
+    bonus
+  );
   return {
     plan: CUSTOMER_PLANS[entitlements.planId],
     entitlements,
     used,
-    limit: entitlements.monthlyRequestLimit,
-    remaining: Math.max(0, entitlements.monthlyRequestLimit - used),
+    bonus,
+    limit,
+    remaining: Math.max(0, limit - used),
     bypassed: bypassConsumerPlanLimits(),
     allPlans: CUSTOMER_PLANS,
   };
