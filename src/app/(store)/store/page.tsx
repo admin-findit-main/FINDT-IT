@@ -1,5 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import {
+  Bell,
+  CalendarClock,
+  CreditCard,
+  Gift,
+  MessageSquareReply,
+  Monitor,
+  PackageSearch,
+  Settings,
+  Tablet,
+  Users,
+  BarChart3,
+} from "lucide-react";
 import { MetricCard, Panel } from "@/components/dashboard/shell";
 import { StoreGreeting, StoreOpenLabel } from "@/components/store/owner-clock";
 import {
@@ -17,6 +30,86 @@ function delta(today: number, yesterday: number) {
   const sign = pct > 0 ? "+" : "";
   return `${sign}${pct}% vs yesterday`;
 }
+
+const QUICK_LINKS: {
+  href: string;
+  label: string;
+  body: string;
+  icon: typeof PackageSearch;
+}[] = [
+  {
+    href: "/store/requests",
+    label: "Requests",
+    body: "Answer nearby asks",
+    icon: PackageSearch,
+  },
+  {
+    href: "/store/responses",
+    label: "Responses",
+    body: "What you already answered",
+    icon: MessageSquareReply,
+  },
+  {
+    href: "/store/demand",
+    label: "Demand",
+    body: "Products people keep asking for",
+    icon: BarChart3,
+  },
+  {
+    href: "/store/customers",
+    label: "Customers",
+    body: "Loyalty balances at this store",
+    icon: Users,
+  },
+  {
+    href: "/store/rewards",
+    label: "Rewards",
+    body: "Points per dollar and thresholds",
+    icon: Gift,
+  },
+  {
+    href: "/store/team",
+    label: "Team",
+    body: "Invite managers and employees",
+    icon: Users,
+  },
+  {
+    href: "/store/shifts",
+    label: "Shifts",
+    body: "Hub PINs and punch hours",
+    icon: CalendarClock,
+  },
+  {
+    href: "/store/hub",
+    label: "FINDIT Hub",
+    body: "Counter tablet for asks and points",
+    icon: Tablet,
+  },
+  {
+    href: "/store/devices",
+    label: "Devices",
+    body: "Pair and manage Hub tablets",
+    icon: Monitor,
+  },
+  {
+    href: "/store/notifications",
+    label: "Notifications",
+    body: "Alerts and browser push",
+    icon: Bell,
+  },
+  {
+    href: "/store/settings",
+    label: "Settings",
+    body: "Hours, coverage, categories",
+    icon: Settings,
+  },
+  {
+    href: "/store/subscription",
+    label: "Billing",
+    body: "Trial and subscription status",
+    icon: CreditCard,
+  },
+];
 
 function OwnerOverview({ data }: { data: OwnerData }) {
   const {
@@ -47,35 +140,36 @@ function OwnerOverview({ data }: { data: OwnerData }) {
         <StoreOpenLabel hours={hours} />
       </div>
 
-      {!hubConnected ? (
-        <div className="rounded-2xl border border-hairline-strong bg-white px-4 py-4 sm:px-5">
-          <p className="text-sm font-semibold text-ink">Open your store</p>
-          <p className="mt-1 text-sm text-ink-muted">
-            FINDIT accepted you. Connect a counter tablet, invite staff, and
-            confirm hours so you can answer Asks.
-          </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <Link
-              href="/store/hub"
-              className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#E5231B] px-4 py-2 text-center text-sm font-semibold text-white"
-            >
-              Connect FINDIT Hub
-            </Link>
-            <Link
-              href="/store/shifts"
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
-            >
-              Employee shifts
-            </Link>
-            <Link
-              href="/store/settings"
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
-            >
-              Settings
-            </Link>
-          </div>
+      <div className="rounded-2xl border border-hairline-strong bg-white px-4 py-4 sm:px-5">
+        <p className="text-sm font-semibold text-ink">
+          {hubConnected ? "FINDIT Hub connected" : "Open your store"}
+        </p>
+        <p className="mt-1 text-sm text-ink-muted">
+          {hubConnected
+            ? "Use the Hub on the counter for customer points and live asks. Manage everything else from this dashboard."
+            : "Connect a counter tablet, invite staff, and confirm hours so you can answer Asks."}
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Link
+            href="/store/hub"
+            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#E5231B] px-4 py-2 text-center text-sm font-semibold text-white"
+          >
+            {hubConnected ? "Open FINDIT Hub" : "Connect FINDIT Hub"}
+          </Link>
+          <Link
+            href="/store/team"
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
+          >
+            Invite team
+          </Link>
+          <Link
+            href="/store/settings"
+            className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
+          >
+            Settings
+          </Link>
         </div>
-      ) : null}
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -117,6 +211,31 @@ function OwnerOverview({ data }: { data: OwnerData }) {
         </div>
       ) : null}
 
+      <Panel title="Everything in Business">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {QUICK_LINKS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex min-h-[4.5rem] gap-3 rounded-xl border border-hairline-strong bg-[var(--solid-chrome)] px-3.5 py-3 transition hover:border-black/15 hover:bg-white"
+              >
+                <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-ink shadow-sm">
+                  <Icon className="h-4 w-4" strokeWidth={2.2} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-ink">{item.label}</span>
+                  <span className="mt-0.5 block text-xs leading-4 text-ink-muted">
+                    {item.body}
+                  </span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </Panel>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel
           title="Recent requests"
@@ -148,7 +267,14 @@ function OwnerOverview({ data }: { data: OwnerData }) {
           )}
         </Panel>
 
-        <Panel title="Demand snapshot">
+        <Panel
+          title="Demand snapshot"
+          action={
+            <Link href="/store/demand" className="text-xs font-medium text-ink-muted hover:text-ink">
+              Full demand
+            </Link>
+          }
+        >
           {top.length === 0 ? (
             <p className="text-sm text-ink-muted">
               Not enough data yet. Insights appear after nearby customers start asking.
@@ -168,7 +294,14 @@ function OwnerOverview({ data }: { data: OwnerData }) {
         </Panel>
       </div>
 
-      <Panel title="Missed opportunities">
+      <Panel
+        title="Missed opportunities"
+        action={
+          <Link href="/store/demand" className="text-xs font-medium text-ink-muted hover:text-ink">
+            Demand
+          </Link>
+        }
+      >
         {missed.length === 0 ? (
           <p className="text-sm text-ink-muted">
             No repeated out-of-stock patterns yet. This fills in as you answer asks.
@@ -193,22 +326,12 @@ function OwnerOverview({ data }: { data: OwnerData }) {
 /**
  * Server component, matching /admin.
  *
- * This page used to be `"use client"`: it shipped a skeleton, waited for the
- * bundle to hydrate, and only then called getStoreOverviewAction() over the
- * network. The HTML was already fast (~280ms) but real content did not appear
- * until ~4.0s, because the database work could not start until the browser
- * had downloaded and run JavaScript. /admin fetched on the server and had
- * content at ~1.0s with the same queries underneath.
- *
- * Awaiting here moves the same single round trip to the server, so the markup
- * arrives with the numbers already in it. The (store)/loading.tsx boundary
- * covers the wait, so there is still no blank screen.
+ * Awaiting here moves the store overview round trip to the server so markup
+ * arrives with numbers already in it. (store)/loading.tsx covers the wait.
  */
 export default async function StoreHomePage() {
   const overview = await getStoreOverviewAction();
 
-  // Employees get the Hub, not the owner dashboard. Redirecting on the server
-  // avoids rendering a dashboard frame that a router.replace then throws away.
   if (overview.mode === "employee") redirect("/store/hub");
 
   if (overview.mode === "no-store") {

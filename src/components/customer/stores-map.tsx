@@ -28,11 +28,9 @@ import type { PublicStoreMapItem } from "@/lib/services/stores-map";
 import { geolocateUsPlace } from "@/lib/customer/geolocate";
 import { usePublicHref } from "@/components/host/host-surface";
 
-const StoresMapLeaflet = dynamic(
+const StoresMapGl = dynamic(
   () =>
-    import("@/components/customer/stores-map-leaflet").then(
-      (mod) => mod.StoresMapLeaflet
-    ),
+    import("@/components/customer/stores-map-gl").then((mod) => mod.StoresMapGl),
   {
     ssr: false,
     loading: () => (
@@ -225,7 +223,7 @@ export function StoresMap() {
             {error || "No FINDIT stores with a map location yet."}
           </div>
         ) : (
-          <StoresMapLeaflet
+          <StoresMapGl
             stores={stores}
             selectedId={selectedId}
             userCoords={userCoords}

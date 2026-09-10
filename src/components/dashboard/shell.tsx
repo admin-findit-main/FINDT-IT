@@ -12,6 +12,7 @@ import {
   Cpu,
   CreditCard,
   FileWarning,
+  Gift,
   LayoutDashboard,
   Menu,
   MessageSquareReply,
@@ -53,6 +54,7 @@ const ICONS: Record<DashItem["icon"], typeof LayoutDashboard> = {
   devices: Monitor,
   store: Store,
   plan: CreditCard,
+  rewards: Gift,
   alerts: Bell,
   account: User,
   settings: Settings,
@@ -63,6 +65,64 @@ const ICONS: Record<DashItem["icon"], typeof LayoutDashboard> = {
   reports: FileWarning,
   system: Cpu,
 };
+
+function NavSections({
+  items,
+  collapsed,
+  internalPath,
+  surface,
+  onNavigate,
+}: {
+  items: DashItem[];
+  collapsed: boolean;
+  internalPath: string;
+  surface: ReturnType<typeof matchProductSurface>;
+  onNavigate: () => void;
+}) {
+  const nodes: React.ReactNode[] = [];
+  let lastSection: string | undefined;
+
+  for (const item of items) {
+    const Icon = ICONS[item.icon];
+    const active = dashItemActive(internalPath, item.href);
+    if (item.section && item.section !== lastSection && !collapsed) {
+      nodes.push(
+        <p
+          key={`section-${item.section}`}
+          className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-subtle first:pt-1"
+        >
+          {item.section}
+        </p>
+      );
+      lastSection = item.section;
+    } else if (item.section) {
+      lastSection = item.section;
+    }
+
+    nodes.push(
+      <Link
+        key={item.href}
+        href={toPublicPath(surface, item.href)}
+        prefetch
+        onClick={onNavigate}
+        aria-current={active ? "page" : undefined}
+        className={cn(
+          "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
+          active
+            ? "bg-black/[0.06] text-ink"
+            : "text-ink-muted hover:bg-black/[0.04] hover:text-ink",
+          collapsed && "justify-center px-0"
+        )}
+        title={collapsed ? item.label : undefined}
+      >
+        <Icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2.4 : 2} />
+        {collapsed ? null : item.label}
+      </Link>
+    );
+  }
+
+  return <>{nodes}</>;
+}
 
 export function DashboardShell({
   tone = "business",
@@ -108,30 +168,13 @@ export function DashboardShell({
 
   const nav = (
     <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-2 py-1">
-      {items.map((item) => {
-        const Icon = ICONS[item.icon];
-        const active = dashItemActive(internalPath, item.href);
-        return (
-          <Link
-            key={item.href}
-            href={toPublicPath(surface, item.href)}
-            prefetch
-            onClick={() => setDrawer(false)}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
-              active
-                ? "bg-black/[0.06] text-ink"
-                : "text-ink-muted hover:bg-black/[0.04] hover:text-ink",
-              collapsed && "justify-center px-0"
-            )}
-            title={collapsed ? item.label : undefined}
-          >
-            <Icon className="h-4 w-4 shrink-0" strokeWidth={active ? 2.4 : 2} />
-            {collapsed ? null : item.label}
-          </Link>
-        );
-      })}
+      <NavSections
+        items={items}
+        collapsed={collapsed}
+        internalPath={internalPath}
+        surface={surface}
+        onNavigate={() => setDrawer(false)}
+      />
     </nav>
   );
 

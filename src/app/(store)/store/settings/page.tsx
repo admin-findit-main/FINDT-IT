@@ -673,11 +673,28 @@ export default function StoreSettingsPage() {
         </SectionCard>
 
         {canManage ? (
-          <MenuLink
-            href="/store/shifts"
-            title="Shifts"
-            body="Hours, PINs, and who is clocked in"
-          />
+          <>
+            <MenuLink
+              href="/store/team"
+              title="Team"
+              body="Invite managers and employees with login access"
+            />
+            <MenuLink
+              href="/store/shifts"
+              title="Shifts"
+              body="Hours, PINs, and who is clocked in on the Hub"
+            />
+            <MenuLink
+              href="/store/hub"
+              title="FINDIT Hub"
+              body="Open the counter tablet experience"
+            />
+            <MenuLink
+              href="/store/rewards"
+              title="Rewards"
+              body="Store points per dollar and redemption"
+            />
+          </>
         ) : null}
 
         <MenuLink

@@ -63,7 +63,7 @@ function formatAddress(store: PublicStoreMapItem) {
   return line || place || "Location unavailable";
 }
 
-function leafletHtml(stores: PublicStoreMapItem[]) {
+function mapLibreHtml(stores: PublicStoreMapItem[]) {
   const payload = JSON.stringify({
     stores: stores.map((s) => ({
       id: s.id,
@@ -72,67 +72,87 @@ function leafletHtml(stores: PublicStoreMapItem[]) {
       lng: s.longitude,
     })),
     accent: ACCENT,
+    style: "https://tiles.openfreemap.org/styles/liberty",
   });
   return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" />
+<script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
 <style>
   html, body, #map { margin:0; padding:0; height:100%; width:100%; background:#F0ECEE; }
-  .leaflet-control-attribution { font-size: 10px; }
-  .leaflet-bottom.leaflet-right { bottom: 12px; right: 8px; }
+  .maplibregl-ctrl-attrib { font-size: 10px; }
+  .findit-store-marker { display:block; padding:0; border:0; background:transparent; cursor:pointer; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <script>
   const boot = ${payload};
-  const map = L.map('map', { zoomControl: false, attributionControl: true });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OSM · CARTO',
-    maxZoom: 19
-  }).addTo(map);
-  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: boot.style,
+    center: [-77.09, 38.82],
+    zoom: 11,
+    attributionControl: { compact: true }
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
   const markers = {};
-  function icon(selected) {
-    const size = selected ? 32 : 24;
-    return L.divIcon({
-      className: '',
-      iconSize: [size, size],
-      iconAnchor: [size/2, size],
-      html: '<span style="display:block;width:'+size+'px;height:'+size+'px;border-radius:999px 999px 999px 4px;transform:rotate(-45deg);background:'+boot.accent+';border:2.5px solid #fff;box-shadow:0 4px 14px rgba(23,19,21,.35);"><span style="display:block;width:8px;height:8px;margin:'+((size-8)/2)+'px auto 0;border-radius:999px;background:#fff;transform:rotate(45deg);"></span></span>'
-    });
+  function paint(el, selected, name) {
+    var size = selected ? 32 : 24;
+    el.title = name;
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    el.innerHTML = '<span style="display:block;width:'+size+'px;height:'+size+'px;border-radius:999px 999px 999px 4px;transform:rotate(-45deg);background:'+boot.accent+';border:2.5px solid #fff;box-shadow:0 4px 14px rgba(23,19,21,.35);"><span style="display:block;width:8px;height:8px;margin:'+((size-8)/2)+'px auto 0;border-radius:999px;background:#fff;transform:rotate(45deg);"></span></span>';
   }
-  const latLngs = [];
-  boot.stores.forEach(function(store) {
-    const ll = [store.lat, store.lng];
-    latLngs.push(ll);
-    const m = L.marker(ll, { icon: icon(false), title: store.name }).addTo(map);
-    m.on('click', function() {
+  function makeMarker(store, selected) {
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'findit-store-marker';
+    paint(el, selected, store.name);
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'select', id: store.id }));
     });
-    markers[store.id] = m;
-  });
-  if (latLngs.length === 1) map.setView(latLngs[0], 14);
-  else if (latLngs.length > 1) map.fitBounds(latLngs, {
-    paddingTopLeft: [28, 96],
-    paddingBottomRight: [28, 220],
-    maxZoom: 14
+    return new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([store.lng, store.lat])
+      .addTo(map);
+  }
+  function fitAll() {
+    if (!boot.stores.length) return;
+    if (boot.stores.length === 1) {
+      map.jumpTo({ center: [boot.stores[0].lng, boot.stores[0].lat], zoom: 14 });
+      return;
+    }
+    var bounds = new maplibregl.LngLatBounds();
+    boot.stores.forEach(function(s) { bounds.extend([s.lng, s.lat]); });
+    map.fitBounds(bounds, {
+      padding: { top: 96, bottom: 220, left: 28, right: 28 },
+      maxZoom: 14,
+      duration: 0
+    });
+  }
+  map.on('load', function() {
+    boot.stores.forEach(function(store) {
+      markers[store.id] = makeMarker(store, false);
+    });
+    fitAll();
   });
   function applySelection(id) {
     Object.keys(markers).forEach(function(key) {
-      markers[key].setIcon(icon(key === id));
+      var store = boot.stores.find(function(s) { return s.id === key; });
+      if (!store) return;
+      paint(markers[key].getElement(), key === id, store.name);
     });
     if (id && markers[id]) {
-      map.panTo(markers[id].getLatLng(), { animate: true });
+      map.easeTo({ center: markers[id].getLngLat(), duration: 420 });
     }
   }
   function onNativeMessage(raw) {
     try {
-      const msg = JSON.parse(raw);
+      var msg = JSON.parse(raw);
       if (msg.type === 'select') applySelection(msg.id);
     } catch (err) {}
   }
@@ -262,7 +282,7 @@ export default function StoresMapScreen() {
   );
 
   const html = useMemo(
-    () => leafletHtml(stores),
+    () => mapLibreHtml(stores),
     [stores]
   );
 

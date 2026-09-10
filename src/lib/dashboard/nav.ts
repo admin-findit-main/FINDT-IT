@@ -12,6 +12,7 @@ export type DashItem = {
     | "devices"
     | "store"
     | "plan"
+    | "rewards"
     | "alerts"
     | "account"
     | "settings"
@@ -21,32 +22,39 @@ export type DashItem = {
     | "analytics"
     | "reports"
     | "system";
+  /** Sidebar group label; consecutive items with the same section render under one header. */
+  section?: string;
 };
 
 export const ownerDashItems: DashItem[] = [
-  { href: "/store", label: "Overview", icon: "overview" },
-  { href: "/store/requests", label: "Requests", icon: "requests" },
-  { href: "/store/customers", label: "Customers", icon: "users" },
-  { href: "/store/rewards", label: "Rewards", icon: "plan" },
-  { href: "/store/responses", label: "Responses", icon: "responses" },
-  { href: "/store/demand", label: "Demand", icon: "demand" },
-  { href: "/store/shifts", label: "Shifts", icon: "shifts" },
-  { href: "/store/devices", label: "Devices", icon: "devices" },
-  { href: "/store/settings", label: "Settings", icon: "settings" },
-  { href: "/store/subscription", label: "Billing", icon: "plan" },
+  { href: "/store", label: "Overview", icon: "overview", section: "Today" },
+  { href: "/store/requests", label: "Requests", icon: "requests", section: "Asks" },
+  { href: "/store/responses", label: "Responses", icon: "responses", section: "Asks" },
+  { href: "/store/demand", label: "Demand", icon: "demand", section: "Asks" },
+  { href: "/store/customers", label: "Customers", icon: "users", section: "Loyalty" },
+  { href: "/store/rewards", label: "Rewards", icon: "rewards", section: "Loyalty" },
+  { href: "/store/team", label: "Team", icon: "staff", section: "People" },
+  { href: "/store/shifts", label: "Shifts", icon: "shifts", section: "People" },
+  { href: "/store/hub", label: "FINDIT Hub", icon: "hub", section: "Counter" },
+  { href: "/store/devices", label: "Devices", icon: "devices", section: "Counter" },
+  { href: "/store/notifications", label: "Notifications", icon: "alerts", section: "Account" },
+  { href: "/store/settings", label: "Settings", icon: "settings", section: "Account" },
+  { href: "/store/subscription", label: "Billing", icon: "plan", section: "Account" },
 ];
 
 export const employeeDashItems: DashItem[] = [
-  { href: "/store/hub", label: "FINDIT Hub", icon: "hub" },
-  { href: "/store/requests", label: "Requests", icon: "requests" },
-  { href: "/store/notifications", label: "Notifications", icon: "alerts" },
+  { href: "/store/hub", label: "FINDIT Hub", icon: "hub", section: "Floor" },
+  { href: "/store/requests", label: "Requests", icon: "requests", section: "Floor" },
+  { href: "/store/notifications", label: "Notifications", icon: "alerts", section: "Account" },
+  { href: "/store/account", label: "Account", icon: "account", section: "Account" },
 ];
 
-/** Phone tab bar — keep to 4–5 short labels. The full list stays in the menu. */
+/** Phone tab bar — keep to 5 short labels. Full list stays in the sidebar menu. */
 export const ownerMobileDashItems: DashItem[] = [
+  { href: "/store", label: "Home", icon: "overview" },
   { href: "/store/requests", label: "Asks", icon: "requests" },
-  { href: "/store/shifts", label: "Shifts", icon: "shifts" },
-  { href: "/store/devices", label: "Devices", icon: "devices" },
+  { href: "/store/team", label: "Team", icon: "staff" },
+  { href: "/store/hub", label: "Hub", icon: "hub" },
   { href: "/store/settings", label: "Settings", icon: "settings" },
 ];
 
@@ -82,15 +90,22 @@ export const adminDashItems: DashItem[] = [
 
 export function dashTitle(pathname: string): { title: string; subtitle: string } {
   const map: Record<string, { title: string; subtitle: string }> = {
-    "/store": { title: "Overview", subtitle: "Today at this location" },
+    "/store": { title: "Overview", subtitle: "Everything for this location" },
     "/store/requests": { title: "Requests", subtitle: "Answer nearby asks" },
     "/store/customers": { title: "Customers", subtitle: "People connected to this store" },
     "/store/rewards": { title: "Rewards", subtitle: "Store-funded points and value" },
     "/store/responses": { title: "Responses", subtitle: "What your team already answered" },
     "/store/demand": { title: "Demand", subtitle: "What people nearby keep asking for" },
-    "/store/shifts": { title: "Shifts", subtitle: "Hours, PINs, and who is on the Hub" },
+    "/store/team": {
+      title: "Team",
+      subtitle: "Managers and employees with FINDIT login access",
+    },
+    "/store/shifts": {
+      title: "Shifts",
+      subtitle: "Floor staff, Hub PINs, and punch hours",
+    },
     "/store/devices": { title: "Devices", subtitle: "Counter tablets connected to this store" },
-    "/store/settings": { title: "Settings", subtitle: "This location and your login" },
+    "/store/settings": { title: "Settings", subtitle: "Store profile, hours, coverage, categories" },
     "/store/subscription": { title: "Billing", subtitle: "Subscription and payment status" },
     "/store/notifications": { title: "Notifications", subtitle: "New asks and team updates" },
     "/store/account": { title: "Account", subtitle: "Your login" },
@@ -124,4 +139,3 @@ export function dashItemActive(pathname: string, href: string) {
   if (href === "/store" || href === "/admin") return pathname === href;
   return pathname === href || pathname.startsWith(href + "/");
 }
-
