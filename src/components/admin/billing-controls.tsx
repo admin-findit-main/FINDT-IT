@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmActionButton } from "@/components/admin/confirm-action";
 import {
   adminStoreBillingAction,
   adminUpdateBillingSettingsAction,
@@ -113,16 +114,34 @@ export function AdminBillingSettingsForm({
           ))}
         </ul>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={busy} onClick={() => void save()}>
-            Save checklist
-          </Button>
           <Button
             type="button"
-            disabled={busy || liveApproved || !checklistComplete || !liveEnv}
-            onClick={() => void save({ approveLive: true })}
+            variant="outline"
+            disabled={busy}
+            onClick={() => void save()}
           >
-            {liveApproved ? "Live billing approved" : "Approve live billing"}
+            Save checklist
           </Button>
+          <ConfirmActionButton
+            label={liveApproved ? "Live billing approved" : "Approve live billing"}
+            confirmTitle="Approve live billing?"
+            confirmBody="Only do this when FastSpring live mode is ready and every checklist item is confirmed. Charges can begin after this."
+            confirmLabel="Approve live"
+            tone="danger"
+            variant="default"
+            disabled={busy || liveApproved || !checklistComplete || !liveEnv}
+            onConfirm={async () => {
+              setBusy(true);
+              setMessage(null);
+              const result = await adminUpdateBillingSettingsAction({
+                checklist: checks,
+                approveLive: true,
+              });
+              setBusy(false);
+              setMessage(result.error || "Saved.");
+              return result;
+            }}
+          />
         </div>
         <p className="mt-2 text-xs text-ink-muted">
           {liveEnv
@@ -136,58 +155,56 @@ export function AdminBillingSettingsForm({
 }
 
 export function AdminStoreBillingActions({ storeId }: { storeId: string }) {
-  const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function run(
     action: "extend_trial" | "complimentary" | "suspend" | "restore"
   ) {
-    setBusy(action);
     setMessage(null);
     const result = await adminStoreBillingAction({ storeId, action });
-    setBusy(null);
-    setMessage(result.error || "Updated.");
+    if (result.error) {
+      setMessage(result.error);
+      return result;
+    }
+    setMessage("Updated.");
+    return result;
   }
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy !== null}
-          onClick={() => void run("extend_trial")}
-        >
-          Extend trial
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy !== null}
-          onClick={() => void run("complimentary")}
-        >
-          Complimentary
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy !== null}
-          onClick={() => void run("suspend")}
-        >
-          Suspend access
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={busy !== null}
-          onClick={() => void run("restore")}
-        >
-          Restore access
-        </Button>
+        <ConfirmActionButton
+          label="Extend trial"
+          confirmTitle="Extend this store’s trial?"
+          confirmBody="Adds more complimentary trial time so the store stays open."
+          confirmLabel="Extend trial"
+          tone="success"
+          onConfirm={() => run("extend_trial")}
+        />
+        <ConfirmActionButton
+          label="Complimentary"
+          confirmTitle="Grant complimentary access?"
+          confirmBody="Marks this store as complimentary so billing will not block them."
+          confirmLabel="Grant access"
+          tone="success"
+          onConfirm={() => run("complimentary")}
+        />
+        <ConfirmActionButton
+          label="Suspend access"
+          confirmTitle="Suspend billing access?"
+          confirmBody="The store dashboard and Hub will pause until you restore access."
+          confirmLabel="Suspend"
+          tone="danger"
+          onConfirm={() => run("suspend")}
+        />
+        <ConfirmActionButton
+          label="Restore access"
+          confirmTitle="Restore billing access?"
+          confirmBody="The store can use FINDIT again immediately."
+          confirmLabel="Restore"
+          tone="success"
+          onConfirm={() => run("restore")}
+        />
       </div>
       {message ? <p className="text-xs text-ink-muted">{message}</p> : null}
     </div>

@@ -1,9 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { ConfirmActionButton } from "@/components/admin/confirm-action";
 import { setStoreSuspendedAction } from "@/lib/services/actions";
 
 export function AdminStoreActions({
@@ -14,27 +12,23 @@ export function AdminStoreActions({
   suspended: boolean;
 }) {
   const router = useRouter();
-  const [pending, start] = useTransition();
 
   return (
-    <Button
-      variant="outline"
-      disabled={pending}
-      onClick={() => {
-        if (!confirm(suspended ? "Reactivate this store?" : "Suspend this store?")) {
-          return;
-        }
-        start(async () => {
-          const result = await setStoreSuspendedAction(storeId, !suspended);
-          if (result.error) toast.error(result.error);
-          else {
-            toast.success(suspended ? "Reactivated" : "Suspended");
-            router.refresh();
-          }
-        });
+    <ConfirmActionButton
+      label={suspended ? "Reactivate" : "Suspend"}
+      confirmTitle={suspended ? "Reactivate this store?" : "Suspend this store?"}
+      confirmBody={
+        suspended
+          ? "The store can answer asks and use FINDIT Hub again."
+          : "The store will be blocked from the dashboard and Hub until you reactivate."
+      }
+      confirmLabel={suspended ? "Reactivate" : "Suspend store"}
+      tone={suspended ? "success" : "danger"}
+      onConfirm={async () => {
+        const result = await setStoreSuspendedAction(storeId, !suspended);
+        if (!result.error) router.refresh();
+        return result;
       }}
-    >
-      {suspended ? "Reactivate" : "Suspend"}
-    </Button>
+    />
   );
 }

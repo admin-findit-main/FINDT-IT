@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Panel } from "@/components/dashboard/shell";
+import { AdminPage, AdminPanel } from "@/components/admin/ui";
 import { AdminPeopleTable } from "@/components/admin/people-table";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getAdminPeopleAction } from "@/lib/admin/directory";
@@ -10,8 +10,13 @@ export default async function AdminOwnersPage() {
   if (!isSoloAdmin(profile)) redirect("/login/business");
   const rows = await getAdminPeopleAction("owner");
   return (
-    <Panel title={`Store owners · ${rows.length}`}>
-      <AdminPeopleTable rows={rows} />
-    </Panel>
+    <AdminPage
+      title="Owners"
+      subtitle="People who own a store. Suspend only with confirmation."
+    >
+      <AdminPanel title={`Store owners · ${rows.length}`}>
+        <AdminPeopleTable rows={rows} />
+      </AdminPanel>
+    </AdminPage>
   );
 }

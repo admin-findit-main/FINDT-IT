@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Panel } from "@/components/dashboard/shell";
+import { AdminPage, AdminPanel } from "@/components/admin/ui";
 import { AdminPeopleTable } from "@/components/admin/people-table";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getAdminPeopleAction } from "@/lib/admin/directory";
@@ -10,8 +10,13 @@ export default async function AdminShoppersPage() {
   if (!isSoloAdmin(profile)) redirect("/login/business");
   const rows = await getAdminPeopleAction("shopper");
   return (
-    <Panel title={`Shoppers · ${rows.length}`}>
-      <AdminPeopleTable rows={rows} />
-    </Panel>
+    <AdminPage
+      title="Shoppers"
+      subtitle="Customer accounts. Suspend or restore only after confirming the popup."
+    >
+      <AdminPanel title={`Shoppers · ${rows.length}`}>
+        <AdminPeopleTable rows={rows} />
+      </AdminPanel>
+    </AdminPage>
   );
 }

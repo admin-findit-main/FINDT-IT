@@ -9,6 +9,12 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "FINDIT Admin",
+  applicationName: "FINDIT Admin",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "FINDIT Admin",
+  },
 };
 
 export default async function AdminLayout({

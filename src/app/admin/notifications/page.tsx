@@ -1,4 +1,4 @@
-import { Panel } from "@/components/dashboard/shell";
+import { AdminEmpty, AdminPage, AdminPanel } from "@/components/admin/ui";
 import { AdminPushBroadcastForm } from "@/app/admin/notifications/broadcast-form";
 import { getAdminPushPageDataAction } from "@/lib/admin/push-actions";
 import { adminPushAudienceLabel } from "@findit/domain";
@@ -8,21 +8,20 @@ export default async function AdminNotificationsPage() {
   const { counts, recent, configured, demo } = await getAdminPushPageDataAction();
 
   return (
-    <div className="space-y-6">
-      <Panel title="Send a notification">
-        <p className="-mt-2 mb-4 text-sm text-ink-muted">
-          Reaches phones that already allowed alerts. Dead tokens are dropped
-          automatically.
-        </p>
+    <AdminPage
+      title="Broadcast"
+      subtitle="Confirm before every send. Reaches phones that already allowed alerts."
+    >
+      <AdminPanel title="Send a notification">
         <AdminPushBroadcastForm
           counts={counts}
           configured={configured}
           demo={demo}
         />
-      </Panel>
-      <Panel title="Recent broadcasts">
+      </AdminPanel>
+      <AdminPanel title="Recent broadcasts">
         {recent.length === 0 ? (
-          <p className="text-sm text-ink-muted">Nothing sent yet.</p>
+          <AdminEmpty title="Nothing sent yet" />
         ) : (
           <ul className="divide-y divide-black/[0.06] text-sm">
             {recent.map((row) => (
@@ -39,7 +38,7 @@ export default async function AdminNotificationsPage() {
             ))}
           </ul>
         )}
-      </Panel>
-    </div>
+      </AdminPanel>
+    </AdminPage>
   );
 }

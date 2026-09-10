@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import {
   ADMIN_PUSH_AUDIENCES,
   ADMIN_PUSH_BODY_MAX,
@@ -11,7 +10,7 @@ import {
   defaultAdminPushUrl,
   type AdminPushAudience,
 } from "@findit/domain";
-import { Button } from "@/components/ui/button";
+import { ConfirmActionButton } from "@/components/admin/confirm-action";
 import { Input, Label, Textarea } from "@/components/ui/primitives";
 import { GlassNotice, GlassSelect } from "@/components/ui/glass";
 import { sendAdminPushBroadcastAction } from "@/lib/admin/push-actions";
@@ -27,53 +26,19 @@ export function AdminPushBroadcastForm({
   demo: boolean;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
   const [audience, setAudience] = useState<AdminPushAudience>("shoppers");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [url, setUrl] = useState("");
   const tally = counts[audience];
   const fallbackUrl = useMemo(() => defaultAdminPushUrl(audience), [audience]);
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    startTransition(async () => {
-      const result = await sendAdminPushBroadcastAction({
-        audience,
-        title,
-        body,
-        url,
-      });
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
-      if (result.demo) {
-        toast.message("Demo mode — nothing was sent.");
-        return;
-      }
-      if (!result.sent) {
-        toast.message("No devices registered for that audience.");
-        return;
-      }
-      toast.success(
-        result.pruned
-          ? `Sent to ${result.sent} devices. Removed ${result.pruned} dead tokens.`
-          : `Sent to ${result.sent} devices.`
-      );
-      setTitle("");
-      setBody("");
-      setUrl("");
-      router.refresh();
-    });
-  }
+  const canSend =
+    !demo && configured && title.trim().length > 0 && body.trim().length > 0;
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <div className="space-y-4">
       {demo ? (
-        <GlassNotice>
-          Demo mode does not send live notifications.
-        </GlassNotice>
+        <GlassNotice>Demo mode does not send live notifications.</GlassNotice>
       ) : null}
       {!demo && !configured ? (
         <GlassNotice>
@@ -141,9 +106,34 @@ export function AdminPushBroadcastForm({
           FINDIT paths only. Leave blank to open {fallbackUrl}.
         </p>
       </div>
-      <Button type="submit" disabled={pending || demo || !configured}>
-        {pending ? "Sending…" : "Send notification"}
-      </Button>
-    </form>
+      <ConfirmActionButton
+        label="Send notification"
+        confirmTitle={`Send to ${adminPushAudienceLabel(audience)}?`}
+        confirmBody={`This push goes to ${tally.devices || 0} registered device${
+          (tally.devices || 0) === 1 ? "" : "s"
+        }. Title: “${title.trim() || "…"}”.`}
+        confirmLabel="Send now"
+        tone="danger"
+        variant="default"
+        size="default"
+        disabled={!canSend}
+        onConfirm={async () => {
+          const result = await sendAdminPushBroadcastAction({
+            audience,
+            title,
+            body,
+            url,
+          });
+          if (result.error) return result;
+          if (result.demo) return { error: "Demo mode — nothing was sent." };
+          if (!result.sent) return { error: "No devices registered for that audience." };
+          setTitle("");
+          setBody("");
+          setUrl("");
+          router.refresh();
+          return { ok: true as const };
+        }}
+      />
+    </div>
   );
 }

@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { MetricCard, Panel } from "@/components/dashboard/shell";
 import {
   AdminBillingSettingsForm,
   AdminStoreBillingActions,
 } from "@/components/admin/billing-controls";
+import { AdminPage, AdminPanel, AdminStat } from "@/components/admin/ui";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getAdminBillingAction } from "@/lib/billing/actions";
 import {
@@ -29,15 +29,15 @@ export default async function AdminSubscriptionsPage() {
   const active = rows.filter((row) => row.status === "active").length;
 
   return (
-    <div className="space-y-6">
+    <AdminPage title="Subscriptions" subtitle="Billing, trials, and FastSpring launch controls.">
       <div className="grid gap-4 sm:grid-cols-3">
-        <MetricCard label="Trials" value={trials} />
-        <MetricCard
+        <AdminStat label="Trials" value={trials} />
+        <AdminStat
           label="Payment processing"
           hint="ACH is not instant — do not lock these stores"
           value={processing}
         />
-        <MetricCard
+        <AdminStat
           label="Active"
           hint={
             settings.billing_required
@@ -48,7 +48,7 @@ export default async function AdminSubscriptionsPage() {
         />
       </div>
 
-      <Panel title="Launch controls">
+      <AdminPanel title="Launch controls">
         <p className="mb-4 text-sm text-ink-muted">
           FastSpring {billing.configured ? "API credentials are present" : "is not connected yet"}.
           Secrets are never shown here. Do not enable live billing until the
@@ -64,9 +64,9 @@ export default async function AdminSubscriptionsPage() {
           liveEnv={billing.liveEnv}
           checklistComplete={billing.checklistComplete}
         />
-      </Panel>
+      </AdminPanel>
 
-      <Panel title="Stores">
+      <AdminPanel title="Stores">
         {rows.length === 0 ? (
           <p className="text-sm text-ink-muted">No stores yet.</p>
         ) : (
@@ -137,7 +137,7 @@ export default async function AdminSubscriptionsPage() {
             </table>
           </div>
         )}
-      </Panel>
-    </div>
+      </AdminPanel>
+    </AdminPage>
   );
 }
