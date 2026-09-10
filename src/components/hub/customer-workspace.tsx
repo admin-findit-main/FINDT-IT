@@ -6,6 +6,7 @@ import { formatUsNationalInput } from "@findit/domain";
 import {
   estimateHubPoints,
   formatHubAmount,
+  hubZeroPointsCopy,
   MAX_HUB_AMOUNT_CENTS,
 } from "@/lib/hub/amount";
 import {
@@ -84,6 +85,8 @@ export function HubCustomerWorkspace({
     amountCents: number;
     pointsAwarded: number;
     pointsBalance: number;
+    rewardsEnabled: boolean;
+    pointsPerDollar: number;
   } | null>(null);
   const [operationId, setOperationId] = useState("");
   const [pendingCreateOperationId, setPendingCreateOperationId] = useState("");
@@ -213,6 +216,8 @@ export function HubCustomerWorkspace({
       amountCents,
       pointsAwarded: result.pointsAwarded,
       pointsBalance: result.pointsBalance,
+      rewardsEnabled: customer.rewardsEnabled,
+      pointsPerDollar: customer.pointsPerDollar,
     });
     setStage("success");
     onPurchaseConfirmed?.();
@@ -243,6 +248,14 @@ export function HubCustomerWorkspace({
   }
 
   if (stage === "success" && success) {
+    const zeroPoints =
+      success.pointsAwarded === 0
+        ? hubZeroPointsCopy({
+            rewardsEnabled: success.rewardsEnabled,
+            amountCents: success.amountCents,
+            pointsPerDollar: success.pointsPerDollar,
+          })
+        : null;
     return (
       <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-6 py-4 text-center md:py-10">
         <div className="grid h-14 w-14 place-items-center rounded-full bg-[#EAF6EF] text-2xl text-[#18784A] md:h-16 md:w-16 md:text-3xl">
@@ -254,9 +267,20 @@ export function HubCustomerWorkspace({
         <p className="mt-2 text-xl font-semibold tabular-nums text-[#171315] md:mt-4 md:text-2xl">
           {formatHubAmount(success.amountCents)}
         </p>
-        <p className="mt-4 text-2xl font-bold text-[#8E1F2D] md:mt-6 md:text-3xl">
-          +{success.pointsAwarded} points
-        </p>
+        {zeroPoints ? (
+          <>
+            <p className="mt-4 text-2xl font-bold text-[#171315] md:mt-6 md:text-3xl">
+              {zeroPoints.headline}
+            </p>
+            <p className="mt-1 text-base text-[#6D6669] md:mt-2 md:text-lg">
+              {zeroPoints.reason}
+            </p>
+          </>
+        ) : (
+          <p className="mt-4 text-2xl font-bold text-[#8E1F2D] md:mt-6 md:text-3xl">
+            +{success.pointsAwarded} points
+          </p>
+        )}
         <p className="mt-1 text-base text-[#6D6669] md:mt-2 md:text-lg">
           {success.pointsBalance} total points
         </p>
@@ -364,13 +388,21 @@ export function HubCustomerWorkspace({
               {formatHubAmount(amountCents)}
             </p>
             <div className="mt-2 flex flex-wrap items-baseline gap-x-2 text-sm md:mt-3 md:text-base">
-              <span className="font-bold text-[#8E1F2D]">
-                {estimatedPoints} estimated point
-                {estimatedPoints === 1 ? "" : "s"}
-              </span>
-              <span className="text-xs text-[#81797C]">
-                Calculated at confirmation
-              </span>
+              {customer.rewardsEnabled ? (
+                <>
+                  <span className="font-bold text-[#8E1F2D]">
+                    {estimatedPoints} estimated point
+                    {estimatedPoints === 1 ? "" : "s"}
+                  </span>
+                  <span className="text-xs text-[#81797C]">
+                    Calculated at confirmation
+                  </span>
+                </>
+              ) : (
+                <span className="font-semibold text-[#6D6669]">
+                  Rewards are turned off for this store
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -432,6 +464,9 @@ export function HubCustomerWorkspace({
   }
 
   if (stage === "confirm" && customer) {
+    const estimatedPoints = customer.rewardsEnabled
+      ? estimateHubPoints(amountCents, customer.pointsPerDollar)
+      : 0;
     return (
       <section className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center px-4 py-2 md:px-6 md:py-10">
         <div className="rounded-2xl border border-[#DED9DB] bg-white p-4 text-center md:p-9">
@@ -444,19 +479,23 @@ export function HubCustomerWorkspace({
           <p className="mt-2 text-2xl font-bold tabular-nums text-[#171315] md:mt-5 md:text-4xl">
             {formatHubAmount(amountCents)}
           </p>
-          <p className="mt-1 text-sm font-semibold text-[#8E1F2D] md:mt-2 md:text-base">
-            Estimated{" "}
-            {estimateHubPoints(
-              amountCents,
-              customer.rewardsEnabled ? customer.pointsPerDollar : 0
-            )}{" "}
-            points
-          </p>
-          <p className="mt-1 text-sm text-[#6D6669] md:mt-3 md:text-base">
-            {customer.status === "pending"
-              ? "Points will be saved in rewards for this store only."
-              : "Points will be awarded to this customer account."}
-          </p>
+          {customer.rewardsEnabled ? (
+            <>
+              <p className="mt-1 text-sm font-semibold text-[#8E1F2D] md:mt-2 md:text-base">
+                Estimated {estimatedPoints} point
+                {estimatedPoints === 1 ? "" : "s"}
+              </p>
+              <p className="mt-1 text-sm text-[#6D6669] md:mt-3 md:text-base">
+                {customer.status === "pending"
+                  ? "Points will be saved in rewards for this store only."
+                  : "Points will be awarded to this customer account."}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-[#6D6669] md:mt-3 md:text-base">
+              Rewards are turned off for this store. No points will be awarded.
+            </p>
+          )}
           {error ? (
             <p className="mt-2 rounded-xl bg-[#FFF0F1] px-4 py-2 text-sm text-[#8E1F2D] md:mt-5 md:py-3">
               {error}

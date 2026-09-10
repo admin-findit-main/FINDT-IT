@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Camera, ChevronDown, ChevronLeft, MapPin } from "lucide-react";
+import { Camera, ChevronLeft, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/primitives";
@@ -79,7 +79,6 @@ export default function CustomerHomePage() {
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [editPlace, setEditPlace] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const [searchOptionsOpen, setSearchOptionsOpen] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<
     RoutableCategoryCount[]
   >([]);
@@ -600,34 +599,13 @@ export default function CustomerHomePage() {
               </p>
             ) : null}
 
-            <button
-              type="button"
-              aria-expanded={searchOptionsOpen}
-              onClick={() => setSearchOptionsOpen((open) => !open)}
-              className="mt-8 flex min-h-16 w-full items-center justify-between gap-4 rounded-2xl border border-hairline-strong bg-white px-5 py-3 text-left"
-            >
-              <span>
-                <span className="block font-semibold text-ink">Search options</span>
-                <span className="mt-1 block text-xs text-ink-muted">
-                  {category || "Automatic category"} · {radiusMiles} miles
-                </span>
-              </span>
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 shrink-0 text-ink-muted transition-transform",
-                  searchOptionsOpen && "rotate-180"
-                )}
-              />
-            </button>
-            {searchOptionsOpen ? (
-              <div className="mt-5">
-                <h2 className="text-xl font-bold tracking-tight text-ink">
-                  Category
-                </h2>
-                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                  Optional. Only categories with stores accepting Finds are shown.
-                  Tobacco, vape, and dispensary Finds ask for ID first.
-                </p>
+            <h2 className="mt-8 text-xl font-bold tracking-tight text-ink">
+              Category
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+              Optional. Only categories with stores accepting Finds are shown.
+              Tobacco, vape, and dispensary Finds ask for ID first.
+            </p>
             {needsCategoryConfirm ? (
               <div className="mt-4 rounded-2xl border border-hairline-strong bg-white p-4">
                 <p className="text-sm font-semibold text-ink">
@@ -730,8 +708,6 @@ export default function CustomerHomePage() {
               <p className="mt-2 px-1 text-xs text-ink-subtle">
                 FINDIT+ searches up to {plus.maxRadiusMiles} miles.
               </p>
-            ) : null}
-              </div>
             ) : null}
 
             <h2 className="mt-8 text-2xl font-bold tracking-tight text-ink">Near</h2>

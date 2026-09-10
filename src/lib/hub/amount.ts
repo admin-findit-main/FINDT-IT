@@ -30,3 +30,34 @@ export function estimateHubPoints(
       100
   );
 }
+
+/** Copy for Hub success when the purchase confirmed but no points were earned. */
+export function hubZeroPointsCopy(input: {
+  rewardsEnabled: boolean;
+  amountCents: number;
+  pointsPerDollar: number;
+}): { headline: string; reason: string } {
+  if (!input.rewardsEnabled) {
+    return {
+      headline: "No points awarded",
+      reason: "Rewards are turned off for this store.",
+    };
+  }
+  const rate = Math.trunc(input.pointsPerDollar);
+  if (!Number.isFinite(rate) || rate <= 0) {
+    return {
+      headline: "No points awarded",
+      reason: "Rewards are turned off for this store.",
+    };
+  }
+  if (estimateHubPoints(input.amountCents, rate) === 0) {
+    return {
+      headline: "No points awarded",
+      reason: "Amount was under $1, so no full point was earned.",
+    };
+  }
+  return {
+    headline: "No points awarded",
+    reason: "No points were added for this purchase.",
+  };
+}

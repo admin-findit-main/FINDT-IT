@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   estimateHubPoints,
   formatHubAmount,
+  hubZeroPointsCopy,
   MAX_HUB_AMOUNT_CENTS,
 } from "@/lib/hub/amount";
 
@@ -24,5 +25,31 @@ describe("Hub purchase amounts", () => {
     expect(estimateHubPoints(199, 3)).toBe(5);
     expect(estimateHubPoints(50, 1)).toBe(0);
     expect(estimateHubPoints(100, 0)).toBe(0);
+  });
+
+  it("explains zero points when rewards are off", () => {
+    expect(
+      hubZeroPointsCopy({
+        rewardsEnabled: false,
+        amountCents: 500,
+        pointsPerDollar: 1,
+      })
+    ).toEqual({
+      headline: "No points awarded",
+      reason: "Rewards are turned off for this store.",
+    });
+  });
+
+  it("explains zero points when amount is under a full dollar", () => {
+    expect(
+      hubZeroPointsCopy({
+        rewardsEnabled: true,
+        amountCents: 50,
+        pointsPerDollar: 1,
+      })
+    ).toEqual({
+      headline: "No points awarded",
+      reason: "Amount was under $1, so no full point was earned.",
+    });
   });
 });

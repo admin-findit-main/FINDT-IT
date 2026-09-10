@@ -99,7 +99,6 @@ export default function HomeFindItScreen() {
   const [used, setUsed] = useState(0);
   const [limit, setLimit] = useState(entitlements.monthlyRequestLimit);
   const [showDetails, setShowDetails] = useState(false);
-  const [searchOptionsOpen, setSearchOptionsOpen] = useState(false);
   const [availableCategories, setAvailableCategories] = useState<
     RoutableCategoryCount[]
   >([]);
@@ -364,7 +363,6 @@ export default function HomeFindItScreen() {
           (item) => item.label === classified.productCategory
         );
       if (needsAvailableCategoryConfirmation) {
-        setSearchOptionsOpen(true);
         setError("Confirm the category so we send this to the right stores.");
         return;
       }
@@ -629,40 +627,14 @@ export default function HomeFindItScreen() {
                 </Text>
               ) : null}
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ expanded: searchOptionsOpen }}
-                onPress={() => setSearchOptionsOpen((open) => !open)}
-                style={[
-                  styles.optionsToggle,
-                  { backgroundColor: theme.solid1, borderColor: theme.hairlineStrong },
-                ]}
-              >
-                <View style={styles.fill}>
-                  <Text style={[styles.placeValue, { color: theme.ink }]}>
-                    Search options
-                  </Text>
-                  <Text style={[styles.placeMeta, { color: theme.inkSubtle }]}>
-                    {category || "Automatic category"} · {radiusMiles} miles
-                  </Text>
-                </View>
-                <FontAwesome
-                  name={searchOptionsOpen ? "chevron-up" : "chevron-down"}
-                  size={14}
-                  color={theme.inkMuted}
-                />
-              </Pressable>
-
-              {searchOptionsOpen ? (
-                <View style={styles.optionsBody}>
-                  <Text style={[styles.sectionTitle, { color: theme.ink }]}>
-                    Category
-                  </Text>
-                  <Text style={[styles.sectionSub, { color: theme.inkMuted }]}>
-                    Only categories with stores accepting Finds are shown. Tobacco,
-                    vape, and dispensary Finds ask for ID first.
-                  </Text>
-                  <View style={styles.chips}>
+              <Text style={[styles.sectionTitle, { color: theme.ink }]}>
+                Category
+              </Text>
+              <Text style={[styles.sectionSub, { color: theme.inkMuted }]}>
+                Only categories with stores accepting Finds are shown. Tobacco,
+                vape, and dispensary Finds ask for ID first.
+              </Text>
+              <View style={styles.chips}>
                 {availableCategories.map((item) => {
                   const selected = category === item.label;
                   return (
@@ -752,8 +724,6 @@ export default function HomeFindItScreen() {
                 <Text style={[styles.planHint, { color: theme.inkSubtle }]}>
                   FINDIT+ searches up to {plus.maxRadiusMiles} miles.
                 </Text>
-              ) : null}
-                </View>
               ) : null}
 
               <Text style={[styles.sectionTitle, { color: theme.ink }]}>Near</Text>
@@ -948,18 +918,6 @@ const styles = StyleSheet.create({
     fontSize: typography.size.footnote,
     fontWeight: typography.weight.semibold,
   },
-  optionsToggle: {
-    minHeight: 64,
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  optionsBody: { marginBottom: spacing.lg },
   sectionTitle: {
     fontSize: typography.size.title3,
     fontWeight: typography.weight.bold,
