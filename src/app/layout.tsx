@@ -65,7 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <LoadProgressHost />
         <Toaster
           position="top-center"
-          closeButton
+          closeButton={false}
           visibleToasts={4}
           toastOptions={{
             duration: 8000,

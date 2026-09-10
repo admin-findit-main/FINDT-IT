@@ -18,11 +18,19 @@ import {
 import { getStoreBillingAccessAction } from "@/lib/billing/actions";
 import { StoreBillingAccessGate } from "@/components/store/billing-access-gate";
 import { StoreNotifyHost } from "@/components/store/notify-host";
+import { BusinessInstallHint } from "@/components/store/business-install-hint";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "FINDIT Business",
+  applicationName: "FINDIT Business",
+  manifest: "/business.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "FINDIT Business",
+  },
 };
 
 export default async function StoreLayout({
@@ -104,6 +112,7 @@ export default async function StoreLayout({
     >
       <StoreNotifyHost userId={profile.id} />
       <StoreBillingAccessGate allowed={billingAccess.allowed}>
+        <BusinessInstallHint />
         {children}
       </StoreBillingAccessGate>
     </DashboardShell>
