@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { MapPin, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { setActiveStoreAction } from "@/lib/services/active-store";
+import { setActiveStoreAction } from "@/lib/services/active-store-actions";
 import { cn } from "@/lib/utils";
 
 export type LocationOption = {
