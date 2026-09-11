@@ -63,12 +63,15 @@ import {
   type RoutableCategoryCount,
 } from "@findit/domain";
 import { CustomerThemeHomeGreeting, CustomerThemeFindHomeBackground } from "@/components/customer/themes/theme-slots";
+import { useCustomerThemeId } from "@/components/customer/themes/theme-context";
 
 type Step = "query" | "radius";
 
 export default function CustomerHomePage() {
   const router = useRouter();
   const sessionProfile = useCustomerProfile();
+  const themeId = useCustomerThemeId();
+  const lockedFindHome = themeId === "pooh";
   const [profile, setProfile] = useState<Profile | null>(sessionProfile);
   const [step, setStep] = useState<Step>("query");
   const [loading, setLoading] = useState(false);
@@ -470,26 +473,54 @@ export default function CustomerHomePage() {
   }
 
   return (
-    <div className="relative flex min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] flex-col px-5 py-8 sm:px-8 md:py-12">
+    <div
+      className={cn(
+        "relative flex flex-col px-5 sm:px-8",
+        lockedFindHome && step === "query"
+          ? "h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] overflow-hidden py-4"
+          : "min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] py-8 md:py-12"
+      )}
+    >
       {step === "query" ? <CustomerThemeFindHomeBackground /> : null}
       <div className="relative z-10 mx-auto flex w-full max-w-xl flex-1 flex-col">
         {step === "query" ? (
-          <div className="flex flex-1 flex-col justify-center pb-28 sm:pb-32">
+          <div
+            className={cn(
+              "flex flex-1 flex-col",
+              lockedFindHome
+                ? "justify-start overflow-hidden pt-1"
+                : "justify-center pb-16"
+            )}
+          >
             <p className="text-[12px] font-semibold tracking-[0.14em] text-ink-muted">
               FINDIT
             </p>
             <CustomerThemeHomeGreeting firstName={profile?.first_name} />
-            <h1 className="mt-3 text-[2.15rem] font-bold leading-[1.12] tracking-tight text-ink sm:text-5xl">
+            <h1
+              className={cn(
+                "font-bold leading-[1.12] tracking-tight text-ink",
+                lockedFindHome
+                  ? "mt-2 text-[1.85rem] sm:text-4xl"
+                  : "mt-3 text-[2.15rem] sm:text-5xl"
+              )}
+            >
               What are you looking for?
             </h1>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-ink-muted sm:text-lg">
+            <p
+              className={cn(
+                "max-w-md leading-relaxed text-ink-muted",
+                lockedFindHome
+                  ? "mt-2 text-sm sm:text-base"
+                  : "mt-4 text-base sm:text-lg"
+              )}
+            >
               Ask nearby stores at once. They tell you if they have it.
             </p>
 
-            <ShopperInstallHint />
+            {lockedFindHome ? null : <ShopperInstallHint />}
 
             <form
-              className="mt-10 space-y-4"
+              className={cn("space-y-3", lockedFindHome ? "mt-5" : "mt-10 space-y-4")}
               onSubmit={(e) => {
                 e.preventDefault();
                 goNextFromQuery();
@@ -498,30 +529,52 @@ export default function CustomerHomePage() {
               <Input
                 autoFocus={!upgrade}
                 disabled={Boolean(upgrade)}
-                className="h-16 rounded-2xl border-hairline-strong bg-white/95 px-5 text-lg shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-sm"
+                className={cn(
+                  "rounded-2xl border-hairline-strong px-5 text-lg shadow-[0_4px_16px_rgba(0,0,0,0.04)]",
+                  lockedFindHome
+                    ? "h-14 bg-white/92 backdrop-blur-sm"
+                    : "h-16 bg-white"
+                )}
                 placeholder={findPlaceholderForCategory(null)}
                 value={productName}
                 onChange={(e) => {
                   setProductName(e.target.value);
                 }}
               />
-              <label className="flex min-h-[140px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-hairline-strong bg-white/95 text-center backdrop-blur-sm">
+              <label
+                className={cn(
+                  "flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-hairline-strong text-center",
+                  lockedFindHome
+                    ? "min-h-[4.75rem] bg-white/92 backdrop-blur-sm"
+                    : "min-h-[140px] bg-white"
+                )}
+              >
                 {imagePreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={imagePreview}
                     alt="Product preview"
-                    className="h-44 w-full object-cover"
+                    className={cn(
+                      "w-full object-cover",
+                      lockedFindHome ? "h-24" : "h-44"
+                    )}
                   />
                 ) : (
-                  <span className="px-5 py-8">
-                    <Camera className="mx-auto h-5 w-5 text-ink-muted" />
-                    <span className="mt-2 block text-sm font-semibold text-ink">
+                  <span className={cn(lockedFindHome ? "px-4 py-3" : "px-5 py-8")}>
+                    <Camera
+                      className={cn(
+                        "mx-auto text-ink-muted",
+                        lockedFindHome ? "h-4 w-4" : "h-5 w-5"
+                      )}
+                    />
+                    <span className="mt-1.5 block text-sm font-semibold text-ink">
                       Add a photo
                     </span>
-                    <span className="mt-1 block text-xs text-ink-muted">
-                      Optional. Or just type the name above.
-                    </span>
+                    {lockedFindHome ? null : (
+                      <span className="mt-1 block text-xs text-ink-muted">
+                        Optional. Or just type the name above.
+                      </span>
+                    )}
                   </span>
                 )}
                 <input
@@ -552,7 +605,7 @@ export default function CustomerHomePage() {
               {upgrade ? null : (
                 <Button
                   className="w-full"
-                  size="xl"
+                  size={lockedFindHome ? "lg" : "xl"}
                   type="submit"
                   disabled={uploading || (!productName.trim() && !imagePreview)}
                 >
@@ -563,6 +616,10 @@ export default function CustomerHomePage() {
                 <p className="text-center text-xs text-ink-muted">{usageLabel}</p>
               ) : null}
             </form>
+
+            {lockedFindHome ? (
+              <div className="min-h-0 flex-1" aria-hidden />
+            ) : null}
           </div>
         ) : (
           <div className="pb-10">
