@@ -35,6 +35,7 @@ function addCustomer(plan: "free" | "plus"): Profile {
     id: randomUUID(),
     email: `${plan}-${randomUUID()}@demo.findit.local`,
     subscription_plan: plan,
+    theme_id: "default",
     account_type: "customer",
   };
   state.profiles.push(profile);

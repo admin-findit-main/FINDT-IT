@@ -1,0 +1,66 @@
+/* Pooh theme — original storybook/honey palette. Loaded only when theme_id === "pooh". */
+
+[data-customer-theme="pooh"] {
+  --fd-red-50: #fff8e8;
+  --fd-red-100: #ffe9b8;
+  --fd-red-300: #f0b429;
+  --fd-red-400: #e09b1a;
+  --fd-red-500: #c97b0c;
+  --fd-red-600: #a35f08;
+  --fd-red-700: #7a4506;
+
+  --canvas: #fff9ef;
+  --canvas-deep: #fff3dc;
+  --surface: #fffdf8;
+  --surface-raised: #fff8ea;
+
+  --accent: #c97b0c;
+  --accent-hover: #a35f08;
+  --accent-ink: #8a4f07;
+  --accent-soft: rgba(201, 123, 12, 0.14);
+  --accent-ring: rgba(201, 123, 12, 0.32);
+  --accent-glow: rgba(240, 180, 41, 0.22);
+
+  --hairline: rgba(120, 80, 20, 0.1);
+  --hairline-strong: rgba(120, 80, 20, 0.16);
+
+  background-color: var(--canvas);
+  color: var(--ink);
+}
+
+[data-customer-theme="pooh"] .app-canvas {
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(255, 214, 120, 0.45), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(255, 236, 180, 0.55), transparent 50%),
+    var(--canvas);
+}
+
+[data-customer-theme="pooh"] .pooh-float {
+  animation: pooh-float 5.5s ease-in-out infinite;
+}
+
+@keyframes pooh-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes pooh-drip {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(3px);
+  }
+}
+
+[data-customer-theme="pooh"] .pooh-drip {
+  animation: pooh-drip 2.8s ease-in-out infinite;
+}

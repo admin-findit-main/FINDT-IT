@@ -62,6 +62,7 @@ import {
   classificationHint,
   type RoutableCategoryCount,
 } from "@findit/domain";
+import { CustomerThemeHomeGreeting } from "@/components/customer/themes/theme-slots";
 
 type Step = "query" | "radius";
 
@@ -476,6 +477,7 @@ export default function CustomerHomePage() {
             <p className="text-[12px] font-semibold tracking-[0.14em] text-ink-muted">
               FINDIT
             </p>
+            <CustomerThemeHomeGreeting firstName={profile?.first_name} />
             <h1 className="mt-3 text-[2.15rem] font-bold leading-[1.12] tracking-tight text-ink sm:text-5xl">
               What are you looking for?
             </h1>

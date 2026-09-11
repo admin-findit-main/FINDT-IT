@@ -25,7 +25,7 @@ export function CustomerChrome({
       <div
         className={
           immersiveMap
-            ? "min-h-dvh overflow-hidden bg-[#F5F2F3]"
+            ? "min-h-dvh overflow-hidden bg-canvas"
             : "app-canvas min-h-dvh overflow-x-clip"
         }
       >

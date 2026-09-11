@@ -25,6 +25,7 @@ import {
   formatShortPlace,
   isCompleteShortPlace,
 } from "@findit/domain";
+import { CustomerThemeProfileBanner } from "@/components/customer/themes/theme-slots";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -47,6 +48,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-xl px-5 py-8 pb-12 sm:px-8">
+      <CustomerThemeProfileBanner firstName={profile.first_name || profile.display_name} />
       <h1 className="text-2xl font-bold tracking-tight text-ink">Profile</h1>
       <p className="mt-2 text-sm text-ink-muted">
         Your name, place, and alerts. Plans live on the Plan page.

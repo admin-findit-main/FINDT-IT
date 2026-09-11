@@ -44,6 +44,13 @@ export type StoreCategory =
   | "Other";
 
 export type CustomerSubscriptionPlan = "free" | "plus";
+/** Customer UI themes. Assigned via DB/admin only. */
+export type CustomerThemeId =
+  | "default"
+  | "pooh"
+  | "dark"
+  | "seasonal"
+  | "custom";
 export type StoreApplicationStatus =
   | "pending"
   | "needs_info"
@@ -65,6 +72,11 @@ export interface Profile {
   account_type: AccountType;
   /** Customer billing plan. FINDIT+ is granted from customer_subscriptions. */
   subscription_plan: CustomerSubscriptionPlan;
+  /**
+   * Customer UI theme. Assigned internally (DB/admin). Clients may read their own
+   * value via RLS; they cannot self-assign (locked by trigger).
+   */
+  theme_id: CustomerThemeId;
   default_city: string | null;
   default_state: string | null;
   default_postal_code: string | null;

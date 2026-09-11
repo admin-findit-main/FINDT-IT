@@ -1,5 +1,6 @@
 import { CustomerChrome } from "@/components/customer/customer-chrome";
 import { CustomerSessionProvider } from "@/components/customer/session";
+import { CustomerThemeRoot } from "@/components/customer/themes/theme-root";
 import { isSoloAdmin } from "@/lib/auth/admin";
 import { getCurrentProfile } from "@/lib/services/actions";
 import { redirect } from "next/navigation";
@@ -26,9 +27,11 @@ export default async function CustomerLayout({
 
   return (
     <CustomerSessionProvider profile={profile}>
-      <CustomerChrome userId={profile.id} accountType={profile.account_type}>
-        {children}
-      </CustomerChrome>
+      <CustomerThemeRoot themeId={profile.theme_id}>
+        <CustomerChrome userId={profile.id} accountType={profile.account_type}>
+          {children}
+        </CustomerChrome>
+      </CustomerThemeRoot>
     </CustomerSessionProvider>
   );
 }
