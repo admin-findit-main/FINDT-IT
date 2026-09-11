@@ -19,6 +19,14 @@ const PoohProfileBanner = dynamic(
   { ssr: true }
 );
 
+const PoohFindHomeBackground = dynamic(
+  () =>
+    import("@/components/customer/themes/pooh/find-home-background").then(
+      (mod) => mod.PoohFindHomeBackground
+    ),
+  { ssr: true }
+);
+
 export function CustomerThemeHomeGreeting({
   firstName,
 }: {
@@ -37,4 +45,11 @@ export function CustomerThemeProfileBanner({
   const themeId = useCustomerThemeId();
   if (themeId !== "pooh") return null;
   return <PoohProfileBanner firstName={firstName} />;
+}
+
+/** Find home query-step background. Loads theme art only when assigned. */
+export function CustomerThemeFindHomeBackground() {
+  const themeId = useCustomerThemeId();
+  if (themeId !== "pooh") return null;
+  return <PoohFindHomeBackground />;
 }

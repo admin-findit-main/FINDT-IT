@@ -24,4 +24,7 @@ Edit files under `src/components/customer/themes/pooh/`:
 - `theme.css` — colors / canvas
 - `shell.tsx` — decorations + easter egg
 - `home-greeting.tsx` / `profile-banner.tsx` — page accents
+- `find-home-background.tsx` — Find home query-step backdrop
 - `marks.tsx` — original SVG placeholders (replace with licensed art later)
+
+Find-home art asset: `public/themes/pooh/find-home-bg.png`

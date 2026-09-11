@@ -62,7 +62,7 @@ import {
   classificationHint,
   type RoutableCategoryCount,
 } from "@findit/domain";
-import { CustomerThemeHomeGreeting } from "@/components/customer/themes/theme-slots";
+import { CustomerThemeHomeGreeting, CustomerThemeFindHomeBackground } from "@/components/customer/themes/theme-slots";
 
 type Step = "query" | "radius";
 
@@ -470,10 +470,11 @@ export default function CustomerHomePage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] flex-col px-5 py-8 sm:px-8 md:py-12">
-      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col">
+    <div className="relative flex min-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] flex-col px-5 py-8 sm:px-8 md:py-12">
+      {step === "query" ? <CustomerThemeFindHomeBackground /> : null}
+      <div className="relative z-10 mx-auto flex w-full max-w-xl flex-1 flex-col">
         {step === "query" ? (
-          <div className="flex flex-1 flex-col justify-center pb-16">
+          <div className="flex flex-1 flex-col justify-center pb-28 sm:pb-32">
             <p className="text-[12px] font-semibold tracking-[0.14em] text-ink-muted">
               FINDIT
             </p>
@@ -497,14 +498,14 @@ export default function CustomerHomePage() {
               <Input
                 autoFocus={!upgrade}
                 disabled={Boolean(upgrade)}
-                className="h-16 rounded-2xl border-hairline-strong bg-white px-5 text-lg shadow-[0_4px_16px_rgba(0,0,0,0.04)]"
+                className="h-16 rounded-2xl border-hairline-strong bg-white/95 px-5 text-lg shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-sm"
                 placeholder={findPlaceholderForCategory(null)}
                 value={productName}
                 onChange={(e) => {
                   setProductName(e.target.value);
                 }}
               />
-              <label className="flex min-h-[140px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-hairline-strong bg-white text-center">
+              <label className="flex min-h-[140px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-hairline-strong bg-white/95 text-center backdrop-blur-sm">
                 {imagePreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
