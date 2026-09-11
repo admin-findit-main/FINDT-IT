@@ -46,8 +46,8 @@ export function StoreCustomerMessageForm({
         <p className="text-sm font-semibold text-ink">Message your customers</p>
         <p className="mt-1 text-sm text-ink-muted">
           Sends an in-app / push alert to shoppers linked to{" "}
-          <span className="font-medium text-ink">{storeName}</span> who opted in
-          to store promotions. Phone-only Hub rows and opted-out shoppers are
+          <span className="font-medium text-ink">{storeName}</span> who have FINDIT
+          alerts installed. Phone-only Hub rows and suspended accounts are
           skipped.
         </p>
         <p className="mt-2 text-xs text-ink-subtle">
@@ -88,9 +88,9 @@ export function StoreCustomerMessageForm({
       </div>
       <div className="flex flex-wrap gap-2">
         <ConfirmActionButton
-          label="Send to opted-in customers"
+          label="Send to reachable customers"
           confirmTitle={`Send to ${count} customer${count === 1 ? "" : "s"}?`}
-          confirmBody={`Only people who shopped at ${storeName} and turned on store promotions will get this. SMS texting is not included yet — this is FINDIT app alerts.`}
+          confirmBody={`People linked to ${storeName} with FINDIT app or web alerts installed will get this. SMS texting is not included yet.`}
           confirmLabel="Send now"
           tone="danger"
           variant="default"
