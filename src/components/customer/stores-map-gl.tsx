@@ -9,9 +9,8 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { PublicStoreMapItem } from "@/lib/services/stores-map";
+import { FINDIT_MAP_STYLE } from "@/lib/maps/basemap-style";
 
-/** Free OpenFreeMap Liberty — soft street colors closest to Apple Maps without an API key. */
-const APPLE_LIKE_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const ACCENT = "#B42332";
 
 function paintStoreMarker(el: HTMLElement, selected: boolean, name: string) {
@@ -109,10 +108,13 @@ export function StoresMapGl({
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
+    const container = containerRef.current;
     const map = new MapLibreMap({
-      container: containerRef.current,
-      style: APPLE_LIKE_STYLE,
-      center: [-77.09, 38.82],
+      container,
+      style: FINDIT_MAP_STYLE,
+      center: userCoords
+        ? [userCoords.lng, userCoords.lat]
+        : [-77.09, 38.82],
       zoom: 11,
       attributionControl: { compact: true },
     });
@@ -129,10 +131,17 @@ export function StoresMapGl({
     map.on("load", onLoad);
 
     const resize = () => map.resize();
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => resize())
+        : null;
+    ro?.observe(container);
     window.setTimeout(resize, 60);
+    window.setTimeout(resize, 300);
     window.addEventListener("resize", resize);
 
     return () => {
+      ro?.disconnect();
       window.removeEventListener("resize", resize);
       map.off("load", onLoad);
       for (const marker of markersRef.current.values()) marker.remove();
@@ -143,6 +152,7 @@ export function StoresMapGl({
       mapRef.current = null;
       mapReadyRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once; coords applied in sync effect
   }, []);
 
   useEffect(() => {
@@ -208,7 +218,7 @@ export function StoresMapGl({
       if (pointCount === 1) {
         const only = userCoords
           ? ([userCoords.lng, userCoords.lat] as [number, number])
-          : ([stores[0].longitude, stores[0].latitude] as [number, number]);
+          : ([stores[0]!.longitude, stores[0]!.latitude] as [number, number]);
         map.jumpTo({ center: only, zoom: 14 });
       } else {
         map.fitBounds(bounds, {
@@ -229,7 +239,6 @@ export function StoresMapGl({
     } else {
       map.once("load", syncMarkers);
     }
-    // Only refit when the store set / user coords change, not on selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boundsKey, bottomPad]);
 
@@ -254,5 +263,5 @@ export function StoresMapGl({
     }
   }, [selectedId, stores]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return <div ref={containerRef} className="h-full w-full min-h-[16rem]" />;
 }

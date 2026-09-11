@@ -164,8 +164,7 @@ export function StoreStaffPage({ storeId }: { storeId: string }) {
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
         <p className="text-sm leading-relaxed text-ink-muted">
-          Manage who works this location — counter staff with a Hub PIN, timesheets,
-          and people who can sign into FINDIT Business.
+          Counter PINs, timesheets, and people who can sign in.
         </p>
       </div>
 
@@ -284,7 +283,7 @@ function FloorPanel() {
           <Card className="p-4">
             <h2 className="text-sm font-semibold text-ink">Add floor employee</h2>
             <p className="mt-1 text-xs text-ink-muted">
-              They clock in on the Hub with a 4-digit PIN — no login required.
+              They clock in on the Hub with a 4-digit PIN. No login needed.
             </p>
             <div className="mt-3">
               <Label htmlFor="shift-name">Name</Label>

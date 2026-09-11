@@ -214,23 +214,23 @@ export function StoresMap() {
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-[#F0ECEE]">
       <div className="absolute inset-0">
+        <StoresMapGl
+          stores={stores}
+          selectedId={selectedId}
+          userCoords={userCoords}
+          onSelect={openProfile}
+          bottomPad={220}
+        />
         {loading && stores.length === 0 ? (
-          <div className="grid h-full place-items-center text-sm text-ink-muted">
+          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#F0ECEE]/70 text-sm text-ink-muted">
             Finding stores…
           </div>
-        ) : stores.length === 0 ? (
-          <div className="grid h-full place-items-center px-8 text-center text-sm text-ink-muted">
-            {error || "No FINDIT stores with a map location yet."}
+        ) : null}
+        {!loading && stores.length === 0 ? (
+          <div className="pointer-events-none absolute inset-x-0 top-24 z-10 px-8 text-center text-sm text-ink-muted">
+            {error || "No FINDIT stores nearby yet."}
           </div>
-        ) : (
-          <StoresMapGl
-            stores={stores}
-            selectedId={selectedId}
-            userCoords={userCoords}
-            onSelect={openProfile}
-            bottomPad={220}
-          />
-        )}
+        ) : null}
       </div>
 
       {/* Always above map, cards, and modals */}

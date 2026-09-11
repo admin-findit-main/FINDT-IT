@@ -70,7 +70,7 @@ const QUICK_LINKS: {
   {
     href: "/store/shifts",
     label: "Staff",
-    body: "Floor PINs, hours, and login access",
+    body: "PINs, hours, and logins",
     icon: CalendarClock,
   },
   {
@@ -140,8 +140,8 @@ function OwnerOverview({ data }: { data: OwnerData }) {
         </p>
         <p className="mt-1 text-sm text-ink-muted">
           {hubConnected
-            ? "Use the Hub on the counter for customer points and live asks. Manage everything else from this dashboard."
-            : "Connect a counter tablet, invite staff, and confirm hours so you can answer Asks."}
+            ? "Use the Hub for points and live asks."
+            : "Pair a tablet, invite staff, and set hours to start answering asks."}
         </p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <Link
@@ -205,7 +205,7 @@ function OwnerOverview({ data }: { data: OwnerData }) {
         </div>
       ) : null}
 
-      <Panel title="Everything in Business">
+      <Panel title="Shortcuts">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {QUICK_LINKS.map((item) => {
             const Icon = item.icon;

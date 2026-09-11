@@ -22,18 +22,16 @@ export default async function StoreRewardsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Store rewards</h2>
+        <h2 className="text-2xl font-bold tracking-tight">Rewards</h2>
         <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-          Set loyalty rules for{" "}
-          <span className="font-medium text-ink">{storeName}</span> only.
+          Loyalty points funded by {storeName}.
           {locationCount > 1
-            ? " Each location you switch to has its own settings."
+            ? " Switch locations in the sidebar to edit another store."
             : null}{" "}
-          This is <span className="font-medium text-ink">not</span> FINDIT Points —
-          those are platform rewards in the shopper app.
+          These are not FINDIT Points.
         </p>
       </div>
-      <Panel title={`${storeName} · loyalty settings`}>
+      <Panel title="Loyalty settings">
         <RewardSettingsForm storeName={storeName} initial={settings} />
       </Panel>
     </div>

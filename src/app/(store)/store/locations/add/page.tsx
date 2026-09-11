@@ -24,8 +24,8 @@ export default async function AddStoreLocationPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Add a location</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Keep your same FINDIT Business login. Fill out the location form — FINDIT
-          reviews it like a normal join application.
+          Same Business login. FINDIT reviews the new location like a standard
+          application.
         </p>
       </div>
       <AddLocationForm ownerName={ownerName} ownerEmail={profile.email || ""} />

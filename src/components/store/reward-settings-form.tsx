@@ -77,7 +77,7 @@ export function RewardSettingsForm({
             Enable rewards at {storeName}
           </span>
           <span className="mt-0.5 block text-xs text-ink-muted">
-            These points are funded by this store only — not FINDIT Points.
+            These points are funded by this store, not FINDIT.
           </span>
         </span>
         <IosSwitch decorative label="Store rewards" checked={enabled} />
@@ -149,18 +149,18 @@ export function RewardSettingsForm({
             Preview for {storeName}
           </p>
           <p className="mt-2 text-sm text-ink">
-            A ${preview.spend} purchase earns{" "}
+              A ${preview.spend} purchase earns{" "}
             <span className="font-semibold">{preview.earned} points</span>
             {preview.rewardsFromSpend > 0
-              ? ` — enough for ${preview.rewardsFromSpend} reward${
+              ? ` (${preview.rewardsFromSpend} reward${
                   preview.rewardsFromSpend === 1 ? "" : "s"
-                } of $${preview.rewardValue.toFixed(2)}`
-              : ` · ${preview.needed} points = $${preview.rewardValue.toFixed(2)}`}
+                } of $${preview.rewardValue.toFixed(2)})`
+              : `. ${preview.needed} points equals $${preview.rewardValue.toFixed(2)}`}
             .
           </p>
           <p className="mt-1.5 text-xs text-ink-muted">
-            FINDIT does not reimburse this value. Switch locations in the sidebar to
-            set different rules per store.
+            FINDIT does not reimburse this value. Use the location switcher for
+            other stores.
           </p>
         </div>
 

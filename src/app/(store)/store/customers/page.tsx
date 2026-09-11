@@ -30,8 +30,9 @@ export default async function StoreCustomersPage({
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Customers</h2>
         <p className="mt-1 text-sm text-ink-muted">
-          People who shopped at <span className="font-medium text-ink">{storeName}</span>.
-          Store points stay here — FINDIT Points are separate on the shopper Rewards page.
+          People who shopped at{" "}
+          <span className="font-medium text-ink">{storeName}</span>. Store
+          loyalty points only (not FINDIT Points).
         </p>
       </div>
 

@@ -38,6 +38,7 @@ import {
   listStoreDevicesAction,
   type StoreDeviceView,
 } from "@/lib/services/hub-devices";
+import { cn } from "@/lib/utils";
 
 type HourRow = {
   day_of_week: number;
@@ -45,6 +46,8 @@ type HourRow = {
   close_time: string | null;
   is_closed: boolean;
 };
+
+type SettingsTab = "profile" | "hours" | "coverage" | "categories" | "devices";
 
 function clockLabel(hhmm: string) {
   const [hStr, mStr] = hhmm.slice(0, 5).split(":");
@@ -93,51 +96,34 @@ function timeChoices(value: string) {
   return [{ value, label: clockLabel(value) }, ...TIME_OPTIONS];
 }
 
-function SectionCard({
-  id,
-  title,
-  body,
-  children,
-}: {
-  id?: string;
-  title: string;
-  body: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card id={id} className="p-5 sm:p-6">
-      <h2 className="font-semibold text-ink">{title}</h2>
-      <p className="mt-1 text-sm text-ink-muted">{body}</p>
-      <div className="mt-5">{children}</div>
-    </Card>
-  );
+function parseTab(hash: string): SettingsTab {
+  if (
+    hash === "hours" ||
+    hash === "coverage" ||
+    hash === "area" ||
+    hash === "categories" ||
+    hash === "devices" ||
+    hash === "profile"
+  ) {
+    if (hash === "area") return "coverage";
+    return hash;
+  }
+  return "profile";
 }
 
-function MenuLink({
-  href,
-  title,
-  body,
-}: {
-  href: string;
-  title: string;
-  body: string;
-}) {
-  const publicHref = usePublicHref(href);
-  return (
-    <Link href={publicHref}>
-      <Card interactive className="flex items-center justify-between gap-4 p-5">
-        <span>
-          <span className="block font-semibold text-ink">{title}</span>
-          <span className="mt-1 block text-sm text-ink-muted">{body}</span>
-        </span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-ink-muted" />
-      </Card>
-    </Link>
-  );
-}
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: "profile", label: "Profile" },
+  { id: "hours", label: "Hours" },
+  { id: "coverage", label: "Area" },
+  { id: "categories", label: "Requests" },
+  { id: "devices", label: "Devices" },
+];
 
 export default function StoreSettingsPage() {
   const devicesHref = usePublicHref("/store/devices");
+  const accountHref = usePublicHref("/store/account");
+  const billingHref = usePublicHref("/store/subscription");
+  const notificationsHref = usePublicHref("/store/notifications");
   const [store, setStore] = useState<(Store & { role: string }) | null>(null);
   const [role, setRole] = useState<string>("employee");
   const [hours, setHours] = useState<HourRow[]>(() => normalizeHours([]));
@@ -161,16 +147,15 @@ export default function StoreSettingsPage() {
   const [ready, setReady] = useState(false);
   const [requiresCustomerId, setRequiresCustomerId] = useState(false);
   const [devices, setDevices] = useState<StoreDeviceView[]>([]);
+  const [tab, setTab] = useState<SettingsTab>("profile");
 
   const canManage = role === "owner" || role === "manager";
 
   useEffect(() => {
     if (!ready) return;
-    const id = window.location.hash.replace("#", "");
-    if (!id) return;
-    document.getElementById(`settings-${id}`)?.scrollIntoView({
-      block: "start",
-    });
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    setTab(parseTab(hash));
   }, [ready]);
 
   useEffect(() => {
@@ -207,14 +192,18 @@ export default function StoreSettingsPage() {
       })
       .catch((err) => {
         console.error("[FINDIT] store settings load failed", err);
-        if (!cancelled) {
-          setReady(true);
-        }
+        if (!cancelled) setReady(true);
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  function selectTab(next: SettingsTab) {
+    setTab(next);
+    const hash = next === "profile" ? "profile" : next;
+    window.history.replaceState(null, "", `#${hash}`);
+  }
 
   function patchHour(idx: number, patch: Partial<HourRow>) {
     setHours((prev) =>
@@ -224,7 +213,11 @@ export default function StoreSettingsPage() {
     );
   }
 
-  async function saveCoverage() {
+  async function saveCoverage(fields?: {
+    includeHours?: boolean;
+    includeArea?: boolean;
+    includeCategories?: boolean;
+  }) {
     if (!store || !canManage) return;
     setSaving(true);
     const zips = serviceZips
@@ -248,15 +241,18 @@ export default function StoreSettingsPage() {
         close_time: h.is_closed ? null : toHm(h.close_time, "21:00"),
       })),
     });
-    setSaving(false);
     if (result.error) {
+      setSaving(false);
       toast.error(result.error);
       return;
     }
-    await updateStoreProfileAction(store.id, {
-      ageRestricted: requiresCustomerId,
-    });
-    toast.success("Store coverage saved");
+    if (fields?.includeCategories) {
+      await updateStoreProfileAction(store.id, {
+        ageRestricted: requiresCustomerId,
+      });
+    }
+    setSaving(false);
+    toast.success("Saved");
   }
 
   async function saveProfile() {
@@ -275,7 +271,7 @@ export default function StoreSettingsPage() {
     });
     setSaving(false);
     if (result.error) toast.error(result.error);
-    else toast.success("Store profile saved");
+    else toast.success("Profile saved");
   }
 
   const plan =
@@ -286,26 +282,44 @@ export default function StoreSettingsPage() {
   }
 
   return (
-    <div>
-      <p className="text-sm text-ink-muted">{store?.name}</p>
-      {pilotBanner ? (
-        <GlassNotice tone="stock" className="mt-3">
-          {PILOT_STORE_BANNER}
-        </GlassNotice>
-      ) : null}
+    <div className="mx-auto max-w-2xl space-y-5">
+      {pilotBanner ? <GlassNotice tone="stock">{PILOT_STORE_BANNER}</GlassNotice> : null}
 
       {!canManage ? (
-        <GlassNotice className="mt-4">
-          You’re signed in as an employee. Ask an owner or manager to change store settings.
+        <GlassNotice>
+          Only owners and managers can edit store settings.
         </GlassNotice>
       ) : null}
 
-      <div className="mt-6 space-y-3">
-        <SectionCard
-          id="settings-profile"
-          title="Business Profile"
-          body="Name, address, phone, website"
-        >
+      <div
+        role="tablist"
+        aria-label="Settings"
+        className="flex gap-1 overflow-x-auto rounded-xl border border-hairline-strong bg-white p-1"
+      >
+        {TABS.map((item) => {
+          const active = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => selectTab(item.id)}
+              className={cn(
+                "min-h-10 min-w-[4.5rem] flex-1 rounded-lg px-2.5 text-sm font-semibold transition-colors",
+                active
+                  ? "bg-[var(--fd-black)] text-ink-inverse"
+                  : "text-ink-muted hover:bg-black/[0.04] hover:text-ink"
+              )}
+            >
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "profile" ? (
+        <Card className="p-5 sm:p-6">
           <form
             autoComplete="off"
             className="space-y-4"
@@ -319,45 +333,41 @@ export default function StoreSettingsPage() {
                 <Label htmlFor="store-name">Store name</Label>
                 <Input
                   id="store-name"
-                  name="store-name"
-                  autoComplete="off"
                   value={name}
                   disabled={!canManage}
                   onChange={(e) => setName(e.target.value)}
+                  className="mt-1.5"
                 />
               </div>
               <div className="sm:col-span-2">
                 <Label htmlFor="store-description">Description</Label>
                 <Input
                   id="store-description"
-                  name="store-description"
-                  autoComplete="off"
                   value={description}
                   disabled={!canManage}
                   onChange={(e) => setDescription(e.target.value)}
+                  className="mt-1.5"
                 />
               </div>
               <div>
                 <Label htmlFor="store-phone">Phone</Label>
                 <Input
                   id="store-phone"
-                  name="store-phone"
                   type="tel"
-                  autoComplete="off"
                   value={phone}
                   disabled={!canManage}
                   onChange={(e) => setPhone(e.target.value)}
+                  className="mt-1.5"
                 />
               </div>
               <div>
                 <Label htmlFor="store-website">Website</Label>
                 <Input
                   id="store-website"
-                  name="store-website"
-                  autoComplete="off"
                   value={website}
                   disabled={!canManage}
                   onChange={(e) => setWebsite(e.target.value)}
+                  className="mt-1.5"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -377,39 +387,37 @@ export default function StoreSettingsPage() {
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between gap-4 text-sm">
+            <div className="flex items-center justify-between gap-4 border-t border-hairline-strong pt-4 text-sm">
               <span className="text-ink-muted">Verified</span>
               {store?.is_verified ? (
-                <VerifiedStoreBadge label="Verified FINDIT store" />
+                <VerifiedStoreBadge label="Verified" />
               ) : (
-                <span className="text-ink">Pending FINDIT review</span>
+                <span className="text-ink">Pending review</span>
               )}
             </div>
             {canManage ? (
               <Button type="submit" disabled={saving}>
-                Save profile
+                {saving ? "Saving…" : "Save profile"}
               </Button>
             ) : null}
           </form>
-        </SectionCard>
+        </Card>
+      ) : null}
 
-        <SectionCard
-          id="settings-hours"
-          title="Business Hours"
-          body="Open days and open–close times"
-        >
-          <div className="space-y-3">
+      {tab === "hours" ? (
+        <Card className="p-5 sm:p-6">
+          <div className="space-y-2">
             {DAYS_OF_WEEK.map((day, idx) => {
-              const row = hours[idx] || normalizeHours([])[idx];
+              const row = hours[idx] || normalizeHours([])[idx]!;
               const openValue = toHm(row.open_time, "09:00");
               const closeValue = toHm(row.close_time, "21:00");
               return (
                 <div
                   key={day}
-                  className="rounded-glass-md bg-glass-1 p-3 sm:p-4"
+                  className="rounded-xl border border-hairline-strong px-3 py-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-ink">{day}</p>
+                    <p className="text-sm font-semibold text-ink">{day}</p>
                     <label className="flex items-center gap-2 text-sm text-ink">
                       <input
                         type="checkbox"
@@ -434,13 +442,12 @@ export default function StoreSettingsPage() {
                   {!row.is_closed ? (
                     <div className="mt-3 grid grid-cols-2 gap-3">
                       <div>
-                        <Label htmlFor={`hours-open-${idx}`}>Open</Label>
+                        <Label htmlFor={`hours-open-${idx}`}>Opens</Label>
                         <GlassSelect
                           id={`hours-open-${idx}`}
-                          name={`hours-open-${idx}`}
-                          autoComplete="off"
                           disabled={!canManage}
                           value={openValue}
+                          className="mt-1.5"
                           onChange={(e) =>
                             patchHour(idx, { open_time: e.target.value })
                           }
@@ -453,13 +460,12 @@ export default function StoreSettingsPage() {
                         </GlassSelect>
                       </div>
                       <div>
-                        <Label htmlFor={`hours-close-${idx}`}>Close</Label>
+                        <Label htmlFor={`hours-close-${idx}`}>Closes</Label>
                         <GlassSelect
                           id={`hours-close-${idx}`}
-                          name={`hours-close-${idx}`}
-                          autoComplete="off"
                           disabled={!canManage}
                           value={closeValue}
+                          className="mt-1.5"
                           onChange={(e) =>
                             patchHour(idx, { close_time: e.target.value })
                           }
@@ -483,18 +489,16 @@ export default function StoreSettingsPage() {
             <Button
               className="mt-4"
               disabled={saving}
-              onClick={() => void saveCoverage()}
+              onClick={() => void saveCoverage({ includeHours: true })}
             >
               {saving ? "Saving…" : "Save hours"}
             </Button>
           ) : null}
-        </SectionCard>
+        </Card>
+      ) : null}
 
-        <SectionCard
-          id="settings-area"
-          title="Service Area"
-          body="ZIP codes and radius you serve"
-        >
+      {tab === "coverage" ? (
+        <Card className="p-5 sm:p-6 space-y-5">
           <div>
             <Label>Service radius</Label>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -511,47 +515,37 @@ export default function StoreSettingsPage() {
               ))}
             </div>
           </div>
-          <div className="mt-4">
-            <Label htmlFor="store-zips">Service ZIP codes</Label>
+          <div>
+            <Label htmlFor="store-zips">ZIP codes</Label>
             <Input
               id="store-zips"
-              name="store-zips"
-              autoComplete="off"
               disabled={!canManage}
               value={serviceZips}
               onChange={(e) => setServiceZips(e.target.value)}
-              placeholder="22044, 22042, 22046"
+              placeholder="22044, 22042"
+              className="mt-1.5"
             />
           </div>
           {canManage ? (
             <Button
-              className="mt-4"
               disabled={saving}
-              onClick={() => void saveCoverage()}
+              onClick={() => void saveCoverage({ includeArea: true })}
             >
-              {saving ? "Saving…" : "Save service area"}
+              {saving ? "Saving…" : "Save area"}
             </Button>
           ) : null}
-        </SectionCard>
+        </Card>
+      ) : null}
 
-        <SectionCard
-          id="settings-categories"
-          title="Request Categories"
-          body="What requests you receive"
-        >
-          <p className="text-sm text-ink-muted">
-            Pick your business type, then the categories you want FINDIT requests
-            for. Keywords are predefined — add a custom tag only for unusual
-            brands.
-          </p>
-          <div className="mt-4">
+      {tab === "categories" ? (
+        <Card className="p-5 sm:p-6 space-y-5">
+          <div>
             <Label htmlFor="business-type">Business type</Label>
             <GlassSelect
               id="business-type"
-              name="store-business-type"
-              autoComplete="off"
               disabled={!canManage}
               value={businessType}
+              className="mt-1.5"
               onChange={(e) => {
                 const next = e.target.value;
                 setBusinessType(next);
@@ -574,22 +568,24 @@ export default function StoreSettingsPage() {
               ))}
             </GlassSelect>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-hairline-strong px-3 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-ink">Accepting FINDIT requests</p>
-              <p className="mt-1 text-xs text-ink-muted">
-                Off means nearby Finds will not be sent to this store.
+              <p className="text-sm font-medium text-ink">Accepting requests</p>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                Turn off to pause new Finds for this store.
               </p>
             </div>
             <IosSwitch
-              label="Accepting FINDIT requests"
+              label="Accepting requests"
               checked={acceptingRequests}
               onCheckedChange={setAcceptingRequests}
               disabled={!canManage}
             />
           </div>
+
           {catalogTypeById(businessType) ? (
-            <div className="mt-4">
+            <div>
               <p className="text-sm font-medium text-ink">Categories</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {catalogTypeById(businessType)!.categories.map((c) => (
@@ -612,49 +608,47 @@ export default function StoreSettingsPage() {
               </div>
             </div>
           ) : null}
-          <div className="mt-4">
-            <Label htmlFor="custom-keywords">Custom keywords (optional)</Label>
+
+          <div>
+            <Label htmlFor="custom-keywords">Extra keywords</Label>
             <Input
               id="custom-keywords"
-              name="store-custom-keywords"
-              autoComplete="off"
               disabled={!canManage}
               value={customKeywords}
               onChange={(e) => setCustomKeywords(e.target.value)}
-              placeholder="Rare brand, comma separated"
+              placeholder="Optional, comma separated"
+              className="mt-1.5"
             />
           </div>
-          <div className="mt-5 flex items-center justify-between gap-3 rounded-glass-md bg-glass-1 px-3 py-3">
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-hairline-strong px-3 py-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-ink">Require a government ID</p>
-              <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-                Tobacco, vape, and similar products. Customers confirm they are 21+
-                before FINDIT sends the ask. You still check ID in the store.
+              <p className="text-sm font-medium text-ink">Require ID (21+)</p>
+              <p className="mt-0.5 text-xs text-ink-muted">
+                For tobacco and similar products. Still check ID in store.
               </p>
             </div>
             <IosSwitch
-              label="Require a government ID"
+              label="Require ID"
               checked={requiresCustomerId}
               disabled={!canManage}
               onCheckedChange={setRequiresCustomerId}
             />
           </div>
+
           {canManage ? (
             <Button
-              className="mt-4"
               disabled={saving}
-              onClick={() => void saveCoverage()}
+              onClick={() => void saveCoverage({ includeCategories: true })}
             >
-              {saving ? "Saving…" : "Save categories"}
+              {saving ? "Saving…" : "Save requests"}
             </Button>
           ) : null}
-        </SectionCard>
+        </Card>
+      ) : null}
 
-        <SectionCard
-          id="settings-devices"
-          title="Hub devices"
-          body="Turn a counter tablet off, or remove it so it needs a new code"
-        >
+      {tab === "devices" ? (
+        <Card className="p-5 sm:p-6">
           <StoreDeviceEnableList
             devices={devices}
             canManage={canManage}
@@ -665,52 +659,41 @@ export default function StoreSettingsPage() {
           {canManage ? (
             <Link
               href={devicesHref}
-              className="mt-4 inline-block text-sm font-semibold text-accent-ink underline underline-offset-2"
+              className="mt-4 inline-flex text-sm font-semibold text-accent-ink underline-offset-2 hover:underline"
             >
               Pair or rename a device
             </Link>
           ) : null}
-        </SectionCard>
+        </Card>
+      ) : null}
 
+      <div className="overflow-hidden rounded-xl border border-hairline-strong bg-white">
+        <Link
+          href={notificationsHref}
+          className="flex items-center justify-between gap-3 border-b border-hairline-strong px-4 py-3.5 hover:bg-black/[0.03]"
+        >
+          <span className="text-sm font-semibold text-ink">Notifications</span>
+          <ChevronRight className="h-4 w-4 text-ink-subtle" />
+        </Link>
         {canManage ? (
-          <>
-            <MenuLink
-              href="/store/shifts"
-              title="Staff"
-              body="Floor PINs, hours, and dashboard login invites"
-            />
-            <MenuLink
-              href="/store/hub"
-              title="FINDIT Hub"
-              body="Open the counter tablet experience"
-            />
-            <MenuLink
-              href="/store/rewards"
-              title="Store rewards"
-              body="Your location’s points — separate from FINDIT Points"
-            />
-          </>
+          <Link
+            href={billingHref}
+            className="flex items-center justify-between gap-3 border-b border-hairline-strong px-4 py-3.5 hover:bg-black/[0.03]"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-semibold text-ink">Billing</span>
+              <span className="block text-xs text-ink-muted">{plan.name}</span>
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-ink-subtle" />
+          </Link>
         ) : null}
-
-        <MenuLink
-          href="/store/notifications"
-          title="Notifications"
-          body="Allow alerts and see new asks"
-        />
-
-        {role === "owner" || role === "manager" ? (
-          <MenuLink
-            href="/store/subscription"
-            title="Billing"
-            body={plan.name}
-          />
-        ) : null}
-
-        <MenuLink
-          href="/store/account"
-          title="Account"
-          body="Your login and role for this store"
-        />
+        <Link
+          href={accountHref}
+          className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-black/[0.03]"
+        >
+          <span className="text-sm font-semibold text-ink">Account</span>
+          <ChevronRight className="h-4 w-4 text-ink-subtle" />
+        </Link>
       </div>
     </div>
   );

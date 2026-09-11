@@ -134,8 +134,8 @@ export function StoreTeamPanel({ storeId }: { storeId: string }) {
       <Card className="p-5 sm:p-6">
         <h2 className="text-base font-bold tracking-tight">Invite someone</h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Managers and employees sign in with email to use the Business dashboard and
-          FINDIT Hub. For counter-only workers, use Floor staff with a Hub PIN.
+          Managers and employees sign in with email for the Business dashboard and
+          Hub. Counter-only workers use Floor staff with a PIN.
         </p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">

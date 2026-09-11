@@ -64,6 +64,25 @@ function formatAddress(store: PublicStoreMapItem) {
 }
 
 function mapLibreHtml(stores: PublicStoreMapItem[]) {
+  const style = {
+    version: 8,
+    name: "FINDIT",
+    sources: {
+      carto: {
+        type: "raster",
+        tiles: [
+          "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+          "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+          "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+          "https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+        ],
+        tileSize: 256,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      },
+    },
+    layers: [{ id: "carto", type: "raster", source: "carto", minzoom: 0, maxzoom: 20 }],
+  };
   const payload = JSON.stringify({
     stores: stores.map((s) => ({
       id: s.id,
@@ -72,7 +91,7 @@ function mapLibreHtml(stores: PublicStoreMapItem[]) {
       lng: s.longitude,
     })),
     accent: ACCENT,
-    style: "https://tiles.openfreemap.org/styles/liberty",
+    style,
   });
   return `<!DOCTYPE html>
 <html>
@@ -121,7 +140,10 @@ function mapLibreHtml(stores: PublicStoreMapItem[]) {
       .addTo(map);
   }
   function fitAll() {
-    if (!boot.stores.length) return;
+    if (!boot.stores.length) {
+      map.jumpTo({ center: [-77.09, 38.82], zoom: 11 });
+      return;
+    }
     if (boot.stores.length === 1) {
       map.jumpTo({ center: [boot.stores[0].lng, boot.stores[0].lat], zoom: 14 });
       return;
@@ -139,6 +161,7 @@ function mapLibreHtml(stores: PublicStoreMapItem[]) {
       markers[store.id] = makeMarker(store, false);
     });
     fitAll();
+    setTimeout(function() { map.resize(); }, 80);
   });
   function applySelection(id) {
     Object.keys(markers).forEach(function(key) {
@@ -321,33 +344,36 @@ export default function StoresMapScreen() {
           <View style={styles.center}>
             <ActivityIndicator color={ACCENT} />
           </View>
-        ) : stores.length === 0 ? (
-          <View style={styles.center}>
-            <Text style={[styles.empty, { color: theme.inkMuted }]}>
-              {error || "No FINDIT stores with a map location yet."}
-            </Text>
-          </View>
         ) : (
-          <MapWebView
-            ref={webRef}
-            originWhitelist={["*"]}
-            source={{ html }}
-            style={styles.map}
-            onMessage={(event) => {
-              try {
-                const msg = JSON.parse(event.nativeEvent.data) as {
-                  type?: string;
-                  id?: string;
-                };
-                if (msg.type === "select" && msg.id) openProfile(msg.id);
-              } catch {
-                /* ignore */
-              }
-            }}
-            javaScriptEnabled
-            domStorageEnabled
-            setSupportMultipleWindows={false}
-          />
+          <>
+            <MapWebView
+              ref={webRef}
+              originWhitelist={["*"]}
+              source={{ html }}
+              style={styles.map}
+              onMessage={(event) => {
+                try {
+                  const msg = JSON.parse(event.nativeEvent.data) as {
+                    type?: string;
+                    id?: string;
+                  };
+                  if (msg.type === "select" && msg.id) openProfile(msg.id);
+                } catch {
+                  /* ignore */
+                }
+              }}
+              javaScriptEnabled
+              domStorageEnabled
+              setSupportMultipleWindows={false}
+            />
+            {!loading && stores.length === 0 ? (
+              <View pointerEvents="none" style={styles.emptyOverlay}>
+                <Text style={[styles.empty, { color: theme.inkMuted }]}>
+                  {error || "No FINDIT stores nearby yet."}
+                </Text>
+              </View>
+            ) : null}
+          </>
         )}
       </View>
 
@@ -609,6 +635,13 @@ const styles = StyleSheet.create({
   empty: {
     textAlign: "center",
     fontSize: typography.size.footnote,
+  },
+  emptyOverlay: {
+    position: "absolute",
+    top: 96,
+    left: 24,
+    right: 24,
+    alignItems: "center",
   },
   topBar: {
     position: "absolute",
