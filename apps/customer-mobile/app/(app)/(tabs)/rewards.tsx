@@ -49,9 +49,27 @@ export default function RewardsScreen() {
         }
       >
         <ScreenTitle
-          title="Store rewards"
-          subtitle="Points funded by each participating store."
+          title="Rewards"
+          subtitle="FINDIT Points and store rewards stay separate."
         />
+        <GlassCard>
+          <Text style={[styles.name, { color: theme.ink }]}>FINDIT Points</Text>
+          <Text style={[styles.muted, { color: theme.inkMuted }]}>
+            Platform participation rewards. Open the FINDIT web Rewards page for your
+            full FINDIT Points balance while mobile parity is finishing.
+          </Text>
+        </GlassCard>
+        <Text
+          style={[
+            styles.section,
+            { color: theme.inkMuted, marginTop: spacing.md },
+          ]}
+        >
+          STORE REWARDS
+        </Text>
+        <Text style={[styles.muted, { color: theme.inkMuted, marginBottom: spacing.sm }]}>
+          Points funded by each store after a Hub purchase confirm.
+        </Text>
         {rows.length === 0 ? (
           <GlassCard>
             <Text style={[styles.muted, { color: theme.inkMuted }]}>
@@ -77,7 +95,7 @@ export default function RewardsScreen() {
                     <Text style={[styles.points, { color: theme.ink }]}>
                       {row.points_balance}
                     </Text>
-                    <Text style={[styles.label, { color: theme.inkMuted }]}>POINTS</Text>
+                    <Text style={[styles.label, { color: theme.inkMuted }]}>STORE PTS</Text>
                   </View>
                 </View>
               </GlassCard>
@@ -119,5 +137,10 @@ const styles = StyleSheet.create({
     fontSize: typography.size.caption,
     letterSpacing: typography.tracking.overline,
     textAlign: "right",
+  },
+  section: {
+    fontSize: typography.size.caption,
+    fontWeight: typography.weight.semibold,
+    letterSpacing: typography.tracking.overline,
   },
 });

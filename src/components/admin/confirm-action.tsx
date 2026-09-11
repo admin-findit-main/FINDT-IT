@@ -52,12 +52,20 @@ export function ConfirmActionButton({
           toast.error(result.error);
           return;
         }
+        const custom =
+          result &&
+          typeof result === "object" &&
+          "message" in result &&
+          typeof (result as { message?: unknown }).message === "string"
+            ? (result as { message: string }).message
+            : null;
         toast.success(
-          tone === "danger"
-            ? "Done"
-            : tone === "success"
-              ? "Saved"
-              : "Updated"
+          custom ||
+            (tone === "danger"
+              ? "Done"
+              : tone === "success"
+                ? "Saved"
+                : "Updated")
         );
         setOpen(false);
       } catch {

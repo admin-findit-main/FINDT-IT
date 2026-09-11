@@ -33,6 +33,7 @@ export const ownerDashItems: DashItem[] = [
   { href: "/store/demand", label: "Demand", icon: "demand", section: "Asks" },
   { href: "/store/customers", label: "Customers", icon: "users", section: "Loyalty" },
   { href: "/store/rewards", label: "Rewards", icon: "rewards", section: "Loyalty" },
+  { href: "/store/locations/add", label: "Locations", icon: "stores", section: "Loyalty" },
   { href: "/store/team", label: "Team", icon: "staff", section: "People" },
   { href: "/store/shifts", label: "Shifts", icon: "shifts", section: "People" },
   { href: "/store/hub", label: "FINDIT Hub", icon: "hub", section: "Counter" },
@@ -94,8 +95,15 @@ export function dashTitle(pathname: string): { title: string; subtitle: string }
   const map: Record<string, { title: string; subtitle: string }> = {
     "/store": { title: "Overview", subtitle: "Everything for this location" },
     "/store/requests": { title: "Requests", subtitle: "Answer nearby asks" },
-    "/store/customers": { title: "Customers", subtitle: "People connected to this store" },
-    "/store/rewards": { title: "Rewards", subtitle: "Store-funded points and value" },
+    "/store/customers": { title: "Customers", subtitle: "Loyalty list and store messages" },
+    "/store/rewards": {
+      title: "Store rewards",
+      subtitle: "Your store’s points — separate from FINDIT Points",
+    },
+    "/store/locations/add": {
+      title: "Add location",
+      subtitle: "Same join form — reviewed by FINDIT, managed under one login",
+    },
     "/store/responses": { title: "Responses", subtitle: "What your team already answered" },
     "/store/demand": { title: "Demand", subtitle: "What people nearby keep asking for" },
     "/store/team": {

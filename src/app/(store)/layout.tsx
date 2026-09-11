@@ -19,6 +19,7 @@ import { getStoreBillingAccessAction } from "@/lib/billing/actions";
 import { StoreBillingAccessGate } from "@/components/store/billing-access-gate";
 import { StoreNotifyHost } from "@/components/store/notify-host";
 import { BusinessInstallHint } from "@/components/store/business-install-hint";
+import { StoreLocationSwitcher } from "@/components/store/location-switcher";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,12 @@ export default async function StoreLayout({
   const canManage = workspace?.canManageStore ?? false;
   const storeName = workspace?.store?.name || "Store";
   const billingAccess = await getStoreBillingAccessAction(workspace?.store);
+  const locations = (workspace?.stores || []).map((store) => ({
+    id: store.id,
+    name: store.name,
+    city: store.city,
+    state: store.state,
+  }));
 
   return (
     <DashboardShell
@@ -109,6 +116,13 @@ export default async function StoreLayout({
       mobileItems={canManage ? ownerMobileDashItems : employeeMobileDashItems}
       accountHref="/store/account"
       logoutHref="/login/business"
+      locationSwitcher={
+        <StoreLocationSwitcher
+          locations={locations}
+          activeId={workspace?.store?.id || null}
+          canAdd={canManage}
+        />
+      }
     >
       <StoreNotifyHost userId={profile.id} />
       <StoreBillingAccessGate allowed={billingAccess.allowed}>

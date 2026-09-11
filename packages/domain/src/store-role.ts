@@ -1,7 +1,11 @@
 import type { Store, StoreMemberRole } from "@findit/types";
 
+export type StoreLocationOption = Store & { role: StoreMemberRole };
+
 export type StoreWorkspace = {
-  store: (Store & { role: StoreMemberRole }) | null;
+  store: StoreLocationOption | null;
+  /** Every location this member can access (for switchers). */
+  stores: StoreLocationOption[];
   role: StoreMemberRole;
   canManageStore: boolean;
   canInvite: boolean;
@@ -29,6 +33,7 @@ export function isOwnerOnlyStorePath(pathname: string): boolean {
     pathname.startsWith("/store/settings") ||
     pathname.startsWith("/store/subscription") ||
     pathname.startsWith("/store/devices") ||
-    pathname.startsWith("/store/responses")
+    pathname.startsWith("/store/responses") ||
+    pathname.startsWith("/store/locations")
   );
 }

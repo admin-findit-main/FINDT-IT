@@ -133,6 +133,7 @@ export function DashboardShell({
   mobileItems,
   accountHref,
   logoutHref = "/login/business",
+  locationSwitcher,
   children,
 }: {
   tone?: "business" | "admin";
@@ -143,6 +144,7 @@ export function DashboardShell({
   mobileItems?: DashItem[];
   accountHref: string;
   logoutHref?: string;
+  locationSwitcher?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -238,6 +240,11 @@ export function DashboardShell({
             <X className="h-4 w-4" />
           </button>
         </div>
+        {!isAdmin && locationSwitcher && !collapsed ? (
+          <div className="border-b border-hairline-strong px-3 py-3">
+            {locationSwitcher}
+          </div>
+        ) : null}
         {nav}
         <div
           className={cn(

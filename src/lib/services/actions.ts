@@ -10,6 +10,7 @@ import {
   canManageFromRole,
   type StoreWorkspace,
 } from "@/lib/auth/store-role";
+import { readActiveStoreCookie } from "@/lib/services/active-store";
 import {
   demoApproveStoreApplication,
   demoCountCustomerRequestsThisMonth,
@@ -628,12 +629,20 @@ export async function getStoreWorkspaceAction(): Promise<StoreWorkspace | null> 
   const profile = await getCurrentProfile();
   if (!profile) return null;
   const stores = await getUserStoresAction();
-  const first = stores[0] || null;
+  const locations = stores.map((store) => ({
+    ...store,
+    role: (store.role as StoreMemberRole) || "employee",
+  }));
 
-  if (first) {
-    const role = (first.role as StoreMemberRole) || "employee";
+  const preferredId = await readActiveStoreCookie();
+  const selected =
+    locations.find((store) => store.id === preferredId) || locations[0] || null;
+
+  if (selected) {
+    const role = selected.role;
     return {
-      store: { ...first, role },
+      store: selected,
+      stores: locations,
       role,
       canManageStore: canManageFromRole(role),
       canInvite: canManageFromRole(role),
@@ -644,6 +653,7 @@ export async function getStoreWorkspaceAction(): Promise<StoreWorkspace | null> 
   if (isSoloAdmin(profile)) {
     return {
       store: null,
+      stores: [],
       role: "owner",
       canManageStore: true,
       canInvite: true,
@@ -2051,7 +2061,8 @@ export const getUserStoresAction = cache(async (): Promise<(Store & { role: stri
     .map((d: { store?: Store | Store[] | null; role: string }) => {
       const store = Array.isArray(d.store) ? d.store[0] : d.store;
       return { ...(store as Store), role: d.role };
-    });
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 });
 
 export async function getStoreDemandAction(storeId: string): Promise<DemandItem[]> {

@@ -26,7 +26,7 @@ export function ShopperFinditPoints() {
   if (!stats) return null;
 
   return (
-    <Card className="mt-6 p-5">
+    <Card className="mt-3 p-5">
       <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">
         FINDIT Points
       </p>
