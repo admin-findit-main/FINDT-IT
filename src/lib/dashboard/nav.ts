@@ -34,8 +34,7 @@ export const ownerDashItems: DashItem[] = [
   { href: "/store/customers", label: "Customers", icon: "users", section: "Loyalty" },
   { href: "/store/rewards", label: "Rewards", icon: "rewards", section: "Loyalty" },
   { href: "/store/locations/add", label: "Locations", icon: "stores", section: "Loyalty" },
-  { href: "/store/team", label: "Team", icon: "staff", section: "People" },
-  { href: "/store/shifts", label: "Shifts", icon: "shifts", section: "People" },
+  { href: "/store/shifts", label: "Staff", icon: "shifts", section: "People" },
   { href: "/store/hub", label: "FINDIT Hub", icon: "hub", section: "Counter" },
   { href: "/store/devices", label: "Devices", icon: "devices", section: "Counter" },
   { href: "/store/notifications", label: "Notifications", icon: "alerts", section: "Account" },
@@ -50,14 +49,11 @@ export const employeeDashItems: DashItem[] = [
   { href: "/store/account", label: "Account", icon: "account", section: "Account" },
 ];
 
-/** Phone tab bar — keep to 5 short labels. Full list stays in the sidebar menu. */
-export const ownerMobileDashItems: DashItem[] = [
-  { href: "/store", label: "Home", icon: "overview" },
-  { href: "/store/requests", label: "Asks", icon: "requests" },
-  { href: "/store/team", label: "Team", icon: "staff" },
-  { href: "/store/hub", label: "Hub", icon: "hub" },
-  { href: "/store/settings", label: "Settings", icon: "settings" },
-];
+/**
+ * Owner Business uses sidebar (desktop) / drawer (mobile) only — no bottom tab bar.
+ * Employees keep a short phone tab bar for the few destinations they use.
+ */
+export const ownerMobileDashItems: DashItem[] = [];
 
 export const employeeMobileDashItems: DashItem[] = [
   { href: "/store/hub", label: "Hub", icon: "hub" },
@@ -107,12 +103,12 @@ export function dashTitle(pathname: string): { title: string; subtitle: string }
     "/store/responses": { title: "Responses", subtitle: "What your team already answered" },
     "/store/demand": { title: "Demand", subtitle: "What people nearby keep asking for" },
     "/store/team": {
-      title: "Team",
-      subtitle: "Managers and employees with FINDIT login access",
+      title: "Staff",
+      subtitle: "Floor PINs, hours, and dashboard logins",
     },
     "/store/shifts": {
-      title: "Shifts",
-      subtitle: "Floor staff, Hub PINs, and punch hours",
+      title: "Staff",
+      subtitle: "Floor PINs, hours, and dashboard logins",
     },
     "/store/devices": { title: "Devices", subtitle: "Counter tablets connected to this store" },
     "/store/settings": { title: "Settings", subtitle: "Store profile, hours, coverage, categories" },

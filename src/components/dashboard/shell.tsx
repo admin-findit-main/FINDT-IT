@@ -292,7 +292,7 @@ export function DashboardShell({
       </aside>
 
       <div className={cn("min-h-dvh", collapsed ? "md:pl-[72px]" : "md:pl-[240px]")}>
-        <header className="glass-chrome sticky top-0 z-30 border-b border-hairline-strong px-3 pt-[env(safe-area-inset-top)] md:px-8">
+        <header className="sticky top-0 z-30 border-b border-hairline-strong bg-white/95 px-3 pt-[env(safe-area-inset-top)] backdrop-blur-md md:px-8">
           <div className="flex min-h-14 items-center gap-2 sm:gap-3">
             <button
               type="button"
@@ -303,15 +303,23 @@ export function DashboardShell({
               <Menu className="h-5 w-5" />
             </button>
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-[15px] font-semibold tracking-tight sm:text-sm">{title}</h1>
+              <h1 className="truncate text-[17px] font-semibold tracking-tight sm:text-base">
+                {title}
+              </h1>
               {subtitle ? (
-                <p className="truncate text-[11px] text-ink-muted sm:text-[12px]">{subtitle}</p>
+                <p className="truncate text-[12px] text-ink-muted">{subtitle}</p>
               ) : null}
             </div>
-            <div className="hidden max-w-[40%] items-center gap-2 truncate text-xs text-ink-muted sm:flex">
-              <Shield className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{identity}</span>
-            </div>
+            {!isAdmin ? (
+              <div className="hidden max-w-[40%] items-center gap-2 truncate text-xs text-ink-muted lg:flex">
+                <span className="truncate">{identity}</span>
+              </div>
+            ) : (
+              <div className="hidden max-w-[40%] items-center gap-2 truncate text-xs text-ink-muted sm:flex">
+                <Shield className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{identity}</span>
+              </div>
+            )}
           </div>
         </header>
         <main

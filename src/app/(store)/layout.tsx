@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/primitives";
-import { employeeDashItems, employeeMobileDashItems, ownerDashItems, ownerMobileDashItems } from "@/lib/dashboard/nav";
+import { employeeDashItems, employeeMobileDashItems, ownerDashItems } from "@/lib/dashboard/nav";
 import { BrandHomeLink } from "@/components/brand/logo";
 import { roleLabel } from "@/lib/auth/store-role";
 import { STORE_TRIAL_DAYS } from "@/lib/config/constants";
@@ -113,7 +113,11 @@ export default async function StoreLayout({
       role={roleLabel(role)}
       email={profile.email}
       items={canManage ? ownerDashItems : employeeDashItems}
-      mobileItems={canManage ? ownerMobileDashItems : employeeMobileDashItems}
+      mobileItems={
+        canManage
+          ? undefined
+          : employeeMobileDashItems
+      }
       accountHref="/store/account"
       logoutHref="/login/business"
       locationSwitcher={

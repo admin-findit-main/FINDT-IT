@@ -675,14 +675,9 @@ export default function StoreSettingsPage() {
         {canManage ? (
           <>
             <MenuLink
-              href="/store/team"
-              title="Team"
-              body="Invite managers and employees with login access"
-            />
-            <MenuLink
               href="/store/shifts"
-              title="Shifts"
-              body="Hours, PINs, and who is clocked in on the Hub"
+              title="Staff"
+              body="Floor PINs, hours, and dashboard login invites"
             />
             <MenuLink
               href="/store/hub"
@@ -691,8 +686,8 @@ export default function StoreSettingsPage() {
             />
             <MenuLink
               href="/store/rewards"
-              title="Rewards"
-              body="Store points per dollar and redemption"
+              title="Store rewards"
+              body="Your location’s points — separate from FINDIT Points"
             />
           </>
         ) : null}

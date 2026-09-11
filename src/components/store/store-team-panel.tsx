@@ -135,7 +135,7 @@ export function StoreTeamPanel({ storeId }: { storeId: string }) {
         <h2 className="text-base font-bold tracking-tight">Invite someone</h2>
         <p className="mt-1 text-sm text-ink-muted">
           Managers and employees sign in with email to use the Business dashboard and
-          FINDIT Hub. Floor-only PIN staff stay under Shifts.
+          FINDIT Hub. For counter-only workers, use Floor staff with a Hub PIN.
         </p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">

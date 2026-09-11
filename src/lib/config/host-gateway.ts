@@ -209,6 +209,7 @@ export function decideHostRouting(
     if (publicPath === "/team" || publicPath === "/store/team") {
       const url = request.nextUrl.clone();
       url.pathname = "/shifts";
+      url.searchParams.set("tab", "access");
       return { kind: "redirect", url };
     }
     if (publicPath.startsWith("/join") || isWwwPublicPath(publicPath) && publicPath !== "/") {

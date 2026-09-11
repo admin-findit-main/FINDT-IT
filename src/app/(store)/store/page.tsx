@@ -68,15 +68,9 @@ const QUICK_LINKS: {
     icon: Gift,
   },
   {
-    href: "/store/team",
-    label: "Team",
-    body: "Invite managers and employees",
-    icon: Users,
-  },
-  {
     href: "/store/shifts",
-    label: "Shifts",
-    body: "Hub PINs and punch hours",
+    label: "Staff",
+    body: "Floor PINs, hours, and login access",
     icon: CalendarClock,
   },
   {
@@ -157,10 +151,10 @@ function OwnerOverview({ data }: { data: OwnerData }) {
             {hubConnected ? "Open FINDIT Hub" : "Connect FINDIT Hub"}
           </Link>
           <Link
-            href="/store/team"
+            href="/store/shifts?tab=access"
             className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline-strong px-4 py-2 text-center text-sm font-semibold text-ink"
           >
-            Invite team
+            Invite staff
           </Link>
           <Link
             href="/store/settings"

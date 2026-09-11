@@ -119,6 +119,7 @@ describe("decideHostRouting", () => {
     expect(oldTeam.kind).toBe("redirect");
     if (oldTeam.kind === "redirect") {
       expect(oldTeam.url.pathname).toBe("/shifts");
+      expect(oldTeam.url.searchParams.get("tab")).toBe("access");
     }
   });
 

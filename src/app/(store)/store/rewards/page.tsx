@@ -17,20 +17,24 @@ export default async function StoreRewardsPage() {
   }
 
   const storeName = workspace?.store?.name || "This store";
+  const locationCount = workspace?.stores?.length ?? 1;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Store rewards</h2>
         <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-          Points your location funds when the Hub confirms a purchase at{" "}
-          <span className="font-medium text-ink">{storeName}</span>. This is{" "}
-          <span className="font-medium text-ink">not</span> FINDIT Points — those are
-          platform rewards customers earn separately in the shopper app.
+          Set loyalty rules for{" "}
+          <span className="font-medium text-ink">{storeName}</span> only.
+          {locationCount > 1
+            ? " Each location you switch to has its own settings."
+            : null}{" "}
+          This is <span className="font-medium text-ink">not</span> FINDIT Points —
+          those are platform rewards in the shopper app.
         </p>
       </div>
-      <Panel title="Your store’s loyalty settings">
-        <RewardSettingsForm initial={settings} />
+      <Panel title={`${storeName} · loyalty settings`}>
+        <RewardSettingsForm storeName={storeName} initial={settings} />
       </Panel>
     </div>
   );
