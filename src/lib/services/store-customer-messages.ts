@@ -9,94 +9,71 @@ import {
   getStoreWorkspaceAction,
 } from "@/lib/services/actions";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
-import type { createServiceClient } from "@/lib/supabase/admin";
 
 const TITLE_MAX = 80;
 const BODY_MAX = 240;
-const IN_CHUNK = 200;
-
-type ServiceAdmin = ReturnType<typeof createServiceClient>;
-
-type LinkedCustomerRow = {
-  customer_id: string | null;
-  customer:
-    | { id: string; is_suspended: boolean }
-    | { id: string; is_suspended: boolean }[]
-    | null;
-};
 
 /**
- * Pilot audience rules
- * --------------------
- * Migration `20260907194000_loyalty_security_and_atomic_purchase` set both
- * `store_customers.marketing_opt_in` and `profiles.notify_store_promotions` to
- * DEFAULT false and mass-reset existing true → false (no affirmative consent
- * evidence). Requiring dual opt-in therefore reaches nobody.
+ * Pilot audience: linked store customers who are not suspended and have at least
+ * one customer/web push token. Dual marketing opt-in defaults were mass-reset to
+ * false, which made the old audience always empty.
  *
- * Reach (pilot): linked, non-removed store customers who are not suspended and
- * have at least one customer/web push token — same token gate as admin push.
- * `marketing_opt_in` is NOT NULL; default/false alone does not block when tokens
- * exist (treat missing affirmative marketing carefully — do not require true).
- *
- * Hard opt-out: `notify_store_promotions === false` is the intended global
- * promotions kill-switch. Because the column is NOT NULL DEFAULT false after the
- * consent reset, requiring === true empties the audience; for pilot we do not
- * require === true. Suspended accounts are always skipped. Phone-only Hub rows
- * (null customer_id) stay out.
+ * Hard opt-out: profiles.notify_store_promotions === false is still respected.
  */
-async function reachableStoreCustomerIds(
-  admin: ServiceAdmin,
-  storeId: string
-): Promise<string[]> {
-  const { data, error } = await admin
+async function reachableCustomerIds(storeId: string) {
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+
+  const { data: rows, error } = await admin
     .from("store_customers")
-    .select(
-      "customer_id, customer:profiles!store_customers_customer_id_fkey(id, is_suspended)"
-    )
+    .select("customer_id")
     .eq("store_id", storeId)
     .is("removed_at", null)
     .not("customer_id", "is", null);
 
   if (error) {
-    console.error("[FINDIT] store message audience query failed", error.message);
-    return [];
+    return { admin, userIds: [] as string[], error: error.message };
   }
 
-  const candidateIds = [
+  const linkedIds = [
     ...new Set(
-      ((data || []) as LinkedCustomerRow[])
-        .map((row) => {
-          const profile = Array.isArray(row.customer)
-            ? row.customer[0]
-            : row.customer;
-          if (!profile || profile.is_suspended === true) return null;
-          // Pilot: ignore notify_store_promotions / marketing_opt_in gates.
-          // Both default false after the consent migration; requiring dual-true
-          // blocks every linked shopper. Token presence is the reachability gate.
-          // When consent UX is affirmative again, treat notify_store_promotions
-          // === false as a hard opt-out here before the token intersect.
-          return boundUuid(String(row.customer_id || profile.id || ""));
-        })
+      (rows || [])
+        .map((row) => boundUuid(String(row.customer_id || "")))
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  if (!linkedIds.length) return { admin, userIds: [] as string[] };
+
+  const { data: profiles } = await admin
+    .from("profiles")
+    .select("id, is_suspended, notify_store_promotions")
+    .in("id", linkedIds);
+
+  const allowed = (profiles || [])
+    .filter(
+      (profile) =>
+        profile.is_suspended !== true &&
+        profile.notify_store_promotions !== false
+    )
+    .map((profile) => profile.id as string);
+
+  if (!allowed.length) return { admin, userIds: [] as string[] };
+
+  const { data: tokens } = await admin
+    .from("device_push_tokens")
+    .select("user_id")
+    .in("user_id", allowed)
+    .in("app_surface", ["customer", "web"]);
+
+  const withTokens = [
+    ...new Set(
+      (tokens || [])
+        .map((row) => boundUuid(String(row.user_id || "")))
         .filter((id): id is string => Boolean(id))
     ),
   ];
 
-  if (!candidateIds.length) return [];
-
-  const withTokens = new Set<string>();
-  for (let i = 0; i < candidateIds.length; i += IN_CHUNK) {
-    const slice = candidateIds.slice(i, i + IN_CHUNK);
-    const { data: tokens } = await admin
-      .from("device_push_tokens")
-      .select("user_id")
-      .in("user_id", slice)
-      .in("app_surface", ["customer", "web"]);
-    for (const row of tokens || []) {
-      if (row.user_id) withTokens.add(String(row.user_id));
-    }
-  }
-
-  return candidateIds.filter((id) => withTokens.has(id));
+  return { admin, userIds: withTokens };
 }
 
 export async function getStoreMessageAudienceAction() {
@@ -108,9 +85,10 @@ export async function getStoreMessageAudienceAction() {
     return { count: 0, storeId: workspace.store.id, storeName: workspace.store.name };
   }
 
-  const { createServiceClient } = await import("@/lib/supabase/admin");
-  const admin = createServiceClient();
-  const userIds = await reachableStoreCustomerIds(admin, workspace.store.id);
+  const { userIds, error } = await reachableCustomerIds(workspace.store.id);
+  if (error) {
+    return { error: "Could not load message audience.", count: 0 };
+  }
 
   return {
     count: userIds.length,
@@ -146,14 +124,13 @@ export async function sendStoreCustomerMessageAction(input: {
     return { ok: true as const, sent: 0, demo: true as const };
   }
 
-  const { createServiceClient } = await import("@/lib/supabase/admin");
-  const admin = createServiceClient();
-  const userIds = await reachableStoreCustomerIds(admin, workspace.store.id);
+  const { admin, userIds, error } = await reachableCustomerIds(workspace.store.id);
+  if (error) return { error: "Could not load customers to message." };
 
   if (!userIds.length) {
     return {
       error:
-        "No reachable customers yet. Linked shoppers need the FINDIT app (or web alerts) installed — phone-only Hub rows cannot get push.",
+        "No reachable customers yet. They need a FINDIT account linked at this store and alerts enabled on their phone or Home Screen app.",
     };
   }
 
@@ -170,7 +147,6 @@ export async function sendStoreCustomerMessageAction(input: {
         url: "/rewards",
       },
     });
-    // notifications.type is unconstrained text (init migration) — same as admin_broadcast.
     await admin.from("notifications").insert({
       user_id: customerId,
       type: "store_promotion",
