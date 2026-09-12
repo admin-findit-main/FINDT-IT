@@ -133,22 +133,41 @@ export const storeJoinApplicationSchema = z.object({
   ownerName: z
     .string()
     .transform((value) => sanitizeText(value, 100))
-    .pipe(z.string().min(2).max(100)),
-  ownerEmail: z.string().trim().email(),
+    .pipe(z.string().min(2, "Your name is required").max(100)),
+  ownerEmail: z.string().trim().email("Enter a valid email"),
   ownerPhone: z.string().max(30).optional().or(z.literal("")),
-  legalName: z.string().min(2, "Legal business name is required").max(120),
+  /** Legal company name as it appears on business papers. */
+  legalName: z
+    .string()
+    .min(2, "Enter the company name from your business papers")
+    .max(120),
+  /** Optional for now — collected later during review if needed. */
   ein: z
     .string()
-    .transform((value) => normalizeEin(value))
-    .pipe(z.string().regex(/^\d{9}$/, "Enter a 9-digit EIN")),
-  entityType: z.enum(BUSINESS_ENTITY_TYPES),
-  businessName: z.string().min(2).max(100),
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => {
+      const digits = normalizeEin(value || "");
+      return digits || null;
+    })
+    .pipe(
+      z.union([
+        z.null(),
+        z.string().regex(/^\d{9}$/, "EIN must be 9 digits if provided"),
+      ])
+    ),
+  entityType: z.enum(BUSINESS_ENTITY_TYPES).optional().default("Other"),
+  /** Storefront / DBA name customers see. */
+  businessName: z
+    .string()
+    .min(2, "Store name is required")
+    .max(100),
   businessType: z.enum(STORE_CATEGORIES),
-  streetAddress: z.string().min(3).max(200),
-  city: z.string().min(2).max(80),
+  streetAddress: z.string().min(3, "Street address is required").max(200),
+  city: z.string().min(2, "City is required").max(80),
   state: z.string().min(2).max(2),
-  postalCode: z.string().regex(/^\d{5}(-\d{4})?$/),
-  phone: z.string().min(7).max(30),
+  postalCode: z.string().regex(/^\d{5}(-\d{4})?$/, "Enter a valid ZIP"),
+  phone: z.string().min(7, "Business phone is required").max(30),
   website: z
     .string()
     .trim()
@@ -160,14 +179,21 @@ export const storeJoinApplicationSchema = z.object({
     .pipe(z.union([z.literal(""), z.string().url("Enter a valid website")])),
   whyLegit: z
     .string()
-    .min(20, "Tell us a bit about your business (at least 20 characters)")
-    .max(800),
+    .max(800)
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => {
+      const trimmed = (value || "").trim();
+      return trimmed.length >= 20
+        ? trimmed
+        : "Pending FINDIT store review.";
+    }),
   requestCategories: z
     .array(z.string().min(1))
-    .min(1, "Select at least one product category you want to receive"),
-  requiresCustomerId: z.boolean(),
+    .min(1, "Select a store type so we know what asks to send"),
+  requiresCustomerId: z.boolean().default(false),
   confirmedLegitimate: z.boolean().refine((v) => v === true, {
-    message: "Confirm you are a legitimate business",
+    message: "Confirm this is a real store",
   }),
 }).superRefine((value, ctx) => {
   if (

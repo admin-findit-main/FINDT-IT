@@ -19,14 +19,13 @@ function LoginForm() {
   const error = publicLoginError(params.get("error"));
 
   return (
-    <Card className="p-6 sm:p-8">
+    <Card className="border-hairline-strong p-6 shadow-[0_12px_40px_rgba(11,11,12,0.06)] sm:p-8">
       <AuthAudienceSwitch audience="shopper" next={next} />
-      <h1 className="mt-5 text-2xl font-bold tracking-tight text-ink">
+      <h1 className="mt-6 text-[1.75rem] font-bold tracking-tight text-ink">
         Shopper sign in
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        We’ll email a 6-digit code. After that, this device stays signed in.
-        Stores use the Store tab.
+        Email a 6-digit code. This device stays signed in.
       </p>
       {error ? (
         <div className="mt-4">

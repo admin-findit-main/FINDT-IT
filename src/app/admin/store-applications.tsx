@@ -67,7 +67,11 @@ export function AdminStoreApplications({
                       <p className="mt-1 font-medium tabular-nums text-ink">
                         EIN {formatEin(app.ein)}
                       </p>
-                    ) : null}
+                    ) : (
+                      <p className="mt-1 text-xs font-medium text-ink-muted">
+                        EIN not collected yet · confirm during review
+                      </p>
+                    )}
                     <p className="mt-1 text-xs text-ink-muted">{app.street_address}</p>
                     {app.request_categories?.length ? (
                       <p className="mt-1 text-xs text-ink-muted">

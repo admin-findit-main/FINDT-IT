@@ -7,8 +7,6 @@ const base = {
   ownerEmail: "casey@testhardware.example",
   ownerPhone: "703-555-0111",
   legalName: "Test Hardware LLC",
-  ein: "12-3456789",
-  entityType: "LLC" as const,
   businessName: "Test Hardware Co",
   businessType: "Hardware" as const,
   streetAddress: "99 Main St",
@@ -17,7 +15,6 @@ const base = {
   postalCode: "22044",
   phone: "703-555-0111",
   website: "testhardware.example",
-  whyLegit: "Licensed hardware retailer operating on Main Street for five years.",
   requestCategories: ["Hardware"],
   requiresCustomerId: false,
   confirmedLegitimate: true,
@@ -33,16 +30,29 @@ describe("EIN helpers", () => {
 });
 
 describe("store join application", () => {
-  it("requires EIN, legal name, and entity type", () => {
+  it("accepts join without EIN", () => {
     const parsed = storeJoinApplicationSchema.safeParse(base);
     expect(parsed.success).toBe(true);
     if (parsed.success) {
-      expect(parsed.data.ein).toBe("123456789");
+      expect(parsed.data.ein).toBeNull();
+      expect(parsed.data.legalName).toBe("Test Hardware LLC");
       expect(parsed.data.website).toBe("https://testhardware.example");
+      expect(parsed.data.whyLegit.length).toBeGreaterThanOrEqual(20);
     }
   });
 
-  it("rejects a short EIN", () => {
+  it("accepts a valid optional EIN", () => {
+    const parsed = storeJoinApplicationSchema.safeParse({
+      ...base,
+      ein: "12-3456789",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.ein).toBe("123456789");
+    }
+  });
+
+  it("rejects a short EIN when provided", () => {
     const parsed = storeJoinApplicationSchema.safeParse({ ...base, ein: "12-345" });
     expect(parsed.success).toBe(false);
   });
