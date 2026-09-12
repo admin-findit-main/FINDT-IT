@@ -636,7 +636,10 @@ export async function getStoreWorkspaceAction(): Promise<StoreWorkspace | null> 
 
   const preferredId = await readActiveStoreCookie();
   const selected =
-    locations.find((store) => store.id === preferredId) || locations[0] || null;
+    locations.find((store) => store.id === preferredId) ||
+    locations.find((store) => canManageFromRole(store.role)) ||
+    locations[0] ||
+    null;
 
   if (selected) {
     const role = selected.role;
@@ -954,6 +957,17 @@ export async function signUpAction(input: {
 }
 
 export async function signOutAction() {
+  const { cookies } = await import("next/headers");
+  const { ACTIVE_STORE_COOKIE } = await import("@/lib/services/active-store");
+  const jar = await cookies();
+  jar.set(ACTIVE_STORE_COOKIE, "", {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 0,
+  });
+
   if (isDemoMode()) {
     const sessionId = await getDemoSessionId();
     demoLogout(sessionId);
@@ -3680,10 +3694,10 @@ export async function getStoreSettingsAction(storeId: string) {
 }
 
 export async function getMyStoreSettingsAction() {
-  const stores = await getUserStoresAction();
-  const first = stores[0];
-  if (!first) return null;
-  return getStoreSettingsAction(first.id);
+  const workspace = await getStoreWorkspaceAction();
+  const storeId = workspace?.store?.id;
+  if (!storeId) return null;
+  return getStoreSettingsAction(storeId);
 }
 
 export async function getPilotAdminStatsAction(): Promise<PilotAdminStats | null> {

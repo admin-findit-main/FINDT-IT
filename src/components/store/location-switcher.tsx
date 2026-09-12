@@ -35,11 +35,16 @@ export function StoreLocationSwitcher({
     if (storeId === activeId) return;
     startTransition(async () => {
       const result = await setActiveStoreAction(storeId);
-      if (result.error) {
+      if ("error" in result && result.error) {
         toast.error(result.error);
         return;
       }
-      toast.success("Location switched");
+      toast.success("Switched location");
+      if ("canManage" in result && result.canManage === false) {
+        router.replace("/store/hub");
+        router.refresh();
+        return;
+      }
       router.refresh();
     });
   }

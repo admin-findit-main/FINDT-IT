@@ -9,7 +9,7 @@ import {
   resolvePostAuthDestination,
 } from "@/lib/auth/home-path";
 import { isOwnerOnlyStorePath } from "@/lib/auth/store-role";
-import { customerNeedsFirstName } from "@findit/domain";
+import { boundUuid, canManageFromRole, customerNeedsFirstName } from "@findit/domain";
 import {
   getSupabasePublishableKey,
   isDemoMode,
@@ -25,6 +25,7 @@ import {
   supabaseCookieOptions,
   toInternalPath,
 } from "@/lib/config/product-hosts";
+import { ACTIVE_STORE_COOKIE } from "@/lib/services/active-store-cookie";
 
 async function resolveHomeForUser(
   supabase: ReturnType<typeof createServerClient>,
@@ -189,7 +190,10 @@ export async function updateSession(request: NextRequest) {
   let profileSuspended = false;
 
   if (user) {
-    const [{ data: profile }, { data: membership }] = await Promise.all([
+    const preferredStoreId = boundUuid(
+      request.cookies.get(ACTIVE_STORE_COOKIE)?.value || ""
+    );
+    const [{ data: profile }, { data: memberships }] = await Promise.all([
       supabase
         .from("profiles")
         .select("account_type, email, first_name, is_suspended")
@@ -197,11 +201,9 @@ export async function updateSession(request: NextRequest) {
         .maybeSingle(),
       supabase
         .from("store_members")
-        .select("role")
+        .select("role, store_id")
         .eq("user_id", user.id)
-        .eq("status", "active")
-        .limit(1)
-        .maybeSingle(),
+        .eq("status", "active"),
     ]);
     resolvedProfile = coerceSoloAdminProfile(
       {
@@ -212,12 +214,18 @@ export async function updateSession(request: NextRequest) {
       user.email
     );
     profileSuspended = Boolean(profile?.is_suspended);
-    memberRole = membership?.role ?? null;
+    const rows = memberships || [];
+    const preferred = preferredStoreId
+      ? rows.find((row) => row.store_id === preferredStoreId)
+      : null;
+    const manageable = rows.find((row) => canManageFromRole(row.role || ""));
+    memberRole =
+      preferred?.role || manageable?.role || rows[0]?.role || null;
     actor = classifyStoreActor({
       isAdmin: isSoloAdmin(resolvedProfile),
       accountType: resolvedProfile?.account_type,
       memberRole,
-      hasStoreMembership: Boolean(memberRole),
+      hasStoreMembership: rows.length > 0,
     });
   }
 
@@ -362,7 +370,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isOwnerOnlyStorePath(internalPath)) {
-    if (!isSoloAdmin(resolvedProfile) && memberRole === "employee") {
+    if (!isSoloAdmin(resolvedProfile) && !canManageFromRole(memberRole || "")) {
       const url = request.nextUrl.clone();
       url.pathname = surface === "store" ? "/hub" : "/store/hub";
       url.search = "";

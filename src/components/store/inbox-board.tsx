@@ -21,7 +21,6 @@ import {
   getCurrentProfile,
   getStoreMetricsAction,
   getStoreWorkspaceAction,
-  getUserStoresAction,
   respondToRequestAction,
 } from "@/lib/services/actions";
 import { HUB_INBOX_POLL_MS } from "@/lib/hub/constants";
@@ -87,20 +86,20 @@ export function StoreInboxBoard() {
   }, [loadInbox, loadMetrics]);
 
   useEffect(() => {
-    Promise.all([
-      getCurrentProfile(),
-      getUserStoresAction(),
-      getStoreWorkspaceAction(),
-    ]).then(([p, s, ws]) => {
-      setProfile(p);
-      setStores(s);
-      setWorkspace(ws);
-      if (s[0]) {
-        setStoreId(s[0].id);
-      } else {
-        setLoading(false);
+    Promise.all([getCurrentProfile(), getStoreWorkspaceAction()]).then(
+      ([p, ws]) => {
+        setProfile(p);
+        setWorkspace(ws);
+        const locations = ws?.stores || [];
+        setStores(locations);
+        const activeId = ws?.store?.id || locations[0]?.id || "";
+        if (activeId) {
+          setStoreId(activeId);
+        } else {
+          setLoading(false);
+        }
       }
-    });
+    );
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("notice") === "manager") setManagerNotice(true);
@@ -227,20 +226,6 @@ export function StoreInboxBoard() {
               : `${store?.name || "Your store"} · Answer quickly`}
           </p>
         </div>
-        {stores.length > 1 ? (
-          <GlassSelect
-            aria-label="Select store"
-            className="h-10 w-auto px-3 text-sm"
-            value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
-          >
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </GlassSelect>
-        ) : null}
       </header>
 
       {canManage ? (

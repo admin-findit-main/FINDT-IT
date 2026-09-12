@@ -131,7 +131,7 @@ export default async function StoreLayout({
       <StoreNotifyHost userId={profile.id} />
       <StoreBillingAccessGate allowed={billingAccess.allowed}>
         <BusinessInstallHint />
-        {children}
+        <div key={workspace?.store?.id || "no-store"}>{children}</div>
       </StoreBillingAccessGate>
     </DashboardShell>
   );

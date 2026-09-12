@@ -1,8 +1,8 @@
 "use server";
 
-import { boundUuid } from "@findit/domain";
+import { boundUuid, canManageFromRole } from "@findit/domain";
 import { cookies } from "next/headers";
-import { ACTIVE_STORE_COOKIE } from "@/lib/services/active-store";
+import { ACTIVE_STORE_COOKIE } from "@/lib/services/active-store-cookie";
 import {
   getCurrentProfile,
   getUserStoresAction,
@@ -15,7 +15,8 @@ export async function setActiveStoreAction(storeId: string) {
   if (!profile) return { error: "Unauthorized" };
 
   const stores = await getUserStoresAction();
-  if (!stores.some((store) => store.id === id)) {
+  const match = stores.find((store) => store.id === id);
+  if (!match) {
     return { error: "You don’t have access to that location." };
   }
 
@@ -27,5 +28,11 @@ export async function setActiveStoreAction(storeId: string) {
     secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60 * 24 * 400,
   });
-  return { ok: true as const };
+  const role = match.role || "employee";
+  return {
+    ok: true as const,
+    storeId: id,
+    role,
+    canManage: canManageFromRole(role),
+  };
 }

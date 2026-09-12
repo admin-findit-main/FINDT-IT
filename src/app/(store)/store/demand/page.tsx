@@ -2,25 +2,26 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
-import { GlassSelect, Overline } from "@/components/ui/glass";
+import { Overline } from "@/components/ui/glass";
 import {
   getStoreDemandAction,
   getStoreMetricsAction,
-  getUserStoresAction,
+  getStoreWorkspaceAction,
 } from "@/lib/services/actions";
-import type { DemandItem, Store, StoreMetrics } from "@/types/database";
+import type { DemandItem, StoreMetrics } from "@/types/database";
 
 export default function DemandPage() {
   const [storeId, setStoreId] = useState("");
-  const [stores, setStores] = useState<(Store & { role: string })[]>([]);
+  const [storeName, setStoreName] = useState("");
   const [demand, setDemand] = useState<DemandItem[]>([]);
   const [metrics, setMetrics] = useState<StoreMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getUserStoresAction().then((s) => {
-      setStores(s);
-      if (s[0]) setStoreId(s[0].id);
+    getStoreWorkspaceAction().then((ws) => {
+      const id = ws?.store?.id || "";
+      setStoreName(ws?.store?.name || "");
+      if (id) setStoreId(id);
       else setLoading(false);
     });
   }, []);
@@ -47,29 +48,15 @@ export default function DemandPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">
-            Customer Demand
-          </h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            What people nearby keep asking for.
-          </p>
-        </div>
-        {stores.length > 1 ? (
-          <GlassSelect
-            aria-label="Select store"
-            className="h-10 w-auto px-3 text-sm"
-            value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
-          >
-            {stores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </GlassSelect>
-        ) : null}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">
+          Customer Demand
+        </h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          {storeName
+            ? `What people near ${storeName} keep asking for.`
+            : "What people nearby keep asking for."}
+        </p>
       </div>
 
       {loading ? (

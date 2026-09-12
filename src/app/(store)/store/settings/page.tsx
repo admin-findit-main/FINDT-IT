@@ -283,6 +283,15 @@ export default function StoreSettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Settings</h1>
+        <p className="mt-1 text-sm text-ink-muted">
+          {store?.name
+            ? `Editing ${store.name}${store.city ? ` · ${store.city}` : ""}. Switch locations in the sidebar.`
+            : "Store profile, hours, area, and devices."}
+        </p>
+      </div>
+
       {pilotBanner ? <GlassNotice tone="stock">{PILOT_STORE_BANNER}</GlassNotice> : null}
 
       {!canManage ? (
