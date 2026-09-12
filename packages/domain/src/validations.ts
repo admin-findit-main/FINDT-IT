@@ -136,11 +136,13 @@ export const storeJoinApplicationSchema = z.object({
     .pipe(z.string().min(2, "Your name is required").max(100)),
   ownerEmail: z.string().trim().email("Enter a valid email"),
   ownerPhone: z.string().max(30).optional().or(z.literal("")),
-  /** Legal company name as it appears on business papers. */
+  /** Legal company name as it appears on business papers. Defaults to store name if blank. */
   legalName: z
     .string()
-    .min(2, "Enter the company name from your business papers")
-    .max(120),
+    .max(120)
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => sanitizeText(value || "", 120)),
   /** Optional for now — collected later during review if needed. */
   ein: z
     .string()
@@ -195,7 +197,12 @@ export const storeJoinApplicationSchema = z.object({
   confirmedLegitimate: z.boolean().refine((v) => v === true, {
     message: "Confirm this is a real store",
   }),
-}).superRefine((value, ctx) => {
+})
+  .transform((value) => ({
+    ...value,
+    legalName: value.legalName || value.businessName,
+  }))
+  .superRefine((value, ctx) => {
   if (
     storeSelectionSuggestsCustomerId({
       businessType: value.businessType,

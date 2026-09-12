@@ -6,10 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Input, Label, Card } from "@/components/ui/primitives";
 import { destinationAfterAuth, isSafeNextPath } from "@/lib/auth/home-path";
-import {
-  AuthAudienceSwitch,
-  AuthSignupLinks,
-} from "@/components/auth/auth-audience";
+import { AuthPageShell } from "@/components/auth/auth-page-shell";
 import { EmailOtpForm } from "@/components/auth/email-otp-form";
 import { completeCustomerFirstNameAction } from "@/lib/services/phone-auth-actions";
 import { useSurfaceHref } from "@/components/host/host-surface";
@@ -36,13 +33,12 @@ function SignupForm() {
 
   if (isStaffInvite) {
     return (
-      <Card className="p-6 sm:p-8">
-        <h1 className="text-2xl font-bold tracking-tight text-ink">
+      <Card className="border-hairline-strong p-6 shadow-[0_12px_40px_rgba(11,11,12,0.06)] sm:p-8">
+        <h1 className="text-[1.75rem] font-bold tracking-tight text-ink">
           Create your staff account
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          Use the email from your invite. We’ll send a 6-digit code. After that,
-          this device stays signed in and you can join the store team.
+          Use the email from your invite. We send a 6-digit code.
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <div>
@@ -53,6 +49,7 @@ function SignupForm() {
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
+              className="mt-1.5"
             />
           </div>
           <div>
@@ -62,6 +59,7 @@ function SignupForm() {
               name="lastName"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
+              className="mt-1.5"
             />
           </div>
         </div>
@@ -102,19 +100,15 @@ function SignupForm() {
   }
 
   return (
-    <Card className="border-hairline-strong p-6 shadow-[0_12px_40px_rgba(11,11,12,0.06)] sm:p-8">
-      <AuthAudienceSwitch
-        audience="shopper"
-        next={next}
-        shopperHref={signupHref}
-        storeHref={joinHref}
-      />
-      <h1 className="mt-6 text-[1.75rem] font-bold tracking-tight text-ink">
-        Create a shopper account
-      </h1>
-      <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Email a 6-digit code. No password. This device stays signed in.
-      </p>
+    <AuthPageShell
+      audience="shopper"
+      intent="create"
+      next={next}
+      shopperHref={signupHref}
+      storeHref={joinHref}
+      title="Create a shopper account"
+      description="We email a 6-digit code. No password."
+    >
       <EmailOtpForm
         createIfMissing
         audience="shopper"
@@ -125,8 +119,7 @@ function SignupForm() {
           router.refresh();
         }}
       />
-      <AuthSignupLinks next={next} />
-    </Card>
+    </AuthPageShell>
   );
 }
 

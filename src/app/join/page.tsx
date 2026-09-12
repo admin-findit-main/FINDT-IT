@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/primitives";
-import { GlassNotice, GlassSelect } from "@/components/ui/glass";
+import { GlassSelect } from "@/components/ui/glass";
 import { BrandHomeLink } from "@/components/brand/logo";
 import { STORE_CATEGORIES, STORE_TRIAL_DAYS } from "@/lib/config/constants";
 import {
@@ -18,7 +18,7 @@ import {
   sendStoreJoinEmailCodeAction,
   submitStoreApplicationAction,
 } from "@/lib/services/actions";
-import { AuthAudienceSwitch } from "@/components/auth/auth-audience";
+import { AuthAudienceSwitch, AuthIntentSwitch } from "@/components/auth/auth-audience";
 import { StoreAddressFields } from "@/components/store/store-address-fields";
 import {
   useMarketingHomeHref,
@@ -55,7 +55,6 @@ export default function JoinAsStorePage() {
 
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
-  const [ownerPhone, setOwnerPhone] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [legalName, setLegalName] = useState("");
   const [businessType, setBusinessType] = useState<string>(STORE_CATEGORIES[0]!);
@@ -91,7 +90,7 @@ export default function JoinAsStorePage() {
     return {
       ownerName,
       ownerEmail,
-      ownerPhone,
+      ownerPhone: "",
       legalName: legalName.trim() || businessName.trim(),
       ein: "",
       entityType: "Other" as const,
@@ -101,7 +100,7 @@ export default function JoinAsStorePage() {
       city: location.city,
       state: location.state,
       postalCode: location.postalCode,
-      phone: phone.trim() || ownerPhone.trim(),
+      phone: phone.trim(),
       website,
       whyLegit: "Pending FINDIT store review.",
       requestCategories:
@@ -116,8 +115,12 @@ export default function JoinAsStorePage() {
       toast.error("Confirm this is a real store to continue");
       return;
     }
-    if (!businessName.trim() || !legalName.trim()) {
-      toast.error("Enter the store name and company name");
+    if (!businessName.trim()) {
+      toast.error("Enter your store name");
+      return;
+    }
+    if (!phone.trim()) {
+      toast.error("Enter the store phone number");
       return;
     }
     if (!ownerName.trim() || !ownerEmail.trim()) {
@@ -259,24 +262,24 @@ export default function JoinAsStorePage() {
         {phase === "form" ? (
           <div className="space-y-5">
             <div>
-              <AuthAudienceSwitch
-                audience="store"
-                shopperHref={shopperSignup}
-                storeHref={joinHref}
-              />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-subtle">
+                Account type
+              </p>
+              <div className="mt-2">
+                <AuthAudienceSwitch
+                  audience="store"
+                  shopperHref={shopperSignup}
+                  storeHref={joinHref}
+                />
+              </div>
+              <AuthIntentSwitch audience="store" intent="create" />
               <h1 className="mt-6 text-3xl font-bold tracking-tight text-ink">
                 Apply your store
               </h1>
               <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-                Short form. We confirm every business before it goes live. No EIN
-                required to start.
+                One short form. We review each business before it goes live.
               </p>
             </div>
-
-            <GlassNotice>
-              Use the storefront name shoppers see, and the company name from your
-              business papers. We will verify details later.
-            </GlassNotice>
 
             <Card className="space-y-5 p-5 sm:p-6">
               <section className="space-y-4">
@@ -287,23 +290,25 @@ export default function JoinAsStorePage() {
                     id="join-store-name"
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
-                    placeholder="What customers call your shop"
+                    placeholder="What customers see"
                     className="mt-1.5"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="join-legal-name">Company name</Label>
+                  <Label htmlFor="join-legal-name">
+                    Company name{" "}
+                    <span className="font-normal text-ink-muted">(optional)</span>
+                  </Label>
                   <Input
                     id="join-legal-name"
                     value={legalName}
                     onChange={(e) => setLegalName(e.target.value)}
-                    placeholder="Legal name on your business papers"
+                    placeholder="Leave blank if same as store name"
                     className="mt-1.5"
-                    required
                   />
                   <p className="mt-1 text-xs text-ink-muted">
-                    The actual company name from your files, not a nickname.
+                    Legal name from your business papers, if different.
                   </p>
                 </div>
                 <div>
@@ -347,16 +352,6 @@ export default function JoinAsStorePage() {
                     required
                   />
                 </div>
-                <div>
-                  <Label htmlFor="join-owner-phone">Phone (optional)</Label>
-                  <Input
-                    id="join-owner-phone"
-                    type="tel"
-                    value={ownerPhone}
-                    onChange={(e) => setOwnerPhone(e.target.value)}
-                    className="mt-1.5"
-                  />
-                </div>
               </section>
 
               <section className="space-y-4 border-t border-hairline-strong pt-5">
@@ -375,19 +370,22 @@ export default function JoinAsStorePage() {
                   }}
                 />
                 <div>
-                  <Label htmlFor="join-phone">Store phone</Label>
+                  <Label htmlFor="join-phone">Phone</Label>
                   <Input
                     id="join-phone"
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Main number for the store"
+                    placeholder="Store phone"
                     className="mt-1.5"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="join-web">Website (optional)</Label>
+                  <Label htmlFor="join-web">
+                    Website{" "}
+                    <span className="font-normal text-ink-muted">(optional)</span>
+                  </Label>
                   <Input
                     id="join-web"
                     value={website}
@@ -406,8 +404,8 @@ export default function JoinAsStorePage() {
                   onChange={(e) => setConfirmed(e.target.checked)}
                 />
                 <span>
-                  This is a real store. FINDIT will review the application before
-                  anything goes live.
+                  This is a real store. FINDIT will review before anything goes
+                  live.
                 </span>
               </label>
 
@@ -421,16 +419,6 @@ export default function JoinAsStorePage() {
                 {loading ? "Sending code…" : "Continue with email code"}
               </Button>
             </Card>
-
-            <p className="text-center text-sm text-ink-muted">
-              Already applied?{" "}
-              <Link
-                href={storeLogin}
-                className="font-semibold text-ink underline-offset-2 hover:underline"
-              >
-                Sign in
-              </Link>
-            </p>
           </div>
         ) : null}
       </main>

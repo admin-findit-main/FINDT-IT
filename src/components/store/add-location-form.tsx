@@ -101,12 +101,15 @@ export function AddLocationForm({
         />
       </div>
       <div>
-        <Label htmlFor="add-legal-name">Company name</Label>
+        <Label htmlFor="add-legal-name">
+          Company name{" "}
+          <span className="font-normal text-ink-muted">(optional)</span>
+        </Label>
         <Input
           id="add-legal-name"
           value={legalName}
           onChange={(e) => setLegalName(e.target.value)}
-          placeholder="Legal name on business papers"
+          placeholder="Leave blank if same as store name"
           className="mt-1.5"
         />
       </div>
@@ -139,7 +142,7 @@ export function AddLocationForm({
         }}
       />
       <div>
-        <Label htmlFor="add-phone">Store phone</Label>
+        <Label htmlFor="add-phone">Phone</Label>
         <Input
           id="add-phone"
           type="tel"

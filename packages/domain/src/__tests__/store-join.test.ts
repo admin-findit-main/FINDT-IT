@@ -69,4 +69,17 @@ describe("store join application", () => {
       parsed.error?.issues.some((issue) => issue.path[0] === "requiresCustomerId")
     ).toBe(true);
   });
+
+  it("fills legalName from businessName when company name is blank", () => {
+    const parsed = storeJoinApplicationSchema.safeParse({
+      ...base,
+      legalName: "",
+      ownerPhone: "",
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.legalName).toBe("Test Hardware Co");
+      expect(parsed.data.ownerPhone).toBe("");
+    }
+  });
 });

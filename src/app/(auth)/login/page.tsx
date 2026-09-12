@@ -2,11 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Card } from "@/components/ui/primitives";
-import {
-  AuthAudienceSwitch,
-  AuthPageLinks,
-} from "@/components/auth/auth-audience";
+import { AuthPageShell } from "@/components/auth/auth-page-shell";
 import { EmailOtpForm } from "@/components/auth/email-otp-form";
 import { GlassNotice } from "@/components/ui/glass";
 import { publicLoginError } from "@/lib/auth/login-error";
@@ -19,14 +15,13 @@ function LoginForm() {
   const error = publicLoginError(params.get("error"));
 
   return (
-    <Card className="border-hairline-strong p-6 shadow-[0_12px_40px_rgba(11,11,12,0.06)] sm:p-8">
-      <AuthAudienceSwitch audience="shopper" next={next} />
-      <h1 className="mt-6 text-[1.75rem] font-bold tracking-tight text-ink">
-        Shopper sign in
-      </h1>
-      <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Email a 6-digit code. This device stays signed in.
-      </p>
+    <AuthPageShell
+      audience="shopper"
+      intent="signin"
+      next={next}
+      title="Shopper sign in"
+      description="We email a 6-digit code. This device stays signed in."
+    >
       {error ? (
         <div className="mt-4">
           <GlassNotice tone="muted">{error}</GlassNotice>
@@ -41,8 +36,7 @@ function LoginForm() {
           router.refresh();
         }}
       />
-      <AuthPageLinks audience="shopper" next={next} />
-    </Card>
+    </AuthPageShell>
   );
 }
 
