@@ -50,6 +50,24 @@ export function isAndroid(env: PwaEnv = liveEnv()): boolean {
   return /Android/i.test(ua(env));
 }
 
+/** Chrome / Chromium on iOS (uses WebKit; install path differs from Safari). */
+export function isIosChrome(env: PwaEnv = liveEnv()): boolean {
+  return isIosDevice(env) && /CriOS/i.test(ua(env));
+}
+
+/** Safari on iOS (not Chrome, Firefox, or Edge). */
+export function isIosSafari(env: PwaEnv = liveEnv()): boolean {
+  if (!isIosDevice(env)) return false;
+  return !/CriOS|FxiOS|EdgiOS|OPiOS|OPT\//i.test(ua(env));
+}
+
+/** Chrome or Chromium-family on Android. */
+export function isAndroidChrome(env: PwaEnv = liveEnv()): boolean {
+  if (!isAndroid(env)) return false;
+  const agent = ua(env);
+  return /Chrome|Chromium|EdgA/i.test(agent) && !/OPR\//i.test(agent);
+}
+
 /** True when FINDIT is running as an installed PWA, not a regular browser tab. */
 export function isStandaloneDisplay(env: PwaEnv = liveEnv()): boolean {
   return Boolean(
@@ -79,6 +97,7 @@ export function supportsPWAInstallPrompt(): boolean {
 export type InstallSurface =
   | "standalone"
   | "ios-safari"
+  | "ios-chrome"
   | "android-prompt"
   | "android-manual"
   | "desktop";
@@ -94,6 +113,7 @@ export function getInstallSurface(
   env: PwaEnv = liveEnv()
 ): InstallSurface {
   if (isStandaloneDisplay(env)) return "standalone";
+  if (isIosChrome(env)) return "ios-chrome";
   if (isIosDevice(env)) return "ios-safari";
   if (canNativePrompt) return "android-prompt";
   if (isAndroid(env)) return "android-manual";

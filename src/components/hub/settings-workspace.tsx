@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, LogOut, Unplug } from "lucide-react";
+import { ArrowLeft, ExternalLink, Unplug } from "lucide-react";
 import { PUBLIC_SUPPORT_EMAIL } from "@/lib/config/support";
 
 function Row({
@@ -26,10 +26,10 @@ export function HubSettingsWorkspace({
   employeeName,
   canPair,
   canClockOut,
-  canSignOut,
+  canLeaveHub,
   onPair,
   onClockOut,
-  onSignOut,
+  onLeaveHub,
 }: {
   storeName: string;
   deviceName: string | null;
@@ -38,10 +38,10 @@ export function HubSettingsWorkspace({
   employeeName: string | null;
   canPair: boolean;
   canClockOut: boolean;
-  canSignOut: boolean;
+  canLeaveHub: boolean;
   onPair: () => void;
   onClockOut: () => Promise<void>;
-  onSignOut: () => Promise<void>;
+  onLeaveHub: () => void;
 }) {
   return (
     <section className="mx-auto w-full max-w-4xl px-6 py-8 md:px-10 md:py-10">
@@ -94,17 +94,22 @@ export function HubSettingsWorkspace({
             Clock out
           </button>
         ) : null}
-        {canSignOut ? (
+        {canLeaveHub ? (
           <button
             type="button"
-            onClick={() => void onSignOut()}
+            onClick={onLeaveHub}
             className="flex min-h-14 items-center justify-center gap-2 rounded-xl bg-[#171315] px-5 text-sm font-bold text-white"
           >
-            <LogOut className="h-4 w-4" />
-            Sign out
+            <ArrowLeft className="h-4 w-4" />
+            Back to home
           </button>
         ) : null}
       </div>
+      {canLeaveHub ? (
+        <p className="mt-3 text-sm text-[#81797C]">
+          Leaves Hub and returns to FINDIT Business. You stay signed in.
+        </p>
+      ) : null}
     </section>
   );
 }

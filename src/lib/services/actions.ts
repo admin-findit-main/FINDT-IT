@@ -2130,11 +2130,42 @@ export async function getNotificationsAction(): Promise<Notification[]> {
   if (!user) return [];
   const { data } = await supabase
     .from("notifications")
-    .select("id, user_id, type, title, body, related_request_id, related_store_id, read_at, created_at")
+    .select(
+      "id, user_id, type, title, body, related_request_id, related_store_id, read_at, created_at, store:stores(id, name, slug, logo_url, street_address, city, state, postal_code)"
+    )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(40);
-  return (data || []) as Notification[];
+  return (data || []).map((row) => {
+    const store = Array.isArray(row.store) ? row.store[0] : row.store;
+    return { ...row, store: store || null } as Notification;
+  });
+}
+
+export async function getNotificationDetailAction(id: string) {
+  const noteId = boundUuid(id);
+  if (!noteId) return null;
+  const profile = await getCurrentProfile();
+  if (!profile) return null;
+  if (isDemoMode()) {
+    const note = getDemoState().notifications.find(
+      (n) => n.id === noteId && n.user_id === profile.id
+    );
+    return note || null;
+  }
+  const { supabase, user } = await getSupabaseUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("notifications")
+    .select(
+      "id, user_id, type, title, body, related_request_id, related_store_id, read_at, created_at, store:stores(id, name, slug, logo_url, street_address, city, state, postal_code)"
+    )
+    .eq("id", noteId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!data) return null;
+  const store = Array.isArray(data.store) ? data.store[0] : data.store;
+  return { ...data, store: store || null } as Notification;
 }
 
 export async function markNotificationReadAction(id: string) {
@@ -2419,9 +2450,71 @@ export async function updateProfileAction(input: {
   notifyCanOrder?: boolean;
   notifyRequestExpired?: boolean;
   notifyStorePromotions?: boolean;
+  birthMonth?: number | null;
+  birthDay?: number | null;
+  birthYear?: number | null;
+  shareBirthdayWithStores?: boolean;
 }) {
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Unauthorized" };
+
+  const birthMonth =
+    input.birthMonth === undefined
+      ? undefined
+      : input.birthMonth === null
+        ? null
+        : Math.trunc(input.birthMonth);
+  const birthDay =
+    input.birthDay === undefined
+      ? undefined
+      : input.birthDay === null
+        ? null
+        : Math.trunc(input.birthDay);
+  const birthYear =
+    input.birthYear === undefined
+      ? undefined
+      : input.birthYear === null
+        ? null
+        : Math.trunc(input.birthYear);
+
+  if (birthMonth !== undefined && birthMonth !== null) {
+    if (birthMonth < 1 || birthMonth > 12) {
+      return { error: "Enter a valid birthday month." };
+    }
+  }
+  if (birthDay !== undefined && birthDay !== null) {
+    if (birthDay < 1 || birthDay > 31) {
+      return { error: "Enter a valid birthday day." };
+    }
+  }
+  if (birthYear !== undefined && birthYear !== null) {
+    const yearNow = new Date().getFullYear();
+    if (birthYear < 1900 || birthYear > yearNow) {
+      return { error: "Enter a valid birth year." };
+    }
+  }
+  if (
+    (birthMonth === null && birthDay != null && birthDay !== undefined) ||
+    (birthDay === null && birthMonth != null && birthMonth !== undefined)
+  ) {
+    return { error: "Add both birthday month and day, or clear both." };
+  }
+  if (
+    birthMonth !== undefined &&
+    birthDay !== undefined &&
+    birthMonth !== null &&
+    birthDay !== null
+  ) {
+    const probe = new Date(
+      Date.UTC(birthYear || 2000, birthMonth - 1, birthDay)
+    );
+    if (
+      probe.getUTCMonth() !== birthMonth - 1 ||
+      probe.getUTCDate() !== birthDay
+    ) {
+      return { error: "That birthday date isn’t valid." };
+    }
+  }
 
   if (isDemoMode()) {
     if (input.firstName !== undefined) profile.first_name = input.firstName;
@@ -2435,25 +2528,38 @@ export async function updateProfileAction(input: {
       profile.notify_request_expired = input.notifyRequestExpired;
     if (input.notifyStorePromotions !== undefined)
       profile.notify_store_promotions = input.notifyStorePromotions;
+    if (birthMonth !== undefined) profile.birth_month = birthMonth;
+    if (birthDay !== undefined) profile.birth_day = birthDay;
+    if (birthYear !== undefined) profile.birth_year = birthYear;
+    if (input.shareBirthdayWithStores !== undefined) {
+      profile.share_birthday_with_stores = input.shareBirthdayWithStores;
+    }
     profile.updated_at = new Date().toISOString();
     return { profile };
   }
 
   const { supabase, user } = await getSupabaseUser();
   if (!user) return { error: "Unauthorized" };
+  const patch: Record<string, unknown> = {
+    first_name: input.firstName,
+    last_name: input.lastName,
+    default_city: input.city,
+    default_state: input.state,
+    default_postal_code: input.postalCode,
+    notify_in_stock: input.notifyInStock,
+    notify_can_order: input.notifyCanOrder,
+    notify_request_expired: input.notifyRequestExpired,
+    notify_store_promotions: input.notifyStorePromotions,
+  };
+  if (birthMonth !== undefined) patch.birth_month = birthMonth;
+  if (birthDay !== undefined) patch.birth_day = birthDay;
+  if (birthYear !== undefined) patch.birth_year = birthYear;
+  if (input.shareBirthdayWithStores !== undefined) {
+    patch.share_birthday_with_stores = input.shareBirthdayWithStores;
+  }
   const { data, error } = await supabase
     .from("profiles")
-    .update({
-      first_name: input.firstName,
-      last_name: input.lastName,
-      default_city: input.city,
-      default_state: input.state,
-      default_postal_code: input.postalCode,
-      notify_in_stock: input.notifyInStock,
-      notify_can_order: input.notifyCanOrder,
-      notify_request_expired: input.notifyRequestExpired,
-      notify_store_promotions: input.notifyStorePromotions,
-    })
+    .update(patch)
     .eq("id", user.id)
     .select("*")
     .single();
@@ -3859,6 +3965,7 @@ export async function updateStoreProfileAction(
     description?: string | null;
     phone?: string | null;
     website?: string | null;
+    logoUrl?: string | null;
     streetAddress?: string;
     city?: string;
     state?: string;
@@ -3887,6 +3994,16 @@ export async function updateStoreProfileAction(
   if (input.description !== undefined) patch.description = input.description;
   if (input.phone !== undefined) patch.phone = input.phone;
   if (input.website !== undefined) patch.website = input.website;
+  if (input.logoUrl !== undefined) {
+    const logo = (input.logoUrl || "").trim();
+    if (!logo) {
+      patch.logo_url = null;
+    } else if (!/^https:\/\//i.test(logo) || logo.length > 500) {
+      return { error: "Logo must be an https:// image link." };
+    } else {
+      patch.logo_url = logo;
+    }
+  }
   if (
     input.streetAddress != null ||
     input.city != null ||

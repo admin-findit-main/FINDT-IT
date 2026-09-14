@@ -138,6 +138,7 @@ export default function StoreSettingsPage() {
   const [description, setDescription] = useState("");
   const [phone, setPhone] = useState("");
   const [website, setWebsite] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
   const [region, setRegion] = useState("");
@@ -182,6 +183,7 @@ export default function StoreSettingsPage() {
         setDescription(settings.store.description || "");
         setPhone(settings.store.phone || "");
         setWebsite(settings.store.website || "");
+        setLogoUrl(settings.store.logo_url || "");
         setStreet(settings.store.street_address || "");
         setCity(settings.store.city || "");
         setRegion(settings.store.state || "");
@@ -263,6 +265,7 @@ export default function StoreSettingsPage() {
       description,
       phone,
       website,
+      logoUrl,
       streetAddress: street,
       city,
       state: region,
@@ -378,6 +381,23 @@ export default function StoreSettingsPage() {
                   onChange={(e) => setWebsite(e.target.value)}
                   className="mt-1.5"
                 />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="store-logo">
+                  Logo link{" "}
+                  <span className="font-normal text-ink-muted">(optional)</span>
+                </Label>
+                <Input
+                  id="store-logo"
+                  value={logoUrl}
+                  disabled={!canManage}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  placeholder="https://…"
+                  className="mt-1.5"
+                />
+                <p className="mt-1 text-xs text-ink-muted">
+                  Public https image. Shows on customer alerts so shoppers recognize your store.
+                </p>
               </div>
               <div className="sm:col-span-2">
                 <StoreAddressFields

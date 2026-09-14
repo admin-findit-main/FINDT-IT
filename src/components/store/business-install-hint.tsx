@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AddToHomeGuide } from "@/components/shared/add-to-home-guide";
 import {
   getInstallSurface,
-  isIosDevice,
   isStandaloneDisplay,
   shouldHoldForHomeScreen,
 } from "@/lib/pwa";
@@ -41,6 +41,7 @@ function writeDismissed() {
 export function BusinessInstallHint() {
   const { canInstall, promptInstall } = usePwaInstall();
   const [visible, setVisible] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [surface, setSurface] = useState(getInstallSurface(false));
 
   useEffect(() => {
@@ -49,8 +50,11 @@ export function BusinessInstallHint() {
       return;
     }
     if (!shouldHoldForHomeScreen() && !canInstall) {
-      setVisible(false);
-      return;
+      // Still show a light desktop hint when install prompt exists.
+      if (!canInstall) {
+        setVisible(false);
+        return;
+      }
     }
     setSurface(getInstallSurface(canInstall));
     setVisible(!readDismissed());
@@ -70,23 +74,41 @@ export function BusinessInstallHint() {
       setVisible(false);
       return;
     }
-    if (result !== "unavailable") dismiss();
+    if (result === "unavailable") {
+      setExpanded(true);
+      return;
+    }
+    setExpanded(true);
   }
 
-  const ios = surface === "ios-safari" || isIosDevice();
+  const showNativeInstall =
+    surface === "android-prompt" || (surface === "desktop" && canInstall);
 
   return (
     <div className="mb-4 rounded-2xl border border-hairline-strong bg-white px-4 py-4 shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
-      <p className="text-sm font-semibold text-ink">Open like an app</p>
+      <p className="text-sm font-semibold text-ink">Open FINDIT Business like an app</p>
       <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-        {ios
-          ? "You’re in Safari. Tap Share → Add to Home Screen so FINDIT Business opens full-screen without the browser bar and tab buttons."
-          : "Install FINDIT Business to hide the browser bar and open it like the customer app."}
+        Add it to your Home Screen so the browser bar and tabs stay out of the way.
       </p>
+
+      {expanded ? (
+        <div className="mt-3">
+          <AddToHomeGuide
+            surface={surface}
+            productName="FINDIT Business"
+          />
+        </div>
+      ) : null}
+
       <div className="mt-3 flex flex-wrap gap-2">
-        {surface === "android-prompt" || canInstall ? (
+        {showNativeInstall ? (
           <Button type="button" size="sm" onClick={() => void install()}>
             Install
+          </Button>
+        ) : null}
+        {!expanded ? (
+          <Button type="button" size="sm" variant="outline" onClick={() => setExpanded(true)}>
+            Show me where
           </Button>
         ) : null}
         <Button type="button" size="sm" variant="ghost" onClick={dismiss}>

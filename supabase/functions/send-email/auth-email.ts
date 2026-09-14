@@ -1,5 +1,5 @@
 /** Transactional FINDIT auth email copy + HTML. Keep in lockstep with
- * `supabase/functions/send-email/auth-email.ts`. */
+ * `../../../../supabase/functions/send-email/auth-email.ts`. */
 
 export type AuthEmailAction = string;
 
@@ -28,6 +28,41 @@ export function escapeHtml(value: string): string {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+/** Escape body copy and preserve line breaks for HTML email clients. */
+export function formatEmailBodyHtml(body: string): string {
+  return escapeHtml(body).replace(/\r\n|\r|\n/g, "<br>");
+}
+
+export type EmailDetailRow = { label: string; value: string };
+
+function formatEmailDetailsHtml(details: EmailDetailRow[] | undefined): string {
+  if (!details?.length) return "";
+  const rows = details
+    .filter((row) => row.label.trim() && row.value.trim())
+    .map(
+      (row) =>
+        `<tr>
+          <td style="padding:8px 0;border-top:1px solid #ECECEF;font-size:13px;line-height:1.45;color:#6E6E78;width:34%;vertical-align:top;">${escapeHtml(row.label)}</td>
+          <td style="padding:8px 0;border-top:1px solid #ECECEF;font-size:15px;line-height:1.45;color:#0B0B0C;vertical-align:top;">${formatEmailBodyHtml(row.value)}</td>
+        </tr>`
+    )
+    .join("");
+  if (!rows) return "";
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:20px 0 0;border-collapse:collapse;">${rows}</table>`;
+}
+
+function formatEmailDetailsText(details: EmailDetailRow[] | undefined): string {
+  if (!details?.length) return "";
+  return (
+    "\n" +
+    details
+      .filter((row) => row.label.trim() && row.value.trim())
+      .map((row) => `${row.label}: ${row.value}`)
+      .join("\n") +
+    "\n"
+  );
 }
 
 /** First 4–8 digit Auth OTP in the payload. Hashes and magic-link tokens are ignored. */
@@ -156,6 +191,7 @@ export function renderFinditEmailHtml(input: {
   footnote: string;
   firstName?: string | null;
   code?: string | null;
+  details?: EmailDetailRow[];
 }): string {
   const greeting = input.firstName?.trim()
     ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.5;color:#2E2E34;">Hi ${escapeHtml(input.firstName.trim())},</p>`
@@ -171,6 +207,7 @@ export function renderFinditEmailHtml(input: {
     ? `<p style="margin:24px 0 6px;font-size:13px;line-height:1.4;color:#6E6E78;text-align:center;">Your code</p>
         <p style="margin:0 0 8px;font-size:36px;line-height:1.2;font-weight:700;color:#0B0B0C;text-align:center;font-family:Menlo,Consolas,'Courier New',monospace;">${escapeHtml(input.code)}</p>`
     : "";
+  const details = formatEmailDetailsHtml(input.details);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -194,14 +231,15 @@ export function renderFinditEmailHtml(input: {
             <td style="background:#FFFFFF;border:1px solid #E2E2E6;border-radius:20px;padding:36px 32px;">
               ${greeting}
               <h1 style="margin:0 0 12px;font-size:24px;line-height:1.25;color:#0B0B0C;font-weight:700;">${escapeHtml(input.heading)}</h1>
-              <p style="margin:0;font-size:16px;line-height:1.6;color:#4A4A52;">${escapeHtml(input.body)}</p>
+              <p style="margin:0;font-size:16px;line-height:1.6;color:#4A4A52;">${formatEmailBodyHtml(input.body)}</p>
+              ${details}
               ${code}
               ${button}
             </td>
           </tr>
           <tr>
             <td style="padding:24px 8px 0;font-size:12px;line-height:1.6;color:#6E6E78;">
-              ${escapeHtml(input.footnote)}<br><br>
+              ${formatEmailBodyHtml(input.footnote)}<br><br>
               FINDIT · ask nearby stores if they have it<br>
               <a href="${APP_URL_FALLBACK}" style="color:#6E6E78;">askfindit.com</a>
             </td>
@@ -221,9 +259,11 @@ export function renderFinditEmailText(input: {
   footnote: string;
   firstName?: string | null;
   code?: string | null;
+  details?: EmailDetailRow[];
 }): string {
   const hi = input.firstName?.trim() ? `Hi ${input.firstName.trim()},\n\n` : "";
   const code = input.code ? `\n\nCode: ${input.code}\n` : "";
   const link = input.buttonUrl ? `\n\n${input.buttonUrl}\n` : "";
-  return `${hi}${input.heading}\n\n${input.body}${code}${link}\n${input.footnote}\n\nFINDIT · https://askfindit.com\n`;
+  const details = formatEmailDetailsText(input.details);
+  return `${hi}${input.heading}\n\n${input.body}${details}${code}${link}\n${input.footnote}\n\nFINDIT · https://www.askfindit.com\n`;
 }

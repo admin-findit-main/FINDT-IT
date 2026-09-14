@@ -1096,64 +1096,201 @@ function decodeCursor(value?: string): CustomerCursor | null {
   }
 }
 
-export async function getStoreCustomersAction(cursorValue?: string) {
+export type StoreCustomerVisitFilter =
+  | "all"
+  | "recent_7"
+  | "recent_30"
+  | "inactive_7"
+  | "inactive_14"
+  | "inactive_17"
+  | "inactive_30"
+  | "inactive_60"
+  | "birthday_month";
+
+export type StoreCustomerSort =
+  | "last_seen_desc"
+  | "last_seen_asc"
+  | "points_desc"
+  | "purchases_desc";
+
+export type StoreCustomerRow = {
+  id: string;
+  displayName: string;
+  pointsBalance: number;
+  lifetimePoints: number;
+  confirmedPurchases: number;
+  marketingOptIn: boolean;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  daysSinceVisit: number;
+  birthdayLabel: string | null;
+  birthdayThisMonth: boolean;
+};
+
+export type StoreCustomersQuery = {
+  cursor?: string;
+  q?: string;
+  visit?: StoreCustomerVisitFilter;
+  sort?: StoreCustomerSort;
+};
+
+function daysAgoIso(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+function daysSince(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 0;
+  return Math.floor(ms / (24 * 60 * 60 * 1000));
+}
+
+function birthdayLabel(month: number | null | undefined, day: number | null | undefined) {
+  if (!month || !day) return null;
+  const date = new Date(Date.UTC(2000, month - 1, day));
+  if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+export async function getStoreCustomersAction(input?: StoreCustomersQuery | string) {
+  const queryInput: StoreCustomersQuery =
+    typeof input === "string" ? { cursor: input } : input || {};
   const profile = await getCurrentProfile();
   const workspace = await getStoreWorkspaceAction();
   if (!profile || !workspace?.store?.id || !workspace.canManageStore) {
-    return { error: "Only owners and managers can view customers.", rows: [], nextCursor: null };
+    return {
+      error: "Only owners and managers can view customers.",
+      rows: [] as StoreCustomerRow[],
+      nextCursor: null as string | null,
+      totalMatched: 0,
+    };
   }
-  if (isDemoMode()) return { rows: [], nextCursor: null };
+  if (isDemoMode()) {
+    return { rows: [] as StoreCustomerRow[], nextCursor: null, totalMatched: 0 };
+  }
 
-  const cursor = decodeCursor(cursorValue);
+  const visit = queryInput.visit || "all";
+  const sort = queryInput.sort || "last_seen_desc";
+  const q = (queryInput.q || "").trim().slice(0, 60);
+  const cursor = decodeCursor(queryInput.cursor);
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  let query = admin
+  const now = new Date();
+  const monthNow = now.getMonth() + 1;
+
+  let db = admin
     .from("store_customers")
     .select(
-      "id, points_balance, lifetime_points, confirmed_purchases, marketing_opt_in, first_seen_at, last_seen_at, customer:profiles(first_name, display_name)"
+      "id, points_balance, lifetime_points, confirmed_purchases, marketing_opt_in, first_seen_at, last_seen_at, customer:profiles!inner(first_name, display_name, birth_month, birth_day, share_birthday_with_stores)"
     )
     .eq("store_id", workspace.store.id)
     .is("removed_at", null)
-    .not("customer_id", "is", null)
-    .order("last_seen_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(CUSTOMER_PAGE_SIZE + 1);
+    .not("customer_id", "is", null);
 
-  if (cursor) {
-    query = query.or(
+  if (visit === "recent_7") {
+    db = db.gte("last_seen_at", daysAgoIso(7));
+  } else if (visit === "recent_30") {
+    db = db.gte("last_seen_at", daysAgoIso(30));
+  } else if (visit === "inactive_7") {
+    db = db.lt("last_seen_at", daysAgoIso(7));
+  } else if (visit === "inactive_14") {
+    db = db.lt("last_seen_at", daysAgoIso(14));
+  } else if (visit === "inactive_17") {
+    db = db.lt("last_seen_at", daysAgoIso(17));
+  } else if (visit === "inactive_30") {
+    db = db.lt("last_seen_at", daysAgoIso(30));
+  } else if (visit === "inactive_60") {
+    db = db.lt("last_seen_at", daysAgoIso(60));
+  } else if (visit === "birthday_month") {
+    db = db
+      .eq("customer.share_birthday_with_stores", true)
+      .eq("customer.birth_month", monthNow);
+  }
+
+  if (q) {
+    const safe = q.replace(/[%_,]/g, " ").trim();
+    if (safe) {
+      db = db.or(
+        `first_name.ilike.%${safe}%,display_name.ilike.%${safe}%`,
+        { referencedTable: "profiles" }
+      );
+    }
+  }
+
+  if (sort === "last_seen_asc") {
+    db = db.order("last_seen_at", { ascending: true }).order("id", { ascending: true });
+  } else if (sort === "points_desc") {
+    db = db
+      .order("points_balance", { ascending: false })
+      .order("last_seen_at", { ascending: false })
+      .order("id", { ascending: false });
+  } else if (sort === "purchases_desc") {
+    db = db
+      .order("confirmed_purchases", { ascending: false })
+      .order("last_seen_at", { ascending: false })
+      .order("id", { ascending: false });
+  } else {
+    db = db.order("last_seen_at", { ascending: false }).order("id", { ascending: false });
+  }
+
+  // Keyset pagination only for the default browse path.
+  const paginateDefault =
+    sort === "last_seen_desc" && visit === "all" && !q;
+  const pageSize = paginateDefault ? CUSTOMER_PAGE_SIZE : 100;
+
+  if (cursor && paginateDefault) {
+    db = db.or(
       `last_seen_at.lt.${cursor.at},and(last_seen_at.eq.${cursor.at},id.lt.${cursor.id})`
     );
   }
 
-  const { data, error } = await query;
+  db = db.limit(pageSize + 1);
+
+  const { data, error } = await db;
   if (error) {
-    return { error: "Could not load customers.", rows: [], nextCursor: null };
+    return {
+      error: "Could not load customers.",
+      rows: [] as StoreCustomerRow[],
+      nextCursor: null,
+      totalMatched: 0,
+    };
   }
   const all = data || [];
-  const hasMore = all.length > CUSTOMER_PAGE_SIZE;
-  const page = all.slice(0, CUSTOMER_PAGE_SIZE);
+  const hasMore = all.length > pageSize;
+  const page = all.slice(0, pageSize);
   const last = page[page.length - 1];
 
+  const rows: StoreCustomerRow[] = page.map((row) => {
+    const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+    const shared = Boolean(customer?.share_birthday_with_stores);
+    const month = shared ? customer?.birth_month ?? null : null;
+    const day = shared ? customer?.birth_day ?? null : null;
+    const label = birthdayLabel(month, day);
+    return {
+      id: row.id,
+      displayName: safeCustomerName(customer || {}),
+      pointsBalance: row.points_balance,
+      lifetimePoints: row.lifetime_points,
+      confirmedPurchases: row.confirmed_purchases,
+      marketingOptIn: row.marketing_opt_in,
+      firstSeenAt: row.first_seen_at,
+      lastSeenAt: row.last_seen_at,
+      daysSinceVisit: daysSince(row.last_seen_at),
+      birthdayLabel: label,
+      birthdayThisMonth: Boolean(month && month === monthNow),
+    };
+  });
+
   return {
-    rows: page.map((row) => {
-      const customer = Array.isArray(row.customer)
-        ? row.customer[0]
-        : row.customer;
-      return {
-        id: row.id,
-        displayName: safeCustomerName(customer || {}),
-        pointsBalance: row.points_balance,
-        lifetimePoints: row.lifetime_points,
-        confirmedPurchases: row.confirmed_purchases,
-        marketingOptIn: row.marketing_opt_in,
-        firstSeenAt: row.first_seen_at,
-        lastSeenAt: row.last_seen_at,
-      };
-    }),
+    rows,
     nextCursor:
-      hasMore && last
+      hasMore && last && paginateDefault
         ? encodeCursor({ at: last.last_seen_at, id: last.id })
         : null,
+    totalMatched: rows.length + (hasMore ? 1 : 0),
   };
 }
 

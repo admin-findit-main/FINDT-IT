@@ -87,6 +87,14 @@ export interface Profile {
   notify_demand_alerts: boolean;
   /** Global store-promotion preference; store-scoped consent is separate. */
   notify_store_promotions: boolean;
+  /** Optional birthday month 1–12. Shared with stores only when opted in. */
+  birth_month: number | null;
+  /** Optional birthday day 1–31. */
+  birth_day: number | null;
+  /** Optional birth year. Not shown to stores for specials. */
+  birth_year: number | null;
+  /** When true, linked stores may see month/day for birthday specials. */
+  share_birthday_with_stores: boolean;
   is_suspended: boolean;
   created_at: string;
   updated_at: string;
@@ -100,6 +108,8 @@ export interface Store {
   description: string | null;
   phone: string | null;
   website: string | null;
+  /** Optional public HTTPS logo for customer-facing alerts. */
+  logo_url?: string | null;
   street_address: string;
   city: string;
   state: string;
@@ -274,6 +284,17 @@ export interface Notification {
   related_store_id: string | null;
   read_at: string | null;
   created_at: string;
+  /** Joined for customer inbox when related_store_id is set. */
+  store?: {
+    id: string;
+    name: string;
+    slug: string;
+    logo_url: string | null;
+    street_address: string;
+    city: string;
+    state: string;
+    postal_code: string;
+  } | null;
 }
 
 export interface StoreWithRelations extends Store {

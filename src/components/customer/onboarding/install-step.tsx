@@ -1,55 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Plus, Share } from "lucide-react";
+import { Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AddToHomeGuide } from "@/components/shared/add-to-home-guide";
 import { usePwaInstall } from "@/lib/pwa-install";
 import { trackShopperOnboardingEventAction } from "@/lib/services/onboarding-actions";
 import { isStandaloneDisplay, type InstallSurface } from "@/lib/pwa";
-
-function IosShareGlyph({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="none">
-      <path
-        d="M12 3v11"
-        stroke="currentColor"
-        strokeWidth="2.15"
-        strokeLinecap="round"
-      />
-      <path
-        d="M8.2 6.8 12 3l3.8 3.8"
-        stroke="currentColor"
-        strokeWidth="2.15"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6.5 10.5v8A2.5 2.5 0 0 0 9 21h6a2.5 2.5 0 0 0 2.5-2.5v-8"
-        stroke="currentColor"
-        strokeWidth="2.15"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-const IOS_STEPS = [
-  {
-    icon: IosShareGlyph,
-    title: "Tap the Share button",
-    body: "It’s the square with the arrow pointing up, at the bottom of Safari.",
-  },
-  {
-    icon: Plus,
-    title: "Select Add to Home Screen",
-    body: "Scroll the share sheet if you need to — then tap it.",
-  },
-  {
-    icon: Check,
-    title: "Tap Add",
-    body: "FINDIT appears on your Home Screen, just like an app.",
-  },
-] as const;
 
 export function InstallStep({
   surface,
@@ -128,7 +85,7 @@ export function InstallStep({
     );
   }
 
-  if (surface === "ios-safari") {
+  if (surface === "ios-safari" || surface === "ios-chrome") {
     return (
       <div className="flex flex-1 flex-col">
         <div className="flex flex-1 flex-col justify-center">
@@ -136,35 +93,13 @@ export function InstallStep({
             Keep FINDIT one tap away
           </h1>
           <p className="mt-4 text-base leading-relaxed text-ink-muted">
-            Add FINDIT to your Home Screen so it opens just like an app.
+            {surface === "ios-chrome"
+              ? "You’re in Chrome on iPhone. Follow the steps below — or open this page in Safari for the classic Share button."
+              : "Add FINDIT to your Home Screen so it opens just like an app."}
           </p>
-          <ol className="mt-8 space-y-5">
-            {IOS_STEPS.map((step, index) => {
-              const Icon = step.icon;
-              return (
-                <li key={step.title} className="flex items-start gap-4">
-                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-ink shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
-                    {index === 0 ? (
-                      <IosShareGlyph className="h-6 w-6" />
-                    ) : (
-                      <Icon className="h-5 w-5" strokeWidth={2.1} aria-hidden />
-                    )}
-                  </span>
-                  <span className="pt-1">
-                    <span className="block text-[11px] font-semibold tracking-[0.14em] text-ink-muted">
-                      {index + 1}
-                    </span>
-                    <span className="mt-0.5 block text-[1.05rem] font-semibold leading-snug text-ink">
-                      {step.title}
-                    </span>
-                    <span className="mt-1 block text-sm leading-relaxed text-ink-muted">
-                      {step.body}
-                    </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+          <div className="mt-8">
+            <AddToHomeGuide surface={surface} productName="FINDIT" />
+          </div>
         </div>
         <div className="mt-8 space-y-2">
           <Button type="button" size="xl" className="w-full" onClick={added}>
@@ -249,9 +184,9 @@ export function InstallStep({
           <p className="mt-4 text-base leading-relaxed text-ink-muted">
             Get faster access and use FINDIT like an app.
           </p>
-          <p className="mt-6 text-base leading-relaxed text-ink-muted">
-            Open your browser menu and choose Add to Home screen or Install app.
-          </p>
+          <div className="mt-8">
+            <AddToHomeGuide surface={surface} productName="FINDIT" />
+          </div>
         </div>
         <div className="mt-8 space-y-2">
           <Button type="button" size="xl" className="w-full" onClick={added}>

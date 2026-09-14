@@ -6,7 +6,6 @@ import { isRequestExpired } from "@findit/domain";
 import {
   markStoreRequestOpenedAction,
   respondToRequestAction,
-  signOutAction,
 } from "@/lib/services/actions";
 import {
   resolveHubTerminalAction,
@@ -388,9 +387,8 @@ export default function FinditHubPage() {
     setShiftLocked(true);
   }
 
-  async function signOut() {
-    await signOutAction();
-    router.replace("/login/business");
+  async function leaveHub() {
+    router.replace("/store");
   }
 
   if (shiftLocked !== false) {
@@ -488,10 +486,10 @@ export default function FinditHubPage() {
               employeeName={shiftName}
               canPair={!deviceId}
               canClockOut={Boolean(deviceId && shiftName)}
-              canSignOut={source === "member"}
+              canLeaveHub={source === "member"}
               onPair={() => goToLinking(deviceIssue)}
               onClockOut={clockOut}
-              onSignOut={signOut}
+              onLeaveHub={leaveHub}
             />
           ) : null}
         </main>

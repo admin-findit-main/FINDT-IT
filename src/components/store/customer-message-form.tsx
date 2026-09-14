@@ -45,10 +45,11 @@ export function StoreCustomerMessageForm({
       <div>
         <p className="text-sm font-semibold text-ink">Message your customers</p>
         <p className="mt-1 text-sm text-ink-muted">
-          Sends an in-app / push alert to shoppers linked to{" "}
-          <span className="font-medium text-ink">{storeName}</span> who have FINDIT
-          alerts installed. Phone-only Hub rows and suspended accounts are
-          skipped.
+          FINDIT brands each alert with{" "}
+          <span className="font-medium text-ink">{storeName}</span> and your
+          store address so shoppers know it came from you — not every FINDIT
+          store. Reachable shoppers need alerts installed on their phone or
+          Home Screen app.
         </p>
         <p className="mt-2 text-xs text-ink-subtle">
           Reachable now:{" "}

@@ -90,6 +90,90 @@ export default function ProfilePage() {
             verification is available.
           </p>
         </div>
+        <div className="space-y-3 border-t border-hairline-strong pt-4">
+          <div>
+            <Label>Birthday (optional)</Label>
+            <p className="mb-2 text-xs text-ink-muted">
+              Add your birthday so stores can offer birthday specials. They only
+              see the month and day if you share it below.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label htmlFor="birth-month" className="text-xs text-ink-muted">
+                  Month
+                </Label>
+                <Input
+                  id="birth-month"
+                  inputMode="numeric"
+                  placeholder="MM"
+                  value={profile.birth_month ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+                    setProfile({
+                      ...profile,
+                      birth_month: raw ? Number(raw) : null,
+                    });
+                  }}
+                />
+              </div>
+              <div>
+                <Label htmlFor="birth-day" className="text-xs text-ink-muted">
+                  Day
+                </Label>
+                <Input
+                  id="birth-day"
+                  inputMode="numeric"
+                  placeholder="DD"
+                  value={profile.birth_day ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+                    setProfile({
+                      ...profile,
+                      birth_day: raw ? Number(raw) : null,
+                    });
+                  }}
+                />
+              </div>
+              <div>
+                <Label htmlFor="birth-year" className="text-xs text-ink-muted">
+                  Year
+                </Label>
+                <Input
+                  id="birth-year"
+                  inputMode="numeric"
+                  placeholder="YYYY"
+                  value={profile.birth_year ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+                    setProfile({
+                      ...profile,
+                      birth_year: raw ? Number(raw) : null,
+                    });
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={Boolean(profile.share_birthday_with_stores)}
+            onClick={() =>
+              setProfile({
+                ...profile,
+                share_birthday_with_stores: !profile.share_birthday_with_stores,
+              })
+            }
+            className="flex min-h-12 w-full items-center justify-between gap-4 text-left text-sm"
+          >
+            <span>Share birthday with stores I shop at</span>
+            <IosSwitch
+              decorative
+              label="Share birthday with stores"
+              checked={Boolean(profile.share_birthday_with_stores)}
+            />
+          </button>
+        </div>
         <div>
           <Label>Place</Label>
           <p className="mb-2 text-xs text-ink-subtle">
@@ -182,6 +266,10 @@ export default function ProfilePage() {
                 notifyCanOrder: profile.notify_can_order,
                 notifyRequestExpired: profile.notify_request_expired,
                 notifyStorePromotions: profile.notify_store_promotions,
+                birthMonth: profile.birth_month,
+                birthDay: profile.birth_day,
+                birthYear: profile.birth_year,
+                shareBirthdayWithStores: profile.share_birthday_with_stores,
               }),
               saveShopperPhoneAction(phone),
             ]);

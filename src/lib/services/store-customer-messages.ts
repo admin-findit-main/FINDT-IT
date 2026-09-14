@@ -13,6 +13,43 @@ import { consumeRateLimit } from "@/lib/security/rate-limit";
 const TITLE_MAX = 80;
 const BODY_MAX = 240;
 
+function formatStoreAddress(store: {
+  street_address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postal_code?: string | null;
+}) {
+  const street = (store.street_address || "").trim();
+  const city = (store.city || "").trim();
+  const state = (store.state || "").trim();
+  const zip = (store.postal_code || "").trim();
+  const cityLine = [city, state].filter(Boolean).join(", ");
+  const withZip = [cityLine, zip].filter(Boolean).join(" ");
+  return [street, withZip].filter(Boolean).join(" · ");
+}
+
+function brandedPromotionCopy(input: {
+  storeName: string;
+  title: string;
+  body: string;
+  address: string;
+}) {
+  const storeName = input.storeName.trim() || "Your store";
+  const titlePrefix = `${storeName}: `;
+  const room = Math.max(12, TITLE_MAX - titlePrefix.length);
+  const titleCore = input.title.trim().slice(0, room);
+  const title = `${titlePrefix}${titleCore}`.slice(0, TITLE_MAX);
+
+  const addressLine = input.address ? `\n\n— ${storeName}\n${input.address}` : `\n\n— ${storeName}`;
+  const bodyCoreMax = Math.max(20, BODY_MAX - addressLine.length);
+  const body = `${input.body.trim().slice(0, bodyCoreMax)}${addressLine}`.slice(
+    0,
+    BODY_MAX + 80
+  );
+
+  return { title, body, storeName };
+}
+
 /**
  * Pilot audience: linked store customers who are not suspended and have at least
  * one customer/web push token. Dual marketing opt-in defaults were mass-reset to
@@ -107,10 +144,10 @@ export async function sendStoreCustomerMessageAction(input: {
     return { error: "Only owners and managers can message customers." };
   }
 
-  const title = input.title.trim().slice(0, TITLE_MAX);
-  const body = input.body.trim().slice(0, BODY_MAX);
-  if (title.length < 3) return { error: "Add a short title." };
-  if (body.length < 3) return { error: "Add a short message." };
+  const rawTitle = input.title.trim().slice(0, TITLE_MAX);
+  const rawBody = input.body.trim().slice(0, BODY_MAX);
+  if (rawTitle.length < 3) return { error: "Add a short title." };
+  if (rawBody.length < 3) return { error: "Add a short message." };
 
   const limited = await consumeRateLimit({
     bucket: "store-customer-message",
@@ -124,7 +161,15 @@ export async function sendStoreCustomerMessageAction(input: {
     return { ok: true as const, sent: 0, demo: true as const };
   }
 
-  const { admin, userIds, error } = await reachableCustomerIds(workspace.store.id);
+  const store = workspace.store;
+  const branded = brandedPromotionCopy({
+    storeName: store.name,
+    title: rawTitle,
+    body: rawBody,
+    address: formatStoreAddress(store),
+  });
+
+  const { admin, userIds, error } = await reachableCustomerIds(store.id);
   if (error) return { error: "Could not load customers to message." };
 
   if (!userIds.length) {
@@ -136,23 +181,33 @@ export async function sendStoreCustomerMessageAction(input: {
 
   let sent = 0;
   for (const customerId of userIds) {
+    const { data: inserted } = await admin
+      .from("notifications")
+      .insert({
+        user_id: customerId,
+        type: "store_promotion",
+        title: branded.title,
+        body: branded.body,
+        related_store_id: store.id,
+      })
+      .select("id")
+      .single();
+
+    const notificationId = boundUuid(String(inserted?.id || "")) || undefined;
     await notifyCustomerDevices({
       admin,
       customerId,
-      title,
-      body,
+      title: branded.title,
+      body: branded.body,
       data: {
         type: "store_promotion",
-        storeId: workspace.store.id,
-        url: "/rewards",
+        storeId: store.id,
+        storeName: branded.storeName,
+        ...(notificationId ? { notificationId } : {}),
+        url: notificationId
+          ? `/notifications/${notificationId}`
+          : `/stores/${store.slug || store.id}`,
       },
-    });
-    await admin.from("notifications").insert({
-      user_id: customerId,
-      type: "store_promotion",
-      title,
-      body,
-      related_store_id: workspace.store.id,
     });
     sent += 1;
   }
@@ -160,8 +215,8 @@ export async function sendStoreCustomerMessageAction(input: {
   await logSecurityEvent({
     actorId: profile.id,
     action: "store.customer_message",
-    resource: workspace.store.id,
-    metadata: { title, recipients: sent },
+    resource: store.id,
+    metadata: { title: branded.title, recipients: sent },
   });
 
   return { ok: true as const, sent };

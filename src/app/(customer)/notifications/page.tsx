@@ -18,13 +18,17 @@ import { canRequestWebPush } from "@/lib/pwa";
 import { formatRelativeTime } from "@/lib/utils";
 import type { Notification } from "@/types/database";
 
+function storeLabel(n: Notification) {
+  return n.store?.name || null;
+}
+
 export default function NotificationsPage() {
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [browserPermission, setBrowserPermission] = useState<NotificationPermission | "unsupported">(
-    "default"
-  );
+  const [browserPermission, setBrowserPermission] = useState<
+    NotificationPermission | "unsupported"
+  >("default");
 
   async function load() {
     const data = await getNotificationsAction();
@@ -61,9 +65,13 @@ export default function NotificationsPage() {
     if (subscribed.ok) {
       toast.success("We’ll ping this phone even after you close FINDIT.");
     } else if (subscribed.error === "ios-homescreen") {
-      toast.message("Add FINDIT to your Home Screen to get alerts after you close it.");
+      toast.message(
+        "Add FINDIT to your Home Screen to get alerts after you close it."
+      );
     } else {
-      toast.message("Couldn’t turn on lock-screen alerts. You can still see replies here.");
+      toast.message(
+        "Couldn’t turn on lock-screen alerts. You can still see replies here."
+      );
     }
   }
 
@@ -72,13 +80,20 @@ export default function NotificationsPage() {
       <h1 className="text-2xl font-bold tracking-tight text-ink">Alerts</h1>
       {browserPermission === "default" ? (
         <div className="mt-4">
-          <Button type="button" variant="outline" className="w-full" onClick={enableBrowserAlerts}>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={enableBrowserAlerts}
+          >
             Allow notifications
           </Button>
         </div>
       ) : null}
       {browserPermission === "granted" ? (
-        <p className="mt-3 text-sm text-ink-subtle">Browser alerts are on for this device.</p>
+        <p className="mt-3 text-sm text-ink-subtle">
+          Browser alerts are on for this device.
+        </p>
       ) : null}
       {browserPermission === "denied" ? (
         <p className="mt-3 text-sm text-ink-muted">
@@ -96,37 +111,60 @@ export default function NotificationsPage() {
           />
         ) : (
           <Card padded={false} className="overflow-hidden">
-            {items.map((n, i) => (
-              <button
-                key={n.id}
-                type="button"
-                className={`flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-black/[0.03] ${
-                  i < items.length - 1 ? "border-b border-hairline-strong" : ""
-                }`}
-                onClick={async () => {
-                  await markNotificationReadAction(n.id);
-                  if (n.related_request_id) {
-                    router.push(`/requests/${n.related_request_id}`);
-                    return;
-                  }
-                  load();
-                }}
-              >
-                <span
-                  aria-hidden
-                  className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                    n.read_at ? "bg-transparent" : "bg-ink"
+            {items.map((n, i) => {
+              const fromStore = storeLabel(n);
+              return (
+                <button
+                  key={n.id}
+                  type="button"
+                  className={`flex w-full items-start gap-3 px-4 py-3.5 text-left hover:bg-black/[0.03] ${
+                    i < items.length - 1 ? "border-b border-hairline-strong" : ""
                   }`}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-ink">{n.title}</span>
-                  <span className="mt-1 block text-sm text-ink-muted">{n.body}</span>
-                  <span className="mt-2 block text-xs text-ink-subtle">
-                    {formatRelativeTime(n.created_at)}
+                  onClick={async () => {
+                    await markNotificationReadAction(n.id);
+                    if (n.related_request_id) {
+                      router.push(`/requests/${n.related_request_id}`);
+                      return;
+                    }
+                    if (n.related_store_id || n.type === "store_promotion") {
+                      router.push(`/notifications/${n.id}`);
+                      return;
+                    }
+                    load();
+                  }}
+                >
+                  {n.store?.logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={n.store.logo_url}
+                      alt=""
+                      className="mt-0.5 h-9 w-9 shrink-0 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                        n.read_at ? "bg-transparent" : "bg-ink"
+                      }`}
+                    />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    {fromStore ? (
+                      <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">
+                        From {fromStore}
+                      </span>
+                    ) : null}
+                    <span className="block font-semibold text-ink">{n.title}</span>
+                    <span className="mt-1 block text-sm text-ink-muted line-clamp-2">
+                      {n.body}
+                    </span>
+                    <span className="mt-2 block text-xs text-ink-subtle">
+                      {formatRelativeTime(n.created_at)}
+                    </span>
                   </span>
-                </span>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </Card>
         )}
       </div>

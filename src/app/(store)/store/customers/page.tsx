@@ -1,24 +1,18 @@
-import Link from "next/link";
 import { Panel } from "@/components/dashboard/shell";
 import { StoreCustomerMessageForm } from "@/components/store/customer-message-form";
+import { StoreCustomersDirectory } from "@/components/store/store-customers-directory";
 import { getStoreCustomersAction } from "@/lib/services/loyalty";
 import { getStoreMessageAudienceAction } from "@/lib/services/store-customer-messages";
 import { getStoreWorkspaceAction } from "@/lib/services/actions";
-import { formatRelativeTime } from "@/lib/utils";
 
-export default async function StoreCustomersPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ cursor?: string }>;
-}) {
-  const { cursor } = await searchParams;
+export default async function StoreCustomersPage() {
   const [result, audience, workspace] = await Promise.all([
-    getStoreCustomersAction(cursor),
+    getStoreCustomersAction({ visit: "all", sort: "last_seen_desc" }),
     getStoreMessageAudienceAction(),
     getStoreWorkspaceAction(),
   ]);
 
-  if ("error" in result && result.error) {
+  if ("error" in result && result.error && result.rows.length === 0) {
     return <p className="text-sm text-ink-muted">{result.error}</p>;
   }
 
@@ -30,9 +24,10 @@ export default async function StoreCustomersPage({
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Customers</h2>
         <p className="mt-1 text-sm text-ink-muted">
-          People who shopped at{" "}
-          <span className="font-medium text-ink">{storeName}</span>. Store
-          loyalty points only (not FINDIT Points).
+          Look up shoppers at{" "}
+          <span className="font-medium text-ink">{storeName}</span>, filter by
+          last visit, and spot birthdays they’ve shared. Loyalty points are
+          store-funded — not FINDIT Points.
         </p>
       </div>
 
@@ -44,47 +39,12 @@ export default async function StoreCustomersPage({
       </Panel>
 
       <Panel title="Store customers">
-        {result.rows.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            Customers appear after your team confirms their first purchase on the Hub.
-          </p>
-        ) : (
-          <ul className="divide-y divide-black/[0.06]">
-            {result.rows.map((customer) => (
-              <li
-                key={customer.id}
-                className="grid gap-2 py-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{customer.displayName}</p>
-                  <p className="text-xs text-ink-muted">
-                    Last activity {formatRelativeTime(customer.lastSeenAt)}
-                    {customer.marketingOptIn ? " · Promo opt-in" : ""}
-                  </p>
-                </div>
-                <p className="tabular-nums text-ink-muted">
-                  {customer.confirmedPurchases} purchase
-                  {customer.confirmedPurchases === 1 ? "" : "s"}
-                </p>
-                <p className="min-w-24 text-right font-semibold tabular-nums">
-                  {customer.pointsBalance} pts
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
+        <StoreCustomersDirectory
+          initialRows={result.rows}
+          initialNextCursor={result.nextCursor}
+          storeName={storeName}
+        />
       </Panel>
-
-      {result.nextCursor ? (
-        <div className="flex justify-end">
-          <Link
-            href={`/store/customers?cursor=${encodeURIComponent(result.nextCursor)}`}
-            className="inline-flex min-h-11 items-center border border-hairline-strong px-4 text-sm font-semibold"
-          >
-            Next customers
-          </Link>
-        </div>
-      ) : null}
     </div>
   );
 }
