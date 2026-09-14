@@ -13,7 +13,9 @@ import {
   confirmPendingPurchaseAction,
   confirmLookupPurchaseAction,
   createPendingStoreCustomerAction,
+  listActiveStoreRewardOffersForHubAction,
   lookupHubCustomerAction,
+  redeemStoreRewardOfferAction,
   type CustomerLookupResult,
 } from "@/lib/services/loyalty";
 
@@ -90,6 +92,16 @@ export function HubCustomerWorkspace({
   } | null>(null);
   const [operationId, setOperationId] = useState("");
   const [pendingCreateOperationId, setPendingCreateOperationId] = useState("");
+  const [offers, setOffers] = useState<
+    Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      points_cost: number;
+      max_value_cents: number | null;
+    }>
+  >([]);
+  const [redeemBusyId, setRedeemBusyId] = useState<string | null>(null);
 
   function reset() {
     setStage("home");
@@ -98,8 +110,11 @@ export function HubCustomerWorkspace({
     setCustomer(null);
     setError(null);
     setSuccess(null);
+    setBusy(false);
     setOperationId("");
     setPendingCreateOperationId("");
+    setOffers([]);
+    setRedeemBusyId(null);
   }
 
   useEffect(() => {
@@ -154,6 +169,7 @@ export function HubCustomerWorkspace({
     setCustomer(result);
     setOperationId(crypto.randomUUID());
     setStage("found");
+    void listActiveStoreRewardOffersForHubAction().then(setOffers);
   }
 
   async function createPendingCustomer() {
@@ -169,19 +185,40 @@ export function HubCustomerWorkspace({
         operationId: createOperationId,
       });
       if (!result.ok) {
+        setBusy(false);
         setError(result.error);
         return;
       }
       setCustomer(result.customer);
       setOperationId(crypto.randomUUID());
-      setPendingCreateOperationId("");
+      setBusy(false);
       setStage("found");
+      void listActiveStoreRewardOffersForHubAction().then(setOffers);
     } catch (createError) {
       console.error("[FINDIT Hub] pending rewards creation failed", createError);
-      setError("We couldn’t connect. Try again.");
-    } finally {
       setBusy(false);
+      setError("Could not create store rewards. Try again.");
     }
+  }
+
+  async function redeemOffer(offerId: string) {
+    if (!customer?.relationshipId || redeemBusyId) return;
+    setRedeemBusyId(offerId);
+    setError(null);
+    const result = await redeemStoreRewardOfferAction({
+      offerId,
+      relationshipId: customer.relationshipId,
+      operationId: crypto.randomUUID(),
+    });
+    setRedeemBusyId(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setCustomer({
+      ...customer,
+      pointsBalance: result.pointsBalance,
+    });
   }
 
   async function confirmPurchase() {
@@ -329,6 +366,48 @@ export function HubCustomerWorkspace({
               </p>
             ) : null}
           </div>
+          {offers.length > 0 && customer.relationshipId ? (
+            <div className="mt-6 space-y-2 border-t border-[#E7E2E4] pt-6 text-left">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#81797C]">
+                Redeem
+              </p>
+              {offers.map((offer) => {
+                const canAfford = customer.pointsBalance >= offer.points_cost;
+                const upTo =
+                  offer.max_value_cents != null
+                    ? ` up to $${(offer.max_value_cents / 100).toFixed(
+                        offer.max_value_cents % 100 === 0 ? 0 : 2
+                      )}`
+                    : "";
+                return (
+                  <div
+                    key={offer.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#E7E2E4] px-3 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[#171315]">
+                        {offer.points_cost} pts = {offer.title}
+                        {upTo}
+                      </p>
+                      {offer.description ? (
+                        <p className="mt-0.5 truncate text-xs text-[#81797C]">
+                          {offer.description}
+                        </p>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!canAfford || Boolean(redeemBusyId)}
+                      onClick={() => void redeemOffer(offer.id)}
+                      className="shrink-0 rounded-lg bg-[#171315] px-3 py-2 text-xs font-bold text-white disabled:opacity-35"
+                    >
+                      {redeemBusyId === offer.id ? "…" : "Redeem"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={() => setStage("amount")}

@@ -18,9 +18,7 @@ export default async function ShopperRewardsPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">
           FINDIT Points
         </h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          From using FINDIT.
-        </p>
+        <p className="mt-1 text-sm text-ink-muted">From using FINDIT.</p>
         <ShopperFinditPoints />
       </section>
 
@@ -29,7 +27,7 @@ export default async function ShopperRewardsPage() {
           Store rewards
         </h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Points each store gives you when they confirm a purchase.
+          Points and prizes from each store. Redeem in-store on the Hub.
         </p>
         <div className="mt-3 space-y-3">
           {relationships.length === 0 ? (
@@ -50,8 +48,9 @@ export default async function ShopperRewardsPage() {
               const store = Array.isArray(relationship.store)
                 ? relationship.store[0]
                 : relationship.store;
+              const offers = relationship.offers || [];
               return (
-                <Card key={relationship.id} className="p-5">
+                <Card key={relationship.id} className="space-y-3 p-5">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <p className="truncate font-semibold">
@@ -73,6 +72,36 @@ export default async function ShopperRewardsPage() {
                       </p>
                     </div>
                   </div>
+                  {offers.length > 0 ? (
+                    <ul className="space-y-1.5 border-t border-hairline pt-3">
+                      {offers.map((offer) => {
+                        const ready =
+                          relationship.points_balance >= offer.points_cost;
+                        const upTo =
+                          offer.max_value_cents != null
+                            ? ` up to $${(offer.max_value_cents / 100).toFixed(
+                                offer.max_value_cents % 100 === 0 ? 0 : 2
+                              )}`
+                            : "";
+                        return (
+                          <li
+                            key={offer.id}
+                            className={`text-sm ${
+                              ready ? "text-ink" : "text-ink-muted"
+                            }`}
+                          >
+                            <span className="font-semibold">
+                              {offer.points_cost} pts
+                            </span>
+                            {" = "}
+                            {offer.title}
+                            {upTo}
+                            {ready ? " · ready" : ""}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
                 </Card>
               );
             })

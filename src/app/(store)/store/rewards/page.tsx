@@ -1,12 +1,17 @@
 import { Panel } from "@/components/dashboard/shell";
 import { RewardSettingsForm } from "@/components/store/reward-settings-form";
-import { getStoreRewardSettingsAction } from "@/lib/services/loyalty";
+import { StoreRewardOffersPanel } from "@/components/store/store-reward-offers-panel";
+import {
+  getStoreRewardSettingsAction,
+  listStoreRewardOffersAction,
+} from "@/lib/services/loyalty";
 import { getStoreWorkspaceAction } from "@/lib/services/actions";
 
 export default async function StoreRewardsPage() {
-  const [settings, workspace] = await Promise.all([
+  const [settings, workspace, offers] = await Promise.all([
     getStoreRewardSettingsAction(),
     getStoreWorkspaceAction(),
+    listStoreRewardOffersAction(),
   ]);
   if (!settings) {
     return (
@@ -24,14 +29,17 @@ export default async function StoreRewardsPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Rewards</h2>
         <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-          Points {storeName} gives customers.
+          Set how {storeName} earns points, then add prizes customers can redeem.
           {locationCount > 1
             ? " Switch locations in the sidebar for another store."
             : null}
         </p>
       </div>
-      <Panel title="Loyalty settings">
+      <Panel title="Earn rate">
         <RewardSettingsForm storeName={storeName} initial={settings} />
+      </Panel>
+      <Panel title="Redeemable rewards">
+        <StoreRewardOffersPanel storeName={storeName} initialOffers={offers} />
       </Panel>
     </div>
   );

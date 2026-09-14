@@ -33,6 +33,7 @@ export type CustomerLookupResult =
       pointsPerDollar: number;
       rewardsEnabled: boolean;
       memberSince: string | null;
+      relationshipId: string;
     }
   | {
       status: "pending";
@@ -43,6 +44,7 @@ export type CustomerLookupResult =
       rewardsEnabled: boolean;
       memberSince: string | null;
       storeOnly: true;
+      relationshipId: string;
     }
   | { status: "error"; error: string };
 
@@ -290,13 +292,14 @@ async function lookupCustomerByPhone(rawPhone: string): Promise<
 }
 
 type PendingRelationshipRow = {
+  id: string;
   points_balance: number;
   first_seen_at: string | null;
 };
 
 function pendingCustomer(
   maskedPhone: string,
-  row: PendingRelationshipRow,
+  row: PendingRelationshipRow & { id: string },
   pointsPerDollar: number,
   rewardsEnabled: boolean
 ): Extract<CustomerLookupResult, { status: "pending" }> {
@@ -309,6 +312,7 @@ function pendingCustomer(
     rewardsEnabled,
     memberSince: row.first_seen_at || null,
     storeOnly: true,
+    relationshipId: row.id,
   };
 }
 
@@ -340,7 +344,7 @@ async function lookupPendingCustomer(input: {
   }
   const { data: row, error: relationshipError } = await admin
     .from("store_customers")
-    .select("points_balance, first_seen_at")
+    .select("id, points_balance, first_seen_at")
     .eq("id", claim.store_customer_id)
     .eq("store_id", input.storeId)
     .is("customer_id", null)
@@ -430,7 +434,7 @@ export async function lookupHubCustomerAction(
 
   const { data: relationship, error: relationshipError } = await admin
     .from("store_customers")
-    .select("points_balance, first_seen_at")
+    .select("id, points_balance, first_seen_at")
     .eq("store_id", operator.actor.storeId)
     .eq("customer_id", profile.id)
     .maybeSingle();
@@ -438,15 +442,30 @@ export async function lookupHubCustomerAction(
     return { status: "error", error: "Could not look up that customer." };
   }
 
+  if (!relationship?.id) {
+    return {
+      status: "found",
+      maskedPhone,
+      maskedEmail: maskEmail(profile.email),
+      displayName: safeCustomerName(profile),
+      pointsBalance: 0,
+      pointsPerDollar,
+      rewardsEnabled,
+      memberSince: null,
+      relationshipId: "",
+    };
+  }
+
   return {
     status: "found",
     maskedPhone,
     maskedEmail: maskEmail(profile.email),
     displayName: safeCustomerName(profile),
-    pointsBalance: relationship?.points_balance || 0,
+    pointsBalance: relationship.points_balance || 0,
     pointsPerDollar,
     rewardsEnabled,
-    memberSince: relationship?.first_seen_at || null,
+    memberSince: relationship.first_seen_at || null,
+    relationshipId: relationship.id,
   };
 }
 
@@ -499,10 +518,16 @@ export async function createPendingStoreCustomerAction(input: {
   if (isDemoMode()) {
     return {
       ok: true,
-      customer: pendingCustomer(maskPhoneE164(parsed.e164), {
-        points_balance: 0,
-        first_seen_at: new Date().toISOString(),
-      }, 1, true),
+      customer: pendingCustomer(
+        maskPhoneE164(parsed.e164),
+        {
+          id: crypto.randomUUID(),
+          points_balance: 0,
+          first_seen_at: new Date().toISOString(),
+        },
+        1,
+        true
+      ),
     };
   }
 
@@ -532,7 +557,7 @@ export async function createPendingStoreCustomerAction(input: {
   }
   const { data: relationship, error: relationshipError } = await admin
     .from("store_customers")
-    .select("points_balance, first_seen_at")
+    .select("id, points_balance, first_seen_at")
     .eq("id", row.pending_store_customer_id)
     .eq("store_id", operator.actor.storeId)
     .is("customer_id", null)
@@ -1408,6 +1433,265 @@ export async function updateStoreRewardSettingsAction(input: {
   return { ok: true as const };
 }
 
+export type StoreRewardOfferInput = {
+  title: string;
+  description?: string;
+  pointsCost: number;
+  maxValueCents: number | null;
+  isActive?: boolean;
+};
+
+function normalizeOfferInput(input: StoreRewardOfferInput) {
+  const title = input.title.trim().replace(/\s+/g, " ").slice(0, 80);
+  const description = (input.description || "").trim().slice(0, 280) || null;
+  const pointsCost = Math.floor(Number(input.pointsCost));
+  const maxValueCents =
+    input.maxValueCents == null
+      ? null
+      : Math.floor(Number(input.maxValueCents));
+  if (!title) return { error: "Give the reward a short name." as const };
+  if (!Number.isInteger(pointsCost) || pointsCost < 1 || pointsCost > 10_000_000) {
+    return { error: "Points needed must be between 1 and 10,000,000." as const };
+  }
+  if (
+    maxValueCents != null &&
+    (!Number.isInteger(maxValueCents) ||
+      maxValueCents < 0 ||
+      maxValueCents > 1_000_000_000)
+  ) {
+    return { error: "Max dollar value is out of range." as const };
+  }
+  return {
+    title,
+    description,
+    pointsCost,
+    maxValueCents,
+    isActive: input.isActive !== false,
+  };
+}
+
+export async function listStoreRewardOffersAction() {
+  const workspace = await getStoreWorkspaceAction();
+  if (!workspace?.store?.id || !workspace.canManageStore) return [];
+  if (isDemoMode()) return [];
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data } = await admin
+    .from("store_reward_offers")
+    .select(
+      "id, store_id, title, description, points_cost, max_value_cents, is_active, sort_order, created_at, updated_at"
+    )
+    .eq("store_id", workspace.store.id)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(50);
+  return data || [];
+}
+
+export async function createStoreRewardOfferAction(input: StoreRewardOfferInput) {
+  const profile = await getCurrentProfile();
+  const workspace = await getStoreWorkspaceAction();
+  if (!profile || !workspace?.store?.id || !workspace.canManageStore) {
+    return { ok: false as const, error: "Only owners and managers can add rewards." };
+  }
+  const parsed = normalizeOfferInput(input);
+  if ("error" in parsed) return { ok: false as const, error: parsed.error };
+  if (isDemoMode()) {
+    return {
+      ok: true as const,
+      offer: {
+        id: crypto.randomUUID(),
+        store_id: workspace.store.id,
+        title: parsed.title,
+        description: parsed.description,
+        points_cost: parsed.pointsCost,
+        max_value_cents: parsed.maxValueCents,
+        is_active: parsed.isActive,
+        sort_order: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    };
+  }
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { count } = await admin
+    .from("store_reward_offers")
+    .select("id", { count: "exact", head: true })
+    .eq("store_id", workspace.store.id)
+    .eq("is_active", true);
+  if ((count || 0) >= 25) {
+    return {
+      ok: false as const,
+      error: "This store already has 25 active rewards. Turn one off first.",
+    };
+  }
+  const { data, error } = await admin
+    .from("store_reward_offers")
+    .insert({
+      store_id: workspace.store.id,
+      title: parsed.title,
+      description: parsed.description,
+      points_cost: parsed.pointsCost,
+      max_value_cents: parsed.maxValueCents,
+      is_active: parsed.isActive,
+      sort_order: count || 0,
+    })
+    .select(
+      "id, store_id, title, description, points_cost, max_value_cents, is_active, sort_order, created_at, updated_at"
+    )
+    .single();
+  if (error || !data) {
+    return { ok: false as const, error: "Could not save that reward." };
+  }
+  void logSecurityEvent({
+    actorId: profile.id,
+    action: "store_reward_offer_created",
+    resource: workspace.store.id,
+    metadata: { offerId: data.id, pointsCost: parsed.pointsCost },
+  });
+  return { ok: true as const, offer: data };
+}
+
+export async function updateStoreRewardOfferAction(
+  offerId: string,
+  input: StoreRewardOfferInput & { isActive: boolean }
+) {
+  const profile = await getCurrentProfile();
+  const workspace = await getStoreWorkspaceAction();
+  const id = boundUuid(offerId);
+  if (!profile || !workspace?.store?.id || !workspace.canManageStore || !id) {
+    return { ok: false as const, error: "Only owners and managers can edit rewards." };
+  }
+  const parsed = normalizeOfferInput(input);
+  if ("error" in parsed) return { ok: false as const, error: parsed.error };
+  if (isDemoMode()) return { ok: true as const };
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { error } = await admin
+    .from("store_reward_offers")
+    .update({
+      title: parsed.title,
+      description: parsed.description,
+      points_cost: parsed.pointsCost,
+      max_value_cents: parsed.maxValueCents,
+      is_active: input.isActive,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("store_id", workspace.store.id);
+  if (error) return { ok: false as const, error: "Could not update that reward." };
+  void logSecurityEvent({
+    actorId: profile.id,
+    action: "store_reward_offer_updated",
+    resource: workspace.store.id,
+    metadata: { offerId: id, isActive: input.isActive },
+  });
+  return { ok: true as const };
+}
+
+export async function listActiveStoreRewardOffersForHubAction() {
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return [];
+  if (isDemoMode()) return [];
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data } = await admin
+    .from("store_reward_offers")
+    .select(
+      "id, title, description, points_cost, max_value_cents, is_active, sort_order"
+    )
+    .eq("store_id", operator.actor.storeId)
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(25);
+  return data || [];
+}
+
+export async function redeemStoreRewardOfferAction(input: {
+  offerId: string;
+  relationshipId: string;
+  operationId: string;
+}) {
+  const operator = await requireStoreOperator();
+  if (!operator.ok) return { ok: false as const, error: operator.error };
+  const offerId = boundUuid(input.offerId);
+  const relationshipId = boundUuid(input.relationshipId);
+  const operationId = boundUuid(input.operationId);
+  if (!offerId || !relationshipId || !operationId) {
+    return { ok: false as const, error: "Refresh and try again." };
+  }
+  const limited = await consumeRateLimit({
+    bucket: "confirm-purchase",
+    limit: 30,
+    windowMs: 10 * 60_000,
+    key: `${operator.actor.storeId}:${operator.actor.employeeUserId || operator.actor.hubDeviceId || "hub"}`,
+  });
+  if (!limited.ok) return { ok: false as const, error: limited.error };
+  if (isDemoMode()) {
+    return {
+      ok: true as const,
+      pointsSpent: 0,
+      pointsBalance: 0,
+      title: "Demo reward",
+      maxValueCents: null as number | null,
+      alreadyRedeemed: false,
+    };
+  }
+  const { createServiceClient } = await import("@/lib/supabase/admin");
+  const admin = createServiceClient();
+  const { data, error } = await admin.rpc("redeem_store_reward_offer", {
+    p_store_id: operator.actor.storeId,
+    p_offer_id: offerId,
+    p_store_customer_id: relationshipId,
+    p_idempotency_key: `redeem:${operationId}`,
+    p_employee_user_id: operator.actor.employeeUserId,
+    p_shift_employee_id: operator.actor.shiftEmployeeId,
+    p_hub_device_id: operator.actor.hubDeviceId,
+  });
+  const row = data?.[0] as
+    | {
+        redemption_id: string;
+        points_spent: number;
+        points_balance: number;
+        title: string;
+        max_value_cents: number | null;
+        already_redeemed: boolean;
+      }
+    | undefined;
+  if (error || !row) {
+    const message = error?.message || "";
+    if (message.includes("Not enough points")) {
+      return { ok: false as const, error: "Not enough points for this reward." };
+    }
+    if (message.includes("not available")) {
+      return { ok: false as const, error: "That reward is no longer available." };
+    }
+    console.error("[FINDIT] reward redeem failed", message);
+    return { ok: false as const, error: "Could not redeem that reward." };
+  }
+  void logSecurityEvent({
+    actorId: operator.actor.employeeUserId,
+    action: "store_reward_redeemed",
+    resource: operator.actor.storeId,
+    metadata: {
+      offerId,
+      relationshipId,
+      pointsSpent: row.points_spent,
+      already: row.already_redeemed,
+    },
+  });
+  return {
+    ok: true as const,
+    pointsSpent: row.points_spent,
+    pointsBalance: row.points_balance,
+    title: row.title,
+    maxValueCents: row.max_value_cents,
+    alreadyRedeemed: row.already_redeemed,
+  };
+}
+
 export async function getMyStoreRewardsAction() {
   const profile = await getCurrentProfile();
   if (!profile || profile.account_type !== "customer") return [];
@@ -1433,5 +1717,48 @@ export async function getMyStoreRewardsAction() {
     .is("removed_at", null)
     .order("last_seen_at", { ascending: false })
     .limit(50);
-  return data || [];
+  const rows = data || [];
+  const storeIds = rows
+    .map((row) => {
+      const store = Array.isArray(row.store) ? row.store[0] : row.store;
+      return store?.id as string | undefined;
+    })
+    .filter((id): id is string => Boolean(id));
+  const offersByStore = new Map<
+    string,
+    Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      points_cost: number;
+      max_value_cents: number | null;
+    }>
+  >();
+  if (storeIds.length) {
+    const { data: offers } = await admin
+      .from("store_reward_offers")
+      .select("id, store_id, title, description, points_cost, max_value_cents")
+      .in("store_id", storeIds)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .limit(200);
+    for (const offer of offers || []) {
+      const list = offersByStore.get(offer.store_id) || [];
+      list.push({
+        id: offer.id,
+        title: offer.title,
+        description: offer.description,
+        points_cost: offer.points_cost,
+        max_value_cents: offer.max_value_cents,
+      });
+      offersByStore.set(offer.store_id, list);
+    }
+  }
+  return rows.map((row) => {
+    const store = Array.isArray(row.store) ? row.store[0] : row.store;
+    return {
+      ...row,
+      offers: store?.id ? offersByStore.get(store.id) || [] : [],
+    };
+  });
 }

@@ -664,6 +664,31 @@ export interface StoreRewardSettings {
   updated_at: string;
 }
 
+export interface StoreRewardOffer {
+  id: string;
+  store_id: string;
+  title: string;
+  description: string | null;
+  points_cost: number;
+  max_value_cents: number | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StoreRewardRedemption {
+  id: string;
+  store_id: string;
+  offer_id: string;
+  store_customer_id: string;
+  customer_id: string | null;
+  points_spent: number;
+  max_value_cents: number | null;
+  title: string;
+  created_at: string;
+}
+
 export interface BillingDispute {
   id: string;
   store_id: string;
