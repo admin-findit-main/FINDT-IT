@@ -93,7 +93,7 @@ export default function StoreRequestDetailPage() {
           description: row.description,
         }) ? (
           <p className="mt-2 text-sm font-medium text-ink">
-            Age-restricted — check a government ID at pickup.
+            Age-restricted. Check a government ID at pickup.
           </p>
         ) : null}
       </div>
