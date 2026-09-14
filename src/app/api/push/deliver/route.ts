@@ -1,4 +1,6 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { boundUuid, sanitizeAppPath } from "@findit/domain";
 import { createServiceClient } from "@/lib/supabase/admin";
 import {
   notifyCustomerDevices,
@@ -22,7 +24,39 @@ function authorized(request: Request): boolean {
   if (!secret) return false;
   const header = request.headers.get("authorization") || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-  return token.length > 0 && token === secret;
+  if (!token || token.length !== secret.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+  } catch {
+    return false;
+  }
+}
+
+function sanitizePushData(raw: Record<string, string> | undefined) {
+  const data = raw || {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value !== "string") continue;
+    if (key === "url") {
+      out.url = sanitizeAppPath(value, "/notifications");
+      continue;
+    }
+    if (key === "type" || key === "storeName") {
+      out[key] = value.slice(0, 120);
+      continue;
+    }
+    if (
+      key === "storeId" ||
+      key === "notificationId" ||
+      key === "requestId" ||
+      key === "customerId"
+    ) {
+      const id = boundUuid(value);
+      if (id) out[key] = id;
+    }
+  }
+  if (!out.url) out.url = "/notifications";
+  return out;
 }
 
 export async function POST(request: Request) {
@@ -48,12 +82,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const title = String(body.title || "");
-  const text = String(body.body || "");
+  const title = String(body.title || "").slice(0, 120);
+  const text = String(body.body || "").slice(0, 500);
   const userIds = Array.isArray(body.userIds)
-    ? body.userIds.map((id) => String(id)).filter(Boolean)
+    ? body.userIds
+        .map((id) => boundUuid(String(id)))
+        .filter((id): id is string => Boolean(id))
     : [];
-  const customerId = String(body.customerId || "");
+  const customerId = boundUuid(String(body.customerId || "")) || "";
   if (!title || (!customerId && !userIds.length)) {
     return NextResponse.json(
       { error: "title and customerId or userIds required" },
@@ -61,6 +97,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const data = sanitizePushData(body.data);
   const admin = createServiceClient();
   if (userIds.length) {
     await notifyEmployeeDevices({
@@ -68,7 +105,7 @@ export async function POST(request: Request) {
       userIds,
       title,
       body: text,
-      data: body.data || { url: "/store" },
+      data: { ...data, url: data.url || "/store" },
     });
   }
   if (customerId) {
@@ -77,7 +114,7 @@ export async function POST(request: Request) {
       customerId,
       title,
       body: text,
-      data: body.data || {},
+      data,
     });
   }
 

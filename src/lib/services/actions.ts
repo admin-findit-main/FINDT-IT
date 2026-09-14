@@ -93,6 +93,7 @@ import {
   ROUTABLE_CATEGORY_ALLOWLIST,
   boundUuid,
   boundSlug,
+  sanitizePublicHttpsImageUrl,
   signupSchema,
   sumMonthlyFindGrants,
   totalFindsAllowanceReachedMessage,
@@ -3998,10 +3999,15 @@ export async function updateStoreProfileAction(
     const logo = (input.logoUrl || "").trim();
     if (!logo) {
       patch.logo_url = null;
-    } else if (!/^https:\/\//i.test(logo) || logo.length > 500) {
-      return { error: "Logo must be an https:// image link." };
     } else {
-      patch.logo_url = logo;
+      const safe = sanitizePublicHttpsImageUrl(logo);
+      if (!safe) {
+        return {
+          error:
+            "Logo must be an https:// link to a PNG, JPG, GIF, or WebP image.",
+        };
+      }
+      patch.logo_url = safe;
     }
   }
   if (

@@ -51,10 +51,22 @@ const envSchema = z.object({
 export type AppEnv = z.infer<typeof envSchema>;
 
 export function getEnv(): AppEnv {
-  if (process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error(
-      "The service role key must never be named NEXT_PUBLIC_*. It would ship to the browser."
-    );
+  const dangerousPublic = [
+    "NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY",
+    "NEXT_PUBLIC_RESEND_API_KEY",
+    "NEXT_PUBLIC_STRIPE_SECRET_KEY",
+    "NEXT_PUBLIC_STRIPE_WEBHOOK_SECRET",
+    "NEXT_PUBLIC_WEB_PUSH_VAPID_PRIVATE_KEY",
+    "NEXT_PUBLIC_PUSH_INTERNAL_SECRET",
+    "NEXT_PUBLIC_FASTSPRING_API_PASSWORD",
+    "NEXT_PUBLIC_FASTSPRING_WEBHOOK_SECRET",
+  ];
+  for (const key of dangerousPublic) {
+    if (process.env[key]) {
+      throw new Error(
+        `${key} must never be set. Secrets cannot use the NEXT_PUBLIC_ prefix.`
+      );
+    }
   }
   return envSchema.parse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,

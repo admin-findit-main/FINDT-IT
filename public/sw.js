@@ -9,6 +9,32 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+function sameOriginPath(raw, fallback) {
+  const fallbackPath =
+    typeof fallback === "string" &&
+    fallback.startsWith("/") &&
+    !fallback.startsWith("//")
+      ? fallback
+      : "/notifications";
+  if (!raw || typeof raw !== "string") return fallbackPath;
+  const trimmed = raw.trim();
+  if (!trimmed) return fallbackPath;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      if (url.origin !== self.location.origin) return fallbackPath;
+      const path = `${url.pathname}${url.search}${url.hash}` || "/";
+      if (!path.startsWith("/") || path.startsWith("//")) return fallbackPath;
+      return path;
+    } catch {
+      return fallbackPath;
+    }
+  }
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return fallbackPath;
+  if (trimmed.includes("\\") || /[\s<>'"]/.test(trimmed)) return fallbackPath;
+  return trimmed.slice(0, 500);
+}
+
 self.addEventListener("push", (event) => {
   event.waitUntil(showPushNotification(event));
 });
@@ -19,6 +45,11 @@ async function showPushNotification(event) {
     body: "A store answered your Find.",
     url: "/notifications",
     tag: "findit",
+    type: "",
+    storeId: "",
+    storeName: "",
+    notificationId: "",
+    requestId: "",
   };
   try {
     if (event.data) {
@@ -26,8 +57,15 @@ async function showPushNotification(event) {
       payload = {
         title: parsed.title || payload.title,
         body: parsed.body || payload.body,
-        url: parsed.url || payload.url,
-        tag: parsed.tag || parsed.url || payload.tag,
+        url: sameOriginPath(parsed.url, payload.url),
+        tag: parsed.tag || parsed.notificationId || parsed.url || payload.tag,
+        type: typeof parsed.type === "string" ? parsed.type : "",
+        storeId: typeof parsed.storeId === "string" ? parsed.storeId : "",
+        storeName: typeof parsed.storeName === "string" ? parsed.storeName : "",
+        notificationId:
+          typeof parsed.notificationId === "string" ? parsed.notificationId : "",
+        requestId:
+          typeof parsed.requestId === "string" ? parsed.requestId : "",
       };
     }
   } catch {
@@ -43,7 +81,14 @@ async function showPushNotification(event) {
     body: payload.body,
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
-    data: { url: payload.url },
+    data: {
+      url: payload.url,
+      type: payload.type,
+      storeId: payload.storeId,
+      storeName: payload.storeName,
+      notificationId: payload.notificationId,
+      requestId: payload.requestId,
+    },
     tag: payload.tag,
     requireInteraction: true,
     renotify: true,
@@ -54,8 +99,21 @@ async function showPushNotification(event) {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target =
-    (event.notification.data && event.notification.data.url) || "/notifications";
+  const data = event.notification.data || {};
+  let target = sameOriginPath(data.url, "/notifications");
+  if (
+    (!data.url || data.url === "/notifications") &&
+    data.notificationId &&
+    typeof data.notificationId === "string"
+  ) {
+    target = `/notifications/${data.notificationId}`;
+  } else if (
+    data.requestId &&
+    typeof data.requestId === "string" &&
+    (!data.url || data.url === "/notifications")
+  ) {
+    target = `/requests/${data.requestId}`;
+  }
   event.waitUntil(
     (async () => {
       const all = await self.clients.matchAll({

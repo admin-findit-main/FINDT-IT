@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { sanitizeAppPath } from "@findit/domain";
 
 type WebSubscription = {
   endpoint: string;
@@ -64,11 +65,22 @@ export async function sendWebPush(input: {
     return;
   }
 
+  const url = sanitizeAppPath(input.data.url, "/notifications");
   const payload = JSON.stringify({
     title: input.title,
     body: input.body,
-    url: input.data.url || "/notifications",
-    tag: input.data.requestId || input.data.url || "findit",
+    url,
+    tag:
+      input.data.notificationId ||
+      input.data.requestId ||
+      input.data.storeId ||
+      url ||
+      "findit",
+    type: input.data.type || "",
+    storeId: input.data.storeId || "",
+    storeName: input.data.storeName || "",
+    notificationId: input.data.notificationId || "",
+    requestId: input.data.requestId || "",
   });
 
   await Promise.all(

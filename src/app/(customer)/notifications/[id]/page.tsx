@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { MapPin } from "lucide-react";
+import { sanitizePublicHttpsImageUrl } from "@findit/domain";
 import { Button } from "@/components/ui/button";
 import { Card, Skeleton } from "@/components/ui/primitives";
 import {
@@ -60,6 +61,7 @@ export default function NotificationDetailPage() {
   }
 
   const store = note.store;
+  const logoUrl = sanitizePublicHttpsImageUrl(store?.logo_url);
   const address = store
     ? [
         store.street_address,
@@ -96,11 +98,12 @@ export default function NotificationDetailPage() {
             Sent by this store
           </p>
           <div className="flex items-start gap-3">
-            {store.logo_url ? (
+            {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={store.logo_url}
+                src={logoUrl}
                 alt=""
+                referrerPolicy="no-referrer"
                 className="h-12 w-12 shrink-0 rounded-xl object-cover"
               />
             ) : (

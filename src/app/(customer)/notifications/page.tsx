@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { sanitizePublicHttpsImageUrl } from "@findit/domain";
 import { Button } from "@/components/ui/button";
 import { Card, EmptyState, Skeleton } from "@/components/ui/primitives";
 import {
@@ -20,6 +21,10 @@ import type { Notification } from "@/types/database";
 
 function storeLabel(n: Notification) {
   return n.store?.name || null;
+}
+
+function storeLogo(n: Notification) {
+  return sanitizePublicHttpsImageUrl(n.store?.logo_url);
 }
 
 export default function NotificationsPage() {
@@ -113,6 +118,7 @@ export default function NotificationsPage() {
           <Card padded={false} className="overflow-hidden">
             {items.map((n, i) => {
               const fromStore = storeLabel(n);
+              const logo = storeLogo(n);
               return (
                 <button
                   key={n.id}
@@ -133,11 +139,12 @@ export default function NotificationsPage() {
                     load();
                   }}
                 >
-                  {n.store?.logo_url ? (
+                  {logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={n.store.logo_url}
+                      src={logo}
                       alt=""
+                      referrerPolicy="no-referrer"
                       className="mt-0.5 h-9 w-9 shrink-0 rounded-lg object-cover"
                     />
                   ) : (
