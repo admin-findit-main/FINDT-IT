@@ -156,7 +156,7 @@ export function StoreCustomersDirectory({
         <p className="text-sm text-ink-muted">
           {deferredQ || visit !== "all"
             ? "No customers match that lookup or filter."
-            : "Customers appear after your team confirms their first purchase on the Hub."}
+            : "No customers yet. They show up after a Hub purchase."}
         </p>
       ) : (
         <ul className="divide-y divide-black/[0.06]">

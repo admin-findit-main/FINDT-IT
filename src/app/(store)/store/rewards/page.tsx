@@ -24,11 +24,10 @@ export default async function StoreRewardsPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Rewards</h2>
         <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-          Loyalty points funded by {storeName}.
+          Points {storeName} gives customers.
           {locationCount > 1
-            ? " Switch locations in the sidebar to edit another store."
-            : null}{" "}
-          These are not FINDIT Points.
+            ? " Switch locations in the sidebar for another store."
+            : null}
         </p>
       </div>
       <Panel title="Loyalty settings">

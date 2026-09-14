@@ -24,10 +24,9 @@ export default async function StoreCustomersPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Customers</h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Look up shoppers at{" "}
-          <span className="font-medium text-ink">{storeName}</span>, filter by
-          last visit, and spot birthdays they’ve shared. Loyalty points are
-          store-funded — not FINDIT Points.
+          People who earned points at{" "}
+          <span className="font-medium text-ink">{storeName}</span>. Filter by
+          visit or birthday month.
         </p>
       </div>
 

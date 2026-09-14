@@ -241,7 +241,7 @@ export function HubCustomerWorkspace({
           className="mt-10 flex min-h-24 w-full max-w-xl items-center justify-center gap-4 rounded-2xl bg-[#8E1F2D] px-8 text-xl font-bold text-white transition-colors hover:bg-[#741824] active:bg-[#61131D]"
         >
           <UserRoundSearch className="h-7 w-7" />
-          + FIND CUSTOMER
+          + Find customer
         </button>
       </section>
     );
@@ -289,7 +289,7 @@ export function HubCustomerWorkspace({
           onClick={reset}
           className="mt-5 min-h-12 w-full max-w-sm rounded-xl bg-[#171315] px-8 text-base font-bold text-white md:mt-10 md:min-h-14"
         >
-          DONE
+          Done
         </button>
       </section>
     );
@@ -315,17 +315,17 @@ export function HubCustomerWorkspace({
             </p>
           ) : (
             <p className="mt-3 text-base font-semibold text-[#8E1F2D]">
-              Rewards for this store only · Not a verified FINDIT account
+              Store rewards only (no FINDIT account yet)
             </p>
           )}
           <p className="mt-1 text-base text-[#6D6669]">{customer.maskedPhone}</p>
           <div className="mt-7 border-t border-[#E7E2E4] pt-7">
             <p className="text-3xl font-bold text-[#8E1F2D]">
-              ★ {customer.pointsBalance} POINTS
+              {customer.pointsBalance} points
             </p>
             {customer.memberSince ? (
               <p className="mt-2 text-sm text-[#81797C]">
-                Customer since {new Date(customer.memberSince).toLocaleDateString()}
+                Since {new Date(customer.memberSince).toLocaleDateString()}
               </p>
             ) : null}
           </div>
@@ -334,7 +334,7 @@ export function HubCustomerWorkspace({
             onClick={() => setStage("amount")}
             className="mt-8 min-h-14 w-full rounded-xl bg-[#8E1F2D] px-6 text-base font-bold text-white"
           >
-            ENTER PURCHASE AMOUNT
+            Enter purchase amount
           </button>
           {error ? (
             <p className="mt-4 rounded-xl bg-[#FFF0F1] px-4 py-3 text-sm text-[#8E1F2D]">
@@ -431,7 +431,7 @@ export function HubCustomerWorkspace({
               tone="utility"
               className="text-xs md:text-sm"
             >
-              CLEAR
+              Clear
             </KeypadKey>
             <KeypadKey
               disabled={busy || amountCents === MAX_HUB_AMOUNT_CENTS}
@@ -456,7 +456,7 @@ export function HubCustomerWorkspace({
             tone="primary"
             className="mt-1 px-1 text-[10px] tracking-[0.02em] min-[480px]:text-xs md:mt-2 md:px-4 md:text-base md:tracking-[0.04em]"
           >
-            REVIEW PURCHASE
+            Review purchase
           </KeypadKey>
         </div>
       </section>
@@ -487,8 +487,8 @@ export function HubCustomerWorkspace({
               </p>
               <p className="mt-1 text-sm text-[#6D6669] md:mt-3 md:text-base">
                 {customer.status === "pending"
-                  ? "Points will be saved in rewards for this store only."
-                  : "Points will be awarded to this customer account."}
+                  ? "Saved to this store until they add the phone in FINDIT."
+                  : "Added to their FINDIT account for this store."}
               </p>
             </>
           ) : (
@@ -507,7 +507,7 @@ export function HubCustomerWorkspace({
             onClick={() => void confirmPurchase()}
             className="mt-3 min-h-11 w-full rounded-xl bg-[#8E1F2D] px-6 text-base font-bold text-white disabled:opacity-50 md:mt-8 md:min-h-16 md:text-lg"
           >
-            {busy ? "CONFIRMING…" : "CONFIRM PURCHASE"}
+            {busy ? "Confirming…" : "Confirm purchase"}
           </button>
           <button
             type="button"
@@ -530,11 +530,11 @@ export function HubCustomerWorkspace({
             Customer not found
           </h1>
           <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-[#6D6669]">
-            This phone number isn&apos;t connected to a FINDIT account yet.
+            No FINDIT account uses this phone yet.
           </p>
           <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-[#81797C]">
-            Create rewards for this store only. This does not create or verify a
-            FINDIT account.
+            You can still start store rewards now. When they sign up and add this
+            phone in Profile, their points link to their account.
           </p>
           {error ? (
             <p className="mt-5 rounded-xl bg-[#FFF0F1] px-4 py-3 text-sm text-[#8E1F2D]">
@@ -547,7 +547,7 @@ export function HubCustomerWorkspace({
             onClick={() => void createPendingCustomer()}
             className="mt-8 min-h-14 w-full rounded-xl bg-[#8E1F2D] px-6 text-base font-bold text-white disabled:opacity-50"
           >
-            {busy ? "CREATING…" : "CREATE STORE REWARDS ACCOUNT"}
+            {busy ? "Creating…" : "Start store rewards"}
           </button>
           <button
             type="button"
@@ -614,7 +614,7 @@ export function HubCustomerWorkspace({
               }}
               className="min-h-11 px-2 text-xs font-bold tracking-[0.04em] text-[#6D6669] transition-colors hover:text-[#8E1F2D] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#8E1F2D] disabled:opacity-30"
             >
-              CLEAR NUMBER
+              Clear number
             </button>
           </div>
         </div>
@@ -667,7 +667,7 @@ export function HubCustomerWorkspace({
             tone="primary"
             className="px-0.5 text-[9px] min-[480px]:text-[10px] md:px-0.5 md:text-[11px]"
           >
-            {busy ? "WAIT…" : "SEARCH"}
+            {busy ? "…" : "Search"}
           </KeypadKey>
         </div>
       </div>

@@ -11,37 +11,38 @@ export default async function ShopperRewardsPage() {
     <div className="mx-auto max-w-xl px-5 py-8 pb-12 sm:px-8">
       <h1 className="text-2xl font-bold tracking-tight">Rewards</h1>
       <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-        Two separate programs. They never mix into one balance.
+        FINDIT Points and store points stay separate.
       </p>
 
       <section className="mt-6">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">
-          1 · FINDIT Points
+          FINDIT Points
         </h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Platform rewards for using FINDIT (visits / participation). Run by FINDIT.
+          From using FINDIT.
         </p>
         <ShopperFinditPoints />
       </section>
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-muted">
-          2 · Store rewards
+          Store rewards
         </h2>
         <p className="mt-1 text-sm text-ink-muted">
-          Loyalty funded by each store when they confirm your purchase on the Hub.
+          Points each store gives you when they confirm a purchase.
         </p>
         <div className="mt-3 space-y-3">
           {relationships.length === 0 ? (
             <Card className="p-5">
               <p className="text-sm text-ink-muted">
-                Store points appear after a participating store confirms your purchase.
+                No store points yet. Add your phone in Profile if a store already
+                looked you up on the Hub.
               </p>
               <Link
                 href="/profile"
                 className="mt-3 inline-block text-sm font-semibold underline"
               >
-                Manage your lookup phone
+                Open profile
               </Link>
             </Card>
           ) : (
@@ -57,10 +58,10 @@ export default async function ShopperRewardsPage() {
                         {store?.name || "Store"}
                       </p>
                       <p className="mt-1 text-xs text-ink-muted">
-                        Store-funded · {relationship.confirmed_purchases} confirmed
-                        purchase
-                        {relationship.confirmed_purchases === 1 ? "" : "s"} · Updated{" "}
-                        {formatRelativeTime(relationship.last_seen_at)}
+                        {relationship.confirmed_purchases} purchase
+                        {relationship.confirmed_purchases === 1 ? "" : "s"}
+                        {" · "}
+                        Updated {formatRelativeTime(relationship.last_seen_at)}
                       </p>
                     </div>
                     <div className="text-right">
@@ -68,7 +69,7 @@ export default async function ShopperRewardsPage() {
                         {relationship.points_balance}
                       </p>
                       <p className="text-xs uppercase tracking-wider text-ink-muted">
-                        store pts
+                        pts
                       </p>
                     </div>
                   </div>

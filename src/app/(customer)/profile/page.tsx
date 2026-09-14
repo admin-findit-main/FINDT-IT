@@ -51,7 +51,7 @@ export default function ProfilePage() {
       <CustomerThemeProfileBanner firstName={profile.first_name || profile.display_name} />
       <h1 className="text-2xl font-bold tracking-tight text-ink">Profile</h1>
       <p className="mt-2 text-sm text-ink-muted">
-        Your name, place, and alerts. Plans live on the Plan page.
+        Name, place, phone, and alerts.
       </p>
 
       <ShopperFinditPoints />
@@ -74,28 +74,25 @@ export default function ProfilePage() {
           />
         </div>
         <div>
-          <Label htmlFor="shopper-phone">Phone for in-store rewards (optional)</Label>
+          <Label htmlFor="shopper-phone">Phone for store rewards</Label>
           <Input
             id="shopper-phone"
             type="tel"
             autoComplete="tel"
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
-            placeholder="(xxx)-xxx-xxxx"
+            placeholder="(555) 555-5555"
           />
           <p className="mt-1 text-xs text-ink-muted">
-            This number is self-reported and remains unverified. For convenience,
-            stores can find an email-confirmed account by an exact phone match.
-            Store-only rewards remain at that store until secure phone
-            verification is available.
+            Use the same number the store puts in the Hub. After you save it,
+            store points from that phone show up under Rewards.
           </p>
         </div>
         <div className="space-y-3 border-t border-hairline-strong pt-4">
           <div>
             <Label>Birthday (optional)</Label>
             <p className="mb-2 text-xs text-ink-muted">
-              Add your birthday so stores can offer birthday specials. They only
-              see the month and day if you share it below.
+              Month and day only if you share them with stores for specials.
             </p>
             <div className="grid grid-cols-3 gap-2">
               <div>
@@ -292,10 +289,14 @@ export default function ProfilePage() {
                   : null,
               });
             }
-            toast.success("Saved");
+            toast.success(
+              phoneResult.attachedStoreRewards > 0
+                ? "Saved. Store rewards linked."
+                : "Saved"
+            );
           }}
         >
-          Save changes
+          Save
         </Button>
       </Card>
 

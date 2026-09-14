@@ -103,9 +103,8 @@ export default function ProfileScreen() {
             containerStyle={{ marginBottom: 0 }}
           />
           <Text style={[styles.hint, { color: theme.inkMuted }]}>
-            Self-reported and unverified. An exact phone match can help stores
-            find an email-confirmed account. Store-only rewards remain at that
-            store until secure phone verification is available.
+            Same number the store uses on the Hub. After you save it, store
+            points show under Rewards.
           </Text>
         </GlassCard>
 

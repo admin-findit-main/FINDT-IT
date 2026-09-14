@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/admin";
 import { getSupabasePublishableKey } from "@/lib/config/env";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { logSecurityEvent } from "@/lib/security/audit";
+import { attachPendingClaimsForPhone } from "@/lib/services/pending-store-claim";
 
 export const runtime = "nodejs";
 
@@ -42,7 +43,10 @@ export async function POST(request: Request) {
     const body = (await request.json()) as { phone?: unknown };
     rawPhone = typeof body.phone === "string" ? body.phone.trim() : "";
   } catch {
-    return NextResponse.json({ error: "Enter a valid phone number." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Enter a valid phone number." },
+      { status: 400 }
+    );
   }
 
   const parsed = rawPhone ? normalizePhoneToE164(rawPhone) : null;
@@ -58,46 +62,57 @@ export async function POST(request: Request) {
     .eq("id", user.id)
     .maybeSingle();
   if (!profile || profile.account_type !== "customer") {
-    return NextResponse.json({ error: "Shopper account required." }, { status: 403 });
+    return NextResponse.json(
+      { error: "Shopper account required." },
+      { status: 403 }
+    );
   }
 
-  if (profile.phone_e164 === phoneE164) {
-    return NextResponse.json({
-      ok: true,
-      phoneE164,
-      maskedPhone: phoneE164 ? maskPhoneE164(phoneE164) : null,
-      verified: Boolean(profile.phone_verified),
+  if (profile.phone_e164 !== phoneE164) {
+    const { error } = await admin
+      .from("profiles")
+      .update({
+        phone_e164: phoneE164,
+        phone_verified: false,
+        phone_verified_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+    if (error) {
+      const message =
+        error.code === "23505"
+          ? "That phone number is already connected to another FINDIT account."
+          : "Could not save that phone number.";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+
+    void logSecurityEvent({
+      actorId: user.id,
+      action: "shopper_phone_changed",
+      resource: user.id,
+      metadata: {
+        removed: phoneE164 === null,
+        verified: false,
+        surface: "mobile",
+      },
     });
   }
 
-  const { error } = await admin
-    .from("profiles")
-    .update({
-      phone_e164: phoneE164,
-      phone_verified: false,
-      phone_verified_at: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", user.id);
-  if (error) {
-    const message =
-      error.code === "23505"
-        ? "That phone number is already connected to another FINDIT account."
-        : "Could not save that phone number.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
-
-  void logSecurityEvent({
-    actorId: user.id,
-    action: "shopper_phone_changed",
-    resource: user.id,
-    metadata: { removed: phoneE164 === null, verified: false, surface: "mobile" },
-  });
+  const attachedStoreRewards = phoneE164
+    ? await attachPendingClaimsForPhone({
+        admin,
+        customerId: user.id,
+        phoneE164,
+      })
+    : 0;
 
   return NextResponse.json({
     ok: true,
     phoneE164,
     maskedPhone: phoneE164 ? maskPhoneE164(phoneE164) : null,
-    verified: false,
+    verified: Boolean(
+      profile.phone_e164 === phoneE164 ? profile.phone_verified : false
+    ),
+    attachedStoreRewards,
   });
 }

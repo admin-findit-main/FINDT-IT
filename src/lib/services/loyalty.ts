@@ -154,6 +154,7 @@ export async function saveShopperPhoneAction(
       phoneE164: string | null;
       maskedPhone: string | null;
       verified: boolean;
+      attachedStoreRewards: number;
     }
   | { ok: false; error: string }
 > {
@@ -175,15 +176,6 @@ export async function saveShopperPhoneAction(
   });
   if (!limited.ok) return { ok: false, error: limited.error };
 
-  if (profile.phone_e164 === phoneE164) {
-    return {
-      ok: true,
-      phoneE164,
-      maskedPhone: phoneE164 ? maskPhoneE164(phoneE164) : null,
-      verified: Boolean(profile.phone_verified),
-    };
-  }
-
   if (isDemoMode()) {
     profile.phone_e164 = phoneE164;
     profile.phone_verified = false;
@@ -193,46 +185,64 @@ export async function saveShopperPhoneAction(
       phoneE164,
       maskedPhone: phoneE164 ? maskPhoneE164(phoneE164) : null,
       verified: false,
+      attachedStoreRewards: 0,
     };
   }
 
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
-  const { error } = await admin
-    .from("profiles")
-    .update({
-      phone_e164: phoneE164,
-      phone_verified: false,
-      phone_verified_at: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", profile.id);
+  const { attachPendingClaimsForPhone } = await import(
+    "@/lib/services/pending-store-claim"
+  );
 
-  if (error) {
-    if (error.code === "23505") {
+  if (profile.phone_e164 !== phoneE164) {
+    const { error } = await admin
+      .from("profiles")
+      .update({
+        phone_e164: phoneE164,
+        phone_verified: false,
+        phone_verified_at: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", profile.id);
+
+    if (error) {
+      if (error.code === "23505") {
+        return {
+          ok: false,
+          error: "That phone number is already connected to another FINDIT account.",
+        };
+      }
       return {
         ok: false,
-        error: "That phone number is already connected to another FINDIT account.",
+        error: toPublicError(error.message, "Could not save that phone number."),
       };
     }
-    return {
-      ok: false,
-      error: toPublicError(error.message, "Could not save that phone number."),
-    };
+
+    void logSecurityEvent({
+      actorId: profile.id,
+      action: "shopper_phone_changed",
+      resource: profile.id,
+      metadata: { removed: phoneE164 === null, verified: false },
+    });
   }
 
-  void logSecurityEvent({
-    actorId: profile.id,
-    action: "shopper_phone_changed",
-    resource: profile.id,
-    metadata: { removed: phoneE164 === null, verified: false },
-  });
+  const attachedStoreRewards = phoneE164
+    ? await attachPendingClaimsForPhone({
+        admin,
+        customerId: profile.id,
+        phoneE164,
+      })
+    : 0;
 
   return {
     ok: true,
     phoneE164,
     maskedPhone: phoneE164 ? maskPhoneE164(phoneE164) : null,
-    verified: false,
+    verified: Boolean(
+      profile.phone_e164 === phoneE164 ? profile.phone_verified : false
+    ),
+    attachedStoreRewards,
   };
 }
 
@@ -408,6 +418,15 @@ export async function lookupHubCustomerAction(
     }
     return pending.customer || { status: "not_found", maskedPhone };
   }
+
+  const { attachPendingClaimsForPhone } = await import(
+    "@/lib/services/pending-store-claim"
+  );
+  await attachPendingClaimsForPhone({
+    admin,
+    customerId: profile.id,
+    phoneE164: profile.phone_e164,
+  });
 
   const { data: relationship, error: relationshipError } = await admin
     .from("store_customers")
@@ -1395,6 +1414,16 @@ export async function getMyStoreRewardsAction() {
   if (isDemoMode()) return [];
   const { createServiceClient } = await import("@/lib/supabase/admin");
   const admin = createServiceClient();
+  if (profile.phone_e164) {
+    const { attachPendingClaimsForPhone } = await import(
+      "@/lib/services/pending-store-claim"
+    );
+    await attachPendingClaimsForPhone({
+      admin,
+      customerId: profile.id,
+      phoneE164: profile.phone_e164,
+    });
+  }
   const { data } = await admin
     .from("store_customers")
     .select(
