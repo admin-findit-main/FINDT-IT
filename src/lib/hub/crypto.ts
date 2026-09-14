@@ -1,13 +1,22 @@
 import { createHmac, createHash, randomBytes, randomInt } from "node:crypto";
+import { isProductionRuntime } from "@/lib/config/env";
 
 export function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
 export function pairingPepper(): string {
-  return sha256Hex(
-    `findit-hub-pairing:${process.env.SUPABASE_SERVICE_ROLE_KEY || "demo-pepper"}`
-  );
+  const material =
+    process.env.HUB_PAIRING_PEPPER || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  if (!material) {
+    if (isProductionRuntime()) {
+      throw new Error(
+        "HUB_PAIRING_PEPPER or SUPABASE_SERVICE_ROLE_KEY is required in production."
+      );
+    }
+    return sha256Hex("findit-hub-pairing:demo-pepper");
+  }
+  return sha256Hex(`findit-hub-pairing:${material}`);
 }
 
 export function hashPairingCode(code: string, pepper = pairingPepper()): string {

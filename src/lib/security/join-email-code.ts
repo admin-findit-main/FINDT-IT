@@ -1,4 +1,5 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
+import { isProductionRuntime } from "@/lib/config/env";
 
 export const JOIN_EMAIL_CODE_TTL_MS = 10 * 60_000;
 export const JOIN_EMAIL_CODE_MAX_ATTEMPTS = 5;
@@ -8,11 +9,17 @@ export function generateJoinEmailCode(): string {
 }
 
 function pepper(): string {
-  return (
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  const value =
     process.env.JOIN_EMAIL_CODE_PEPPER ||
-    "findit-join-email-code"
-  );
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    "";
+  if (value) return value;
+  if (isProductionRuntime()) {
+    throw new Error(
+      "JOIN_EMAIL_CODE_PEPPER or SUPABASE_SERVICE_ROLE_KEY is required in production."
+    );
+  }
+  return "findit-join-email-code";
 }
 
 export function hashJoinEmailCode(email: string, code: string): string {

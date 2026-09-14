@@ -1184,6 +1184,7 @@ export async function getStoreCustomersAction(input?: StoreCustomersQuery | stri
   let db = admin
     .from("store_customers")
     .select(
+      // birth_year intentionally omitted — stores only get month/day when shared.
       "id, points_balance, lifetime_points, confirmed_purchases, marketing_opt_in, first_seen_at, last_seen_at, customer:profiles!inner(first_name, display_name, birth_month, birth_day, share_birthday_with_stores)"
     )
     .eq("store_id", workspace.store.id)

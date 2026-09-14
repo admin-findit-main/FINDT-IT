@@ -103,6 +103,7 @@ import {
   type LoginAudience,
 } from "@findit/domain";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
+import { logSecurityEvent } from "@/lib/security/audit";
 import { measurePerf } from "@/lib/perf";
 import {
   generateJoinEmailCode,
@@ -2649,12 +2650,14 @@ export async function inviteEmployeeAction(
 ) {
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Unauthorized" };
+  const id = boundUuid(storeId);
+  if (!id) return { error: "Invalid store" };
 
   if (isDemoMode()) {
     const state = getDemoState();
     const member = state.storeMembers.find(
       (m) =>
-        m.store_id === storeId &&
+        m.store_id === id &&
         m.user_id === profile.id &&
         m.status === "active" &&
         (m.role === "owner" || m.role === "manager")
@@ -2663,7 +2666,7 @@ export async function inviteEmployeeAction(
     const token = crypto.randomUUID().replace(/-/g, "");
     state.invites.push({
       id: crypto.randomUUID(),
-      store_id: storeId,
+      store_id: id,
       email: email.toLowerCase(),
       role,
       token,
@@ -2675,8 +2678,8 @@ export async function inviteEmployeeAction(
   }
 
   const workspace = await getStoreWorkspaceAction();
-  if (!workspace?.canInvite || workspace.store?.id !== storeId) {
-    if (profile.account_type !== "admin") {
+  if (!workspace?.canInvite || workspace.store?.id !== id) {
+    if (!isSoloAdmin(profile)) {
       return { error: "Only owners and managers can invite" };
     }
   }
@@ -2686,7 +2689,7 @@ export async function inviteEmployeeAction(
   const { data, error } = await admin
     .from("store_invites")
     .insert({
-      store_id: storeId,
+      store_id: id,
       email: email.toLowerCase(),
       role,
       invitee_name: inviteeName?.trim() || null,
@@ -2694,6 +2697,12 @@ export async function inviteEmployeeAction(
     .select("token")
     .single();
   if (error) return { error: error.message };
+  await logSecurityEvent({
+    actorId: profile.id,
+    action: "store.invite",
+    resource: id,
+    metadata: { role, email: email.toLowerCase() },
+  });
   return { token: data.token as string, ok: true as const };
 }
 
@@ -3641,10 +3650,12 @@ export async function updateStoreCoverageAction(
 ) {
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Unauthorized" };
+  const id = boundUuid(storeId);
+  if (!id) return { error: "Invalid store" };
 
   if (isDemoMode()) {
     try {
-      const store = demoUpdateStoreSettings(storeId, profile.id, input);
+      const store = demoUpdateStoreSettings(id, profile.id, input);
       return { store };
     } catch (e) {
       return { error: e instanceof Error ? e.message : "Failed" };
@@ -3657,7 +3668,7 @@ export async function updateStoreCoverageAction(
   const { data: membership } = await supabase
     .from("store_members")
     .select("role")
-    .eq("store_id", storeId)
+    .eq("store_id", id)
     .eq("user_id", user.id)
     .eq("status", "active")
     .maybeSingle();
@@ -3673,47 +3684,47 @@ export async function updateStoreCoverageAction(
     if (input.serviceRadiusMiles != null) patch.service_radius_miles = input.serviceRadiusMiles;
     if (input.businessType !== undefined) patch.business_type = input.businessType;
     if (input.acceptingRequests !== undefined) patch.accepting_requests = input.acceptingRequests;
-    await supabase.from("stores").update(patch).eq("id", storeId);
+    await supabase.from("stores").update(patch).eq("id", id);
   }
   if (input.serviceZips) {
-    await supabase.from("store_service_areas").delete().eq("store_id", storeId);
+    await supabase.from("store_service_areas").delete().eq("store_id", id);
     if (input.serviceZips.length) {
       await supabase.from("store_service_areas").insert(
-        input.serviceZips.map((postal_code) => ({ store_id: storeId, postal_code }))
+        input.serviceZips.map((postal_code) => ({ store_id: id, postal_code }))
       );
     }
   }
   if (input.categories) {
-    await supabase.from("store_categories").delete().eq("store_id", storeId);
+    await supabase.from("store_categories").delete().eq("store_id", id);
     if (input.categories.length) {
       await supabase.from("store_categories").insert(
-        input.categories.map((category) => ({ store_id: storeId, category }))
+        input.categories.map((category) => ({ store_id: id, category }))
       );
     }
   }
   if (input.catalogCategoryIds) {
-    await supabase.from("store_catalog_categories").delete().eq("store_id", storeId);
+    await supabase.from("store_catalog_categories").delete().eq("store_id", id);
     if (input.catalogCategoryIds.length) {
       await supabase.from("store_catalog_categories").insert(
-        input.catalogCategoryIds.map((category_id) => ({ store_id: storeId, category_id }))
+        input.catalogCategoryIds.map((category_id) => ({ store_id: id, category_id }))
       );
     }
   }
   if (input.catalogKeywordIds) {
-    await supabase.from("store_catalog_keywords").delete().eq("store_id", storeId);
+    await supabase.from("store_catalog_keywords").delete().eq("store_id", id);
     if (input.catalogKeywordIds.length) {
       await supabase.from("store_catalog_keywords").insert(
-        input.catalogKeywordIds.map((keyword_id) => ({ store_id: storeId, keyword_id }))
+        input.catalogKeywordIds.map((keyword_id) => ({ store_id: id, keyword_id }))
       );
     }
   }
   if (input.customKeywords) {
-    await supabase.from("store_custom_keywords").delete().eq("store_id", storeId);
+    await supabase.from("store_custom_keywords").delete().eq("store_id", id);
     const unique = [...new Set(input.customKeywords.map((k) => k.trim()).filter(Boolean))];
     if (unique.length) {
       await supabase.from("store_custom_keywords").insert(
         unique.map((keyword) => ({
-          store_id: storeId,
+          store_id: id,
           keyword,
           normalized_keyword: keyword.toLowerCase().replace(/\s+/g, " "),
         }))
@@ -3724,7 +3735,7 @@ export async function updateStoreCoverageAction(
     for (const h of input.hours) {
       await supabase.from("store_hours").upsert(
         {
-          store_id: storeId,
+          store_id: id,
           day_of_week: h.day_of_week,
           open_time: h.open_time,
           close_time: h.close_time,
@@ -4040,18 +4051,21 @@ export async function setMemberStatusAction(
 ) {
   const profile = await getCurrentProfile();
   if (!profile) return { error: "Unauthorized" };
+  const id = boundUuid(storeId);
+  const mid = boundUuid(memberId);
+  if (!id || !mid) return { error: "Invalid request" };
 
   if (isDemoMode()) {
     const state = getDemoState();
     const actor = state.storeMembers.find(
       (m) =>
-        m.store_id === storeId &&
+        m.store_id === id &&
         m.user_id === profile.id &&
         m.status === "active" &&
         (m.role === "owner" || m.role === "manager")
     );
     if (!actor) return { error: "Only owners and managers can change staff status" };
-    const target = state.storeMembers.find((m) => m.id === memberId && m.store_id === storeId);
+    const target = state.storeMembers.find((m) => m.id === mid && m.store_id === id);
     if (!target || target.role === "owner") return { error: "Couldn't update that teammate." };
     target.status = status;
     return { ok: true };
@@ -4062,7 +4076,7 @@ export async function setMemberStatusAction(
   const { data: membership } = await supabase
     .from("store_members")
     .select("role")
-    .eq("store_id", storeId)
+    .eq("store_id", id)
     .eq("user_id", user.id)
     .eq("status", "active")
     .maybeSingle();
@@ -4072,8 +4086,8 @@ export async function setMemberStatusAction(
   const { error } = await supabase
     .from("store_members")
     .update({ status })
-    .eq("id", memberId)
-    .eq("store_id", storeId)
+    .eq("id", mid)
+    .eq("store_id", id)
     .neq("role", "owner");
   if (error) return { error: "Couldn't update that teammate." };
   return { ok: true };

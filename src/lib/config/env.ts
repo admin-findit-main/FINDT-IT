@@ -50,6 +50,15 @@ const envSchema = z.object({
 
 export type AppEnv = z.infer<typeof envSchema>;
 
+/** Vercel production, or bare Node production outside Vercel. */
+export function isProductionRuntime(): boolean {
+  if (process.env.VERCEL_ENV === "production") return true;
+  if (process.env.NODE_ENV === "production" && !process.env.VERCEL_ENV) {
+    return true;
+  }
+  return false;
+}
+
 export function getEnv(): AppEnv {
   const dangerousPublic = [
     "NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY",
@@ -67,6 +76,26 @@ export function getEnv(): AppEnv {
         `${key} must never be set. Secrets cannot use the NEXT_PUBLIC_ prefix.`
       );
     }
+  }
+  for (const key of Object.keys(process.env)) {
+    if (
+      key.startsWith("NEXT_PUBLIC_") &&
+      /(SERVICE_ROLE|SECRET|PRIVATE|RESEND_API)/i.test(key) &&
+      process.env[key]
+    ) {
+      throw new Error(
+        `${key} must never be set. Secrets cannot use the NEXT_PUBLIC_ prefix.`
+      );
+    }
+  }
+  if (
+    isProductionRuntime() &&
+    (process.env.FINDIT_DEMO_MODE === "true" ||
+      process.env.NEXT_PUBLIC_FINDIT_DEMO_MODE === "true")
+  ) {
+    throw new Error(
+      "FINDIT_DEMO_MODE cannot be enabled in production. It disables auth middleware."
+    );
   }
   return envSchema.parse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
