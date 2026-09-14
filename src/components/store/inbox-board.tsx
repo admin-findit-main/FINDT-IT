@@ -162,7 +162,7 @@ export function StoreInboxBoard() {
     }
     toast.success(
       type === "in_stock"
-        ? "Marked in stock — customer notified"
+        ? "Marked in stock. Customer notified"
         : type === "can_order"
           ? "Sent to customer"
           : "Marked out of stock"

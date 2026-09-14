@@ -390,8 +390,8 @@ export function StoresMap() {
               <h3 className="font-bold text-ink">How FINDIT works</h3>
               <p className="mt-1.5 text-ink-muted">
                 You ask nearby stores if they have a product. Stores answer In Stock,
-                Out of Stock, or Can Order. You choose where to go. FINDIT is not a
-                checkout cart — it connects you with local stores that participate.
+                Out of Stock, or Can Order. You pick where to go. FINDIT is not
+                checkout. It connects you with local stores.
               </p>
             </section>
             <section>

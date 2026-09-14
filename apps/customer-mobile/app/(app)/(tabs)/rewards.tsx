@@ -50,13 +50,13 @@ export default function RewardsScreen() {
       >
         <ScreenTitle
           title="Rewards"
-          subtitle="FINDIT Points and store rewards stay separate."
+          subtitle="FINDIT Points and store points stay separate."
         />
         <GlassCard>
           <Text style={[styles.name, { color: theme.ink }]}>FINDIT Points</Text>
           <Text style={[styles.muted, { color: theme.inkMuted }]}>
-            Platform participation rewards. Open the FINDIT web Rewards page for your
-            full FINDIT Points balance while mobile parity is finishing.
+            Points from using FINDIT. Full balance is on the web Rewards page for
+            now.
           </Text>
         </GlassCard>
         <Text
@@ -68,12 +68,13 @@ export default function RewardsScreen() {
           STORE REWARDS
         </Text>
         <Text style={[styles.muted, { color: theme.inkMuted, marginBottom: spacing.sm }]}>
-          Points funded by each store after a Hub purchase confirm.
+          Points each store gives you after a Hub purchase.
         </Text>
         {rows.length === 0 ? (
           <GlassCard>
             <Text style={[styles.muted, { color: theme.inkMuted }]}>
-              Store points appear after an employee confirms your purchase.
+              No store points yet. Add your phone in Profile if a store already
+              looked you up.
             </Text>
           </GlassCard>
         ) : (

@@ -139,7 +139,7 @@ export function PlaceFields({
         </div>
       ) : (
         <p className="text-xs leading-relaxed text-ink-subtle">
-          Type your city — we’ll add the ZIP. No street address.
+          Type your city. We’ll fill in the ZIP. No street address.
         </p>
       )}
     </div>

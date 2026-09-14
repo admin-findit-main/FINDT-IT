@@ -598,7 +598,7 @@ export default function RequestDetailPage() {
                               onClick={() => void chooseStore(store.id)}
                             >
                               {selectedStoreId === store.id
-                                ? "Selected — tell store staff when you arrive"
+                                ? "Selected. Tell store staff when you arrive"
                                 : "I’ll go here"}
                             </Button>
                           ) : null}
@@ -698,7 +698,7 @@ export default function RequestDetailPage() {
                   helpful: false,
                 });
                 setFeedbackDone(true);
-                toast.success("Thanks — we’ll keep improving");
+                toast.success("Thanks. We’ll keep improving");
               }}
             >
               Not really

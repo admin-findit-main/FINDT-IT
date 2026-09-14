@@ -94,7 +94,7 @@ export function InstallStep({
           </h1>
           <p className="mt-4 text-base leading-relaxed text-ink-muted">
             {surface === "ios-chrome"
-              ? "You’re in Chrome on iPhone. Follow the steps below — or open this page in Safari for the classic Share button."
+              ? "You’re in Chrome on iPhone. Follow the steps below, or open this page in Safari for the classic Share button."
               : "Add FINDIT to your Home Screen so it opens just like an app."}
           </p>
           <div className="mt-8">

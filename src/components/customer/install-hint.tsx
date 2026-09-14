@@ -65,7 +65,7 @@ export function ShopperInstallHint() {
         {surface === "ios-safari"
           ? "Opens like an app. We’ll show exactly where to tap in Safari."
           : surface === "ios-chrome"
-            ? "You’re in Chrome on iPhone — here’s where to add it."
+            ? "You’re in Chrome on iPhone. Here’s where to add it."
             : surface === "android-manual" || surface === "android-prompt"
               ? "Install from Chrome so FINDIT feels like an app."
               : "Install FINDIT for one-tap access without the browser bar."}

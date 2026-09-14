@@ -146,7 +146,7 @@ const COPY: Record<
     steps: [
       "Tap Share (square with ↑) at the bottom",
       "Scroll and tap Add to Home Screen",
-      "Tap Add — then open FINDIT from your Home Screen",
+      "Tap Add, then open FINDIT from your Home Screen",
     ],
   },
   "ios-chrome": {

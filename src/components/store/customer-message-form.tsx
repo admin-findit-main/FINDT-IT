@@ -45,11 +45,10 @@ export function StoreCustomerMessageForm({
       <div>
         <p className="text-sm font-semibold text-ink">Message your customers</p>
         <p className="mt-1 text-sm text-ink-muted">
-          FINDIT brands each alert with{" "}
-          <span className="font-medium text-ink">{storeName}</span> and your
-          store address so shoppers know it came from you — not every FINDIT
-          store. Reachable shoppers need alerts installed on their phone or
-          Home Screen app.
+          Alerts show as{" "}
+          <span className="font-medium text-ink">{storeName}</span> with your
+          store address. Shoppers need FINDIT installed or added to Home Screen
+          to get them.
         </p>
         <p className="mt-2 text-xs text-ink-subtle">
           Reachable now:{" "}
@@ -82,7 +81,7 @@ export function StoreCustomerMessageForm({
           value={body}
           maxLength={240}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Stop by this weekend — double points on purchases over $20."
+          placeholder="Stop by this weekend. Double points over $20."
           rows={4}
           className="mt-1.5"
         />

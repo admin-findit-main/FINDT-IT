@@ -864,7 +864,7 @@ export default function CustomerHomePage() {
               {loading ? sendStageLabel(sendPercent) : "Find it"}
             </Button>
             <p className="mt-3 text-center text-xs leading-relaxed text-ink-subtle">
-              We’ll ask participating stores near your ZIP. Your contact stays private.
+              We’ll ask stores near your ZIP. Your contact stays private.
             </p>
           </div>
         )}

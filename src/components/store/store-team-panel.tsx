@@ -72,9 +72,9 @@ export function StoreTeamPanel({ storeId }: { storeId: string }) {
         setLastInviteUrl(url);
         try {
           await navigator.clipboard.writeText(url);
-          toast.success("Invite created — link copied");
+          toast.success("Invite created. Link copied.");
         } catch {
-          toast.success("Invite created — copy the link below");
+          toast.success("Invite created. Copy the link below.");
         }
       } else {
         toast.success("Invite created");
